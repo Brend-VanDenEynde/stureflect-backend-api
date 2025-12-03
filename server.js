@@ -1,2 +1,4 @@
-const app = require('./index');
-app.listen(3000, () => console.log('Local server running on :3000'));
+const app = require('./src/app');
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Local server running on :${PORT}`));
