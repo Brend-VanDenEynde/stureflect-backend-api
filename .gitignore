@@ -27,3 +27,5 @@ dist/
 build/
 .out/
 .vercel_build_output/
+
+.instructions
