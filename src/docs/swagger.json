@@ -3,9 +3,13 @@
   "info": {
     "title": "StuReflect Backend API",
     "version": "1.0.0",
-    "description": "API documentatie voor de StuReflect backend",
+    "description": "Uitgebreide API documentatie voor de StuReflect backend. Deze API biedt authenticatie, gebruikersbeheer en GitHub OAuth-integratie.",
     "contact": {
-      "name": "API Support"
+      "name": "API Support",
+      "email": "support@stureflect.com"
+    },
+    "license": {
+      "name": "MIT"
     }
   },
   "servers": [
@@ -21,18 +25,23 @@
   "tags": [
     {
       "name": "General",
-      "description": "Algemene endpoints"
+      "description": "Algemene endpoints voor de API"
+    },
+    {
+      "name": "Authentication",
+      "description": "Authenticatie gerelateerde endpoints (login, registratie)"
     }
   ],
   "paths": {
     "/": {
       "get": {
         "summary": "Root endpoint",
-        "description": "Returns a welcome message from the API",
+        "description": "Retourneert een welkomstbericht van de API. Dit endpoint kan gebruikt worden om te controleren of de API online is.",
+        "operationId": "getRootMessage",
         "tags": ["General"],
         "responses": {
           "200": {
-            "description": "Successful response",
+            "description": "Succesvolle respons met welkomstbericht",
             "content": {
               "text/plain": {
                 "schema": {
@@ -44,10 +53,506 @@
           }
         }
       }
+    },
+    "/users/login": {
+      "post": {
+        "summary": "Log in gebruiker",
+        "description": "Authenticate een gebruiker met e-mailadres en wachtwoord. Retourneert een JWT-token die gebruikt kan worden voor beveiligde endpoints. De token is 1 uur geldig.",
+        "operationId": "loginUser",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "description": "Gebruiker inloggegevens",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com",
+                    "description": "E-mailadres van de gebruiker"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "securePassword123!",
+                    "description": "Wachtwoord van de gebruiker (minimum 6 karakters)"
+                  }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succesvol ingelogd - JWT token ontvangen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE2OTI4MDAwMDAsImV4cCI6MTY5MjgwMzYwMH0.signature",
+                      "description": "JWT-token met 1 uur geldigheid. Gebruik dit token in de Authorization header voor beveiligde endpoints."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ongeldige input - e-mailadres of wachtwoord ontbreekt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "E-mailadres en wachtwoord zijn verplicht."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Gebruiker niet gevonden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Gebruiker niet gevonden."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ongeldige inloggegevens - wachtwoord incorrect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Ongeldig wachtwoord."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Er is iets misgegaan."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/register": {
+      "post": {
+        "summary": "Registreer een nieuwe gebruiker",
+        "description": "Maak een nieuwe gebruikeraccount aan met e-mailadres, naam en wachtwoord. Het wachtwoord wordt versleuteld opgeslagen. Na registratie kan de gebruiker inloggen met de login endpoint.",
+        "operationId": "registerUser",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "description": "Registratie gegevens voor nieuwe gebruiker",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "newuser@example.com",
+                    "description": "Uniek e-mailadres van de nieuwe gebruiker"
+                  },
+                  "name": {
+                    "type": "string",
+                    "example": "John Doe",
+                    "description": "Volledige naam van de gebruiker"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "securePassword123!",
+                    "description": "Wachtwoord van minimaal 6 karakters"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["student", "teacher", "admin"],
+                    "example": "student",
+                    "description": "Optioneel: gebruikersrol. Standaard is 'student'"
+                  }
+                },
+                "required": ["email", "name", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Gebruiker succesvol aangemaakt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "example": 1,
+                      "description": "Unieke gebruiker ID"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "newuser@example.com",
+                      "description": "E-mailadres van de nieuwe gebruiker"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "John Doe",
+                      "description": "Volledige naam van de gebruiker"
+                    },
+                    "role": {
+                      "type": "string",
+                      "example": "student",
+                      "description": "Rol van de gebruiker"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ongeldige input of e-mailadres al in gebruik",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "E-mailadres is al in gebruik."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Er is iets misgegaan."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+      "post": {
+        "summary": "Log in gebruiker",
+        "description": "Authenticate een gebruiker met e-mailadres en wachtwoord. Retourneert een JWT-token die gebruikt kan worden voor beveiligde endpoints. De token is 1 uur geldig.",
+        "operationId": "loginUser",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "description": "Gebruiker inloggegevens",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com",
+                    "description": "E-mailadres van de gebruiker"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "securePassword123!",
+                    "description": "Wachtwoord van de gebruiker (minimum 6 karakters)"
+                  }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succesvol ingelogd - JWT token ontvangen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE2OTI4MDAwMDAsImV4cCI6MTY5MjgwMzYwMH0.signature",
+                      "description": "JWT-token met 1 uur geldigheid. Gebruik dit token in de Authorization header voor beveiligde endpoints."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ongeldige input - e-mailadres of wachtwoord ontbreekt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "E-mailadres en wachtwoord zijn verplicht."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Gebruiker niet gevonden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Gebruiker niet gevonden."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ongeldige inloggegevens - wachtwoord incorrect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Ongeldig wachtwoord."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Er is iets misgegaan."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/register": {
+      "post": {
+        "summary": "Registreer een nieuwe gebruiker",
+        "description": "Maak een nieuwe gebruikeraccount aan met e-mailadres, naam en wachtwoord. Het wachtwoord wordt versleuteld opgeslagen. Na registratie kan de gebruiker inloggen met de login endpoint.",
+        "operationId": "registerUser",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "description": "Registratie gegevens voor nieuwe gebruiker",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "newuser@example.com",
+                    "description": "Uniek e-mailadres van de nieuwe gebruiker"
+                  },
+                  "name": {
+                    "type": "string",
+                    "example": "John Doe",
+                    "description": "Volledige naam van de gebruiker"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "securePassword123!",
+                    "description": "Wachtwoord van minimaal 6 karakters"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["student", "teacher", "admin"],
+                    "example": "student",
+                    "description": "Optioneel: gebruikersrol. Standaard is 'student'"
+                  }
+                },
+                "required": ["email", "name", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Gebruiker succesvol aangemaakt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "example": 1,
+                      "description": "Unieke gebruiker ID"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "newuser@example.com",
+                      "description": "E-mailadres van de nieuwe gebruiker"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "John Doe",
+                      "description": "Volledige naam van de gebruiker"
+                    },
+                    "role": {
+                      "type": "string",
+                      "example": "student",
+                      "description": "Rol van de gebruiker"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ongeldige input of e-mailadres al in gebruik",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "E-mailadres is al in gebruik."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Er is iets misgegaan."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
-    "schemas": {},
-    "securitySchemes": {}
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unieke gebruiker ID"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "E-mailadres van de gebruiker"
+          },
+          "name": {
+            "type": "string",
+            "description": "Volledige naam van de gebruiker"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["student", "teacher", "admin"],
+            "description": "Rol van de gebruiker"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Foutmelding"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Token authentication. BELANGRIJK: Voeg het token toe in de Authorization header, NIET in de request body. Format: 'Authorization: Bearer <your_jwt_token>'. Verkrijg een token via /users/login of /users/register."
+      }
+    }
   }
 }

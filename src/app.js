@@ -28,4 +28,8 @@ app.get('/api-docs.json', (req, res) => {
 const generalRoutes = require('./routes/general');
 app.use('/', generalRoutes);
 
+// Voeg de user-routes toe
+const userRoutes = require('./routes/userRoutes');
+app.use('/users', userRoutes);
+
 module.exports = app;
