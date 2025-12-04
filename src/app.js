@@ -1,6 +1,7 @@
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger.json');
+const db = require('./config/db'); // Voeg databaseconfiguratie toe
 
 const app = express();
 
