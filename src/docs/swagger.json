@@ -22,6 +22,10 @@
     {
       "name": "General",
       "description": "Algemene endpoints"
+    },
+    {
+      "name": "Teacher - Student Management",
+      "description": "Docentendpoints voor student beheer en voortgang tracking"
     }
   ],
   "paths": {
@@ -44,10 +48,608 @@
           }
         }
       }
+    },
+    "/api/teachers/{teacherId}/classes/{classId}/students": {
+      "get": {
+        "summary": "List all students in class",
+        "description": "Haalt alle ingeschreven studenten op voor een specifieke cursus",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "ID van de docent"
+          },
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "ID van de cursus"
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["name", "email", "created_at"], "default": "name" },
+            "description": "Veld om op te sorteren"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["ASC", "DESC"], "default": "ASC" },
+            "description": "Sorteerrichting"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lijst van studenten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StudentListItem"
+                      }
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot cursus"
+          }
+        }
+      },
+      "post": {
+        "summary": "Enroll students in class",
+        "description": "Schrijft één of meerdere studenten in voor een cursus",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "studentIds": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "description": "Array van student IDs"
+                  }
+                },
+                "required": ["studentIds"],
+                "example": { "studentIds": [1, 2, 3] }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Studenten ingeschreven",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "enrolled": { "type": "integer" },
+                        "failed": { "type": "integer" },
+                        "errors": { "type": "array" }
+                      }
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot cursus"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Bulk remove students from class",
+        "description": "Verwijdert meerdere studenten uit een cursus",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "studentIds": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "description": "Array van student IDs"
+                  }
+                },
+                "required": ["studentIds"],
+                "example": { "studentIds": [1, 2] }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Studenten verwijderd",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deleted": { "type": "integer" },
+                        "failed": { "type": "integer" }
+                      }
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot cursus"
+          }
+        }
+      }
+    },
+    "/api/teachers/{teacherId}/classes/{classId}/students/{studentId}": {
+      "delete": {
+        "summary": "Remove student from class",
+        "description": "Verwijdert een student uit een cursus",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student verwijderd",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "studentId": { "type": "integer" },
+                        "classId": { "type": "integer" }
+                      }
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot cursus"
+          },
+          "404": {
+            "description": "Student-cursus combinatie niet gevonden"
+          }
+        }
+      }
+    },
+    "/api/teachers/{teacherId}/students/{studentId}": {
+      "get": {
+        "summary": "Get student profile",
+        "description": "Haalt profiel en basisinformatie van een student op",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Studentprofiel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "$ref": "#/components/schemas/StudentProfile"
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot student"
+          },
+          "404": {
+            "description": "Student niet gevonden"
+          }
+        }
+      }
+    },
+    "/api/teachers/{teacherId}/students/{studentId}/progress": {
+      "get": {
+        "summary": "Get student progress overview",
+        "description": "Haalt voortgangsoverzicht op (inzendingen, scores, statistieken)",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Voortgangsoverzicht",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "$ref": "#/components/schemas/StudentProgress"
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot student"
+          }
+        }
+      }
+    },
+    "/api/teachers/{teacherId}/students/{studentId}/submissions": {
+      "get": {
+        "summary": "Get student submissions",
+        "description": "Haalt alle inzendingen van een student op",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "assignmentId",
+            "in": "query",
+            "schema": { "type": "integer" },
+            "description": "Optioneel: filter op assignment"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["pending", "completed", "failed"] },
+            "description": "Optioneel: filter op status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lijst van inzendingen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Submission"
+                      }
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot student"
+          }
+        }
+      }
+    },
+    "/api/teachers/{teacherId}/students/{studentId}/feedback": {
+      "get": {
+        "summary": "Get student feedback",
+        "description": "Haalt alle feedback (AI en docent) voor een student op",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "submissionId",
+            "in": "query",
+            "schema": { "type": "integer" },
+            "description": "Optioneel: filter op inzending"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lijst van feedback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Feedback"
+                      }
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot student"
+          }
+        }
+      }
+    },
+    "/api/teachers/{teacherId}/students/{studentId}/manual-score": {
+      "put": {
+        "summary": "Set manual score",
+        "description": "Stelt handmatige score in voor een inzending",
+        "tags": ["Teacher - Student Management"],
+        "parameters": [
+          {
+            "name": "teacherId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "submissionId": {
+                    "type": "integer",
+                    "description": "ID van de inzending"
+                  },
+                  "score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Score (0-100)"
+                  }
+                },
+                "required": ["submissionId", "score"],
+                "example": { "submissionId": 42, "score": 85 }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Score ingesteld",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "submissionId": { "type": "integer" },
+                        "score": { "type": "number" }
+                      }
+                    },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen toegang tot student"
+          },
+          "404": {
+            "description": "Inzending niet gevonden"
+          }
+        }
+      }
     }
   },
   "components": {
-    "schemas": {},
+    "schemas": {
+      "StudentListItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "github_id": { "type": "string" },
+          "enrolled_date": { "type": "string", "format": "date-time" },
+          "submission_count": { "type": "integer" },
+          "average_score": { "type": "number" }
+        }
+      },
+      "StudentProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "github_id": { "type": "string" },
+          "role": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "StudentProgress": {
+        "type": "object",
+        "properties": {
+          "submissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Submission"
+            }
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {
+              "total_submissions": { "type": "integer" },
+              "completed_submissions": { "type": "integer" },
+              "pending_submissions": { "type": "integer" },
+              "average_score": { "type": "number" },
+              "highest_score": { "type": "number" },
+              "lowest_score": { "type": "number" }
+            }
+          }
+        }
+      },
+      "Submission": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "assignment_id": { "type": "integer" },
+          "assignment_title": { "type": "string" },
+          "status": { "type": "string" },
+          "ai_score": { "type": "integer" },
+          "manual_score": { "type": "integer" },
+          "final_score": { "type": "integer" },
+          "github_url": { "type": "string" },
+          "commit_sha": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "feedback_count": { "type": "integer" }
+        }
+      },
+      "Feedback": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "submission_id": { "type": "integer" },
+          "assignment_id": { "type": "integer" },
+          "assignment_title": { "type": "string" },
+          "content": { "type": "string" },
+          "reviewer": { "type": "string", "enum": ["ai", "teacher"] },
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "line_number": { "type": "integer" },
+          "suggestion": { "type": "string" },
+          "type": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
     "securitySchemes": {}
   }
 }
