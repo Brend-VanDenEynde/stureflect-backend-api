@@ -285,6 +285,60 @@
           }
         }
       }
+    },
+    "/api/courses": {
+      "get": {
+        "summary": "Haal alle cursussen op",
+        "description": "Retourneert een lijst met alle beschikbare cursussen met hun details (ID, titel, beschrijving, join code en aanmaakdatum).",
+        "operationId": "getAllCourses",
+        "tags": ["Courses"],
+        "responses": {
+          "200": {
+            "description": "Cursussen succesvol opgehaald",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "Status van de request"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Course"
+                      },
+                      "description": "Array van cursussen"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Er is een fout opgetreden bij het ophalen van de cursussen"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -309,6 +363,32 @@
             "type": "string",
             "enum": ["student", "teacher", "admin"],
             "description": "Rol van de gebruiker"
+          }
+        }
+      },
+      "Course": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unieke cursus ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Titel van de cursus"
+          },
+          "description": {
+            "type": "string",
+            "description": "Beschrijving van de cursus"
+          },
+          "join_code": {
+            "type": "string",
+            "description": "Unieke code om lid te worden van de cursus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Aanmaakdatum van de cursus"
           }
         }
       },
