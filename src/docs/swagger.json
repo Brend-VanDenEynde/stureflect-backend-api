@@ -3,9 +3,13 @@
   "info": {
     "title": "StuReflect Backend API",
     "version": "1.0.0",
-    "description": "API documentatie voor de StuReflect backend",
+    "description": "Uitgebreide API documentatie voor de StuReflect backend. Deze API biedt authenticatie, gebruikersbeheer en GitHub OAuth-integratie.",
     "contact": {
-      "name": "API Support"
+      "name": "API Support",
+      "email": "support@stureflect.com"
+    },
+    "license": {
+      "name": "MIT"
     }
   },
   "servers": [
@@ -32,11 +36,12 @@
     "/": {
       "get": {
         "summary": "Root endpoint",
-        "description": "Returns a welcome message from the API",
+        "description": "Retourneert een welkomstbericht van de API. Dit endpoint kan gebruikt worden om te controleren of de API online is.",
+        "operationId": "getRootMessage",
         "tags": ["General"],
         "responses": {
           "200": {
-            "description": "Successful response",
+            "description": "Succesvolle respons met welkomstbericht",
             "content": {
               "text/plain": {
                 "schema": {
