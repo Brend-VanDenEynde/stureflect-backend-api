@@ -25,19 +25,15 @@
   "tags": [
     {
       "name": "General",
-<<<<<<< HEAD
       "description": "Algemene endpoints voor de API"
     },
     {
       "name": "Authentication",
       "description": "Authenticatie gerelateerde endpoints (login, registratie)"
-=======
-      "description": "Algemene endpoints"
     },
     {
       "name": "Courses",
       "description": "Cursus/vak endpoints"
->>>>>>> origin/main
     }
   ],
   "paths": {
@@ -62,7 +58,6 @@
         }
       }
     },
-<<<<<<< HEAD
     "/users/login": {
       "post": {
         "summary": "Log in gebruiker",
@@ -98,22 +93,11 @@
         "responses": {
           "200": {
             "description": "Succesvol ingelogd - JWT token ontvangen",
-=======
-    "/api/courses": {
-      "get": {
-        "summary": "Alle cursussen ophalen",
-        "description": "Geeft een lijst van alle beschikbare cursussen/vakken terug",
-        "tags": ["Courses"],
-        "responses": {
-          "200": {
-            "description": "Lijst van cursussen",
->>>>>>> origin/main
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-<<<<<<< HEAD
                     "token": {
                       "type": "string",
                       "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE2OTI4MDAwMDAsImV4cCI6MTY5MjgwMzYwMH0.signature",
@@ -166,17 +150,6 @@
                     "error": {
                       "type": "string",
                       "example": "Ongeldig wachtwoord."
-=======
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Course"
-                      }
->>>>>>> origin/main
                     }
                   }
                 }
@@ -184,7 +157,6 @@
             }
           },
           "500": {
-<<<<<<< HEAD
             "description": "Interne serverfout",
             "content": {
               "application/json": {
@@ -535,13 +507,6 @@
                       "example": "Er is iets misgegaan."
                     }
                   }
-=======
-            "description": "Server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
->>>>>>> origin/main
                 }
               }
             }
@@ -552,16 +517,11 @@
   },
   "components": {
     "schemas": {
-<<<<<<< HEAD
       "User": {
-=======
-      "Course": {
->>>>>>> origin/main
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
-<<<<<<< HEAD
             "description": "Unieke gebruiker ID"
           },
           "email": {
@@ -577,49 +537,19 @@
             "type": "string",
             "enum": ["student", "teacher", "admin"],
             "description": "Rol van de gebruiker"
-=======
-            "example": 1
-          },
-          "title": {
-            "type": "string",
-            "example": "Web Development"
-          },
-          "description": {
-            "type": "string",
-            "example": "Leer de basis van webontwikkeling"
-          },
-          "join_code": {
-            "type": "string",
-            "example": "WEB2024"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
->>>>>>> origin/main
           }
         }
       },
       "Error": {
         "type": "object",
         "properties": {
-<<<<<<< HEAD
           "error": {
             "type": "string",
             "description": "Foutmelding"
-=======
-          "success": {
-            "type": "boolean",
-            "example": false
-          },
-          "error": {
-            "type": "string",
-            "example": "Error message"
->>>>>>> origin/main
           }
         }
       }
     },
-<<<<<<< HEAD
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
@@ -628,8 +558,5 @@
         "description": "JWT Token authentication. BELANGRIJK: Voeg het token toe in de Authorization header, NIET in de request body. Format: 'Authorization: Bearer <your_jwt_token>'. Verkrijg een token via /users/login of /users/register."
       }
     }
-=======
-    "securitySchemes": {}
->>>>>>> origin/main
   }
 }
