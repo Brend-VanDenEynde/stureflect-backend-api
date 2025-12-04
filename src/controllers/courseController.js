@@ -5,6 +5,7 @@ const getAllCourses = async (req, res) => {
     const result = await pool.query(
       'SELECT id, title, description, join_code, created_at FROM course'
     );
+    console.log(`[DEBUG] GET /api/courses - Fetched ${result.rows.length} courses`);
     res.status(200).json({
       success: true,
       data: result.rows
