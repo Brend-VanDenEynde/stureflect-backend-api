@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const leerlingBeheer = require('../Docent/LeerlingBeheer');
+const docentController = require('../controllers/docentController');
 
 /**
  * GET /api/teachers/:teacherId/classes/:classId/students
@@ -12,7 +12,7 @@ router.get('/teachers/:teacherId/classes/:classId/students', async (req, res) =>
     const { sortBy = 'name', order = 'ASC' } = req.query;
 
     // Validatie: check of teacher eigenaar is van deze class
-    const isOwner = await leerlingBeheer.isTeacherOwnerOfClass(teacherId, classId);
+    const isOwner = await docentController.isTeacherOwnerOfClass(teacherId, classId);
     if (!isOwner) {
       return res.status(403).json({
         success: false,
@@ -21,7 +21,7 @@ router.get('/teachers/:teacherId/classes/:classId/students', async (req, res) =>
       });
     }
 
-    const students = await leerlingBeheer.getStudentsByClass(classId, sortBy, order);
+    const students = await docentController.getStudentsByClass(classId, sortBy, order);
 
     res.status(200).json({
       success: true,
@@ -48,7 +48,7 @@ router.get('/teachers/:teacherId/students/:studentId', async (req, res) => {
     const { teacherId, studentId } = req.params;
 
     // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await leerlingBeheer.teacherHasAccessToStudent(teacherId, studentId);
+    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -57,7 +57,7 @@ router.get('/teachers/:teacherId/students/:studentId', async (req, res) => {
       });
     }
 
-    const student = await leerlingBeheer.getStudentProfile(studentId);
+    const student = await docentController.getStudentProfile(studentId);
     if (!student) {
       return res.status(404).json({
         success: false,
@@ -91,7 +91,7 @@ router.get('/teachers/:teacherId/students/:studentId/progress', async (req, res)
     const { teacherId, studentId } = req.params;
 
     // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await leerlingBeheer.teacherHasAccessToStudent(teacherId, studentId);
+    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -100,7 +100,7 @@ router.get('/teachers/:teacherId/students/:studentId/progress', async (req, res)
       });
     }
 
-    const progress = await leerlingBeheer.getStudentProgress(studentId);
+    const progress = await docentController.getStudentProgress(studentId);
 
     res.status(200).json({
       success: true,
@@ -128,7 +128,7 @@ router.get('/teachers/:teacherId/students/:studentId/submissions', async (req, r
     const { assignmentId, status = null } = req.query;
 
     // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await leerlingBeheer.teacherHasAccessToStudent(teacherId, studentId);
+    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -137,7 +137,7 @@ router.get('/teachers/:teacherId/students/:studentId/submissions', async (req, r
       });
     }
 
-    const submissions = await leerlingBeheer.getStudentSubmissions(studentId, assignmentId, status);
+    const submissions = await docentController.getStudentSubmissions(studentId, assignmentId, status);
 
     res.status(200).json({
       success: true,
@@ -165,7 +165,7 @@ router.get('/teachers/:teacherId/students/:studentId/feedback', async (req, res)
     const { submissionId = null } = req.query;
 
     // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await leerlingBeheer.teacherHasAccessToStudent(teacherId, studentId);
+    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -174,7 +174,7 @@ router.get('/teachers/:teacherId/students/:studentId/feedback', async (req, res)
       });
     }
 
-    const feedback = await leerlingBeheer.getStudentFeedback(studentId, submissionId);
+    const feedback = await docentController.getStudentFeedback(studentId, submissionId);
 
     res.status(200).json({
       success: true,
@@ -202,7 +202,7 @@ router.post('/teachers/:teacherId/classes/:classId/students', async (req, res) =
     const { studentIds } = req.body; // Array van student IDs, of bulkdata
 
     // Validatie: check of teacher eigenaar is van deze class
-    const isOwner = await leerlingBeheer.isTeacherOwnerOfClass(teacherId, classId);
+    const isOwner = await docentController.isTeacherOwnerOfClass(teacherId, classId);
     if (!isOwner) {
       return res.status(403).json({
         success: false,
@@ -219,7 +219,7 @@ router.post('/teachers/:teacherId/classes/:classId/students', async (req, res) =
       });
     }
 
-    const results = await leerlingBeheer.enrollStudents(classId, studentIds);
+    const results = await docentController.enrollStudents(classId, studentIds);
 
     res.status(201).json({
       success: true,
@@ -246,7 +246,7 @@ router.delete('/teachers/:teacherId/classes/:classId/students/:studentId', async
     const { teacherId, classId, studentId } = req.params;
 
     // Validatie: check of teacher eigenaar is van deze class
-    const isOwner = await leerlingBeheer.isTeacherOwnerOfClass(teacherId, classId);
+    const isOwner = await docentController.isTeacherOwnerOfClass(teacherId, classId);
     if (!isOwner) {
       return res.status(403).json({
         success: false,
@@ -255,7 +255,7 @@ router.delete('/teachers/:teacherId/classes/:classId/students/:studentId', async
       });
     }
 
-    const deleted = await leerlingBeheer.unenrollStudent(classId, studentId);
+    const deleted = await docentController.unenrollStudent(classId, studentId);
     if (!deleted) {
       return res.status(404).json({
         success: false,
@@ -290,7 +290,7 @@ router.delete('/teachers/:teacherId/classes/:classId/students', async (req, res)
     const { studentIds } = req.body;
 
     // Validatie: check of teacher eigenaar is van deze class
-    const isOwner = await leerlingBeheer.isTeacherOwnerOfClass(teacherId, classId);
+    const isOwner = await docentController.isTeacherOwnerOfClass(teacherId, classId);
     if (!isOwner) {
       return res.status(403).json({
         success: false,
@@ -307,7 +307,7 @@ router.delete('/teachers/:teacherId/classes/:classId/students', async (req, res)
       });
     }
 
-    const results = await leerlingBeheer.unenrollMultipleStudents(classId, studentIds);
+    const results = await docentController.unenrollMultipleStudents(classId, studentIds);
 
     res.status(200).json({
       success: true,
@@ -335,7 +335,7 @@ router.put('/teachers/:teacherId/students/:studentId/manual-score', async (req, 
     const { submissionId, score } = req.body;
 
     // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await leerlingBeheer.teacherHasAccessToStudent(teacherId, studentId);
+    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -352,7 +352,7 @@ router.put('/teachers/:teacherId/students/:studentId/manual-score', async (req, 
       });
     }
 
-    const updated = await leerlingBeheer.setManualScore(submissionId, score);
+    const updated = await docentController.setManualScore(submissionId, score);
     if (!updated) {
       return res.status(404).json({
         success: false,
