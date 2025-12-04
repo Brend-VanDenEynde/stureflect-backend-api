@@ -28,4 +28,6 @@ build/
 .out/
 .vercel_build_output/
 
+# Claude Code (lokale instructies)
+.claude/
 .instructions/
