@@ -22,6 +22,10 @@
     {
       "name": "General",
       "description": "Algemene endpoints"
+    },
+    {
+      "name": "Courses",
+      "description": "Cursus/vak endpoints"
     }
   ],
   "paths": {
@@ -44,10 +48,90 @@
           }
         }
       }
+    },
+    "/api/courses": {
+      "get": {
+        "summary": "Alle cursussen ophalen",
+        "description": "Geeft een lijst van alle beschikbare cursussen/vakken terug",
+        "tags": ["Courses"],
+        "responses": {
+          "200": {
+            "description": "Lijst van cursussen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Course"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
-    "schemas": {},
+    "schemas": {
+      "Course": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "example": "Web Development"
+          },
+          "description": {
+            "type": "string",
+            "example": "Leer de basis van webontwikkeling"
+          },
+          "join_code": {
+            "type": "string",
+            "example": "WEB2024"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Error message"
+          }
+        }
+      }
+    },
     "securitySchemes": {}
   }
 }
