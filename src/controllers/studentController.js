@@ -84,6 +84,40 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
 }
 
 /**
+ * Haal alle submissions op van een student
+ * @param {number} studentId - ID van de student
+ * @returns {Promise<Array>}
+ */
+async function getStudentSubmissions(studentId) {
+  try {
+    const result = await db.query(
+      `SELECT
+        s.id,
+        s.assignment_id,
+        a.title as assignment_title,
+        c.id as course_id,
+        c.title as course_title,
+        s.github_url,
+        s.status,
+        s.ai_score,
+        s.manual_score,
+        s.created_at,
+        a.due_date
+      FROM submission s
+      JOIN assignment a ON s.assignment_id = a.id
+      JOIN course c ON a.course_id = c.id
+      WHERE s.user_id = $1
+      ORDER BY s.created_at DESC`,
+      [studentId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Fout bij ophalen submissions:', error);
+    throw error;
+  }
+}
+
+/**
  * Controleer of een student is ingeschreven in een cursus
  * @param {number} studentId - ID van de student
  * @param {number} courseId - ID van de cursus
@@ -105,5 +139,6 @@ async function isStudentEnrolledInCourse(studentId, courseId) {
 module.exports = {
   getStudentCourses,
   getCourseAssignments,
+  getStudentSubmissions,
   isStudentEnrolledInCourse
 };

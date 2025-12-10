@@ -33,6 +33,31 @@ router.get('/me/courses', async (req, res) => {
 });
 
 /**
+ * GET /api/students/me/submissions
+ * Haalt alle submissions op van de ingelogde student
+ */
+router.get('/me/submissions', async (req, res) => {
+  try {
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
+    const submissions = await studentController.getStudentSubmissions(studentId);
+
+    res.status(200).json({
+      success: true,
+      data: submissions,
+      message: `${submissions.length} submissions gevonden`,
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij ophalen submissions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen submissions',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
  * GET /api/students/me/courses/:courseId/assignments
  * Haalt alle opdrachten op voor een specifieke cursus
  * Query params:
