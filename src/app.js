@@ -13,7 +13,7 @@ app.use(cors({
     'http://localhost:3001',
     'http://localhost:5173',
     'http://localhost:5174',
-    'stureflect-frontend.vercel.app'
+    'https://stureflect-frontend.vercel.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
