@@ -11,16 +11,6 @@ router.get('/teachers/:teacherId/classes/:classId/students', async (req, res) =>
     const { teacherId, classId } = req.params;
     const { sortBy = 'name', order = 'ASC' } = req.query;
 
-    // Validatie: check of teacher eigenaar is van deze class
-    const isOwner = await docentController.isTeacherOwnerOfClass(teacherId, classId);
-    if (!isOwner) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze cursus',
-        error: 'FORBIDDEN'
-      });
-    }
-
     const students = await docentController.getStudentsByClass(classId, sortBy, order);
 
     res.status(200).json({
@@ -46,16 +36,6 @@ router.get('/teachers/:teacherId/classes/:classId/students', async (req, res) =>
 router.get('/teachers/:teacherId/students/:studentId', async (req, res) => {
   try {
     const { teacherId, studentId } = req.params;
-
-    // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze student',
-        error: 'FORBIDDEN'
-      });
-    }
 
     const student = await docentController.getStudentProfile(studentId);
     if (!student) {
@@ -90,16 +70,6 @@ router.get('/teachers/:teacherId/students/:studentId/progress', async (req, res)
   try {
     const { teacherId, studentId } = req.params;
 
-    // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze student',
-        error: 'FORBIDDEN'
-      });
-    }
-
     const progress = await docentController.getStudentProgress(studentId);
 
     res.status(200).json({
@@ -126,16 +96,6 @@ router.get('/teachers/:teacherId/students/:studentId/submissions', async (req, r
   try {
     const { teacherId, studentId } = req.params;
     const { assignmentId, status = null } = req.query;
-
-    // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze student',
-        error: 'FORBIDDEN'
-      });
-    }
 
     const submissions = await docentController.getStudentSubmissions(studentId, assignmentId, status);
 
@@ -164,16 +124,6 @@ router.get('/teachers/:teacherId/students/:studentId/feedback', async (req, res)
     const { teacherId, studentId } = req.params;
     const { submissionId = null } = req.query;
 
-    // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze student',
-        error: 'FORBIDDEN'
-      });
-    }
-
     const feedback = await docentController.getStudentFeedback(studentId, submissionId);
 
     res.status(200).json({
@@ -200,16 +150,6 @@ router.post('/teachers/:teacherId/classes/:classId/students', async (req, res) =
   try {
     const { teacherId, classId } = req.params;
     const { studentIds } = req.body; // Array van student IDs, of bulkdata
-
-    // Validatie: check of teacher eigenaar is van deze class
-    const isOwner = await docentController.isTeacherOwnerOfClass(teacherId, classId);
-    if (!isOwner) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze cursus',
-        error: 'FORBIDDEN'
-      });
-    }
 
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       return res.status(400).json({
@@ -245,16 +185,6 @@ router.delete('/teachers/:teacherId/classes/:classId/students/:studentId', async
   try {
     const { teacherId, classId, studentId } = req.params;
 
-    // Validatie: check of teacher eigenaar is van deze class
-    const isOwner = await docentController.isTeacherOwnerOfClass(teacherId, classId);
-    if (!isOwner) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze cursus',
-        error: 'FORBIDDEN'
-      });
-    }
-
     const deleted = await docentController.unenrollStudent(classId, studentId);
     if (!deleted) {
       return res.status(404).json({
@@ -288,16 +218,6 @@ router.delete('/teachers/:teacherId/classes/:classId/students', async (req, res)
   try {
     const { teacherId, classId } = req.params;
     const { studentIds } = req.body;
-
-    // Validatie: check of teacher eigenaar is van deze class
-    const isOwner = await docentController.isTeacherOwnerOfClass(teacherId, classId);
-    if (!isOwner) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze cursus',
-        error: 'FORBIDDEN'
-      });
-    }
 
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       return res.status(400).json({
@@ -333,16 +253,6 @@ router.put('/teachers/:teacherId/students/:studentId/manual-score', async (req, 
   try {
     const { teacherId, studentId } = req.params;
     const { submissionId, score } = req.body;
-
-    // Validatie: check of teacher toegang heeft tot deze student
-    const hasAccess = await docentController.teacherHasAccessToStudent(teacherId, studentId);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Je hebt geen toegang tot deze student',
-        error: 'FORBIDDEN'
-      });
-    }
 
     if (typeof score !== 'number' || score < 0 || score > 100) {
       return res.status(400).json({
