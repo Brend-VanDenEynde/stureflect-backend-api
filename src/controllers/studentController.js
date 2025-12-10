@@ -32,12 +32,24 @@ async function getStudentCourses(studentId) {
  * Haal alle opdrachten op voor een cursus met submission status
  * @param {number} studentId - ID van de student
  * @param {number} courseId - ID van de cursus
+ * @param {object} options - Filter en sort opties
+ * @param {string} options.status - Filter op status: 'submitted', 'pending', 'all'
+ * @param {string} options.sortBy - Sorteer op: 'deadline', 'title', 'created_at'
+ * @param {string} options.order - Sorteerrichting: 'asc', 'desc'
  * @returns {Promise<Array>}
  */
-async function getCourseAssignments(studentId, courseId) {
+async function getCourseAssignments(studentId, courseId, options = {}) {
   try {
-    const result = await db.query(
-      `SELECT
+    const { status = 'all', sortBy = 'deadline', order = 'asc' } = options;
+
+    // Valideer sortBy en order om SQL injection te voorkomen
+    const validSortFields = ['deadline', 'title', 'created_at'];
+    const validOrders = ['asc', 'desc'];
+    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'deadline';
+    const safeOrder = validOrders.includes(order.toLowerCase()) ? order.toUpperCase() : 'ASC';
+
+    let query = `
+      SELECT
         a.id,
         a.title,
         a.description,
@@ -51,9 +63,19 @@ async function getCourseAssignments(studentId, courseId) {
       FROM assignment a
       LEFT JOIN submission s ON a.id = s.assignment_id AND s.user_id = $1
       WHERE a.course_id = $2
-      ORDER BY a.deadline ASC`,
-      [studentId, courseId]
-    );
+    `;
+
+    // Filter op status
+    if (status === 'submitted') {
+      query += ' AND s.id IS NOT NULL';
+    } else if (status === 'pending') {
+      query += ' AND s.id IS NULL';
+    }
+
+    // Sorteer
+    query += ` ORDER BY a.${safeSortBy} ${safeOrder}`;
+
+    const result = await db.query(query, [studentId, courseId]);
     return result.rows;
   } catch (error) {
     console.error('Fout bij ophalen opdrachten:', error);

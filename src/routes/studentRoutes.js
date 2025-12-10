@@ -31,11 +31,16 @@ router.get('/me/courses', async (req, res) => {
 /**
  * GET /api/students/me/courses/:courseId/assignments
  * Haal alle opdrachten op voor een specifieke cursus
+ * Query params:
+ *   - status: 'submitted' | 'pending' | 'all' (default: 'all')
+ *   - sortBy: 'deadline' | 'title' | 'created_at' (default: 'deadline')
+ *   - order: 'asc' | 'desc' (default: 'asc')
  */
 router.get('/me/courses/:courseId/assignments', async (req, res) => {
   try {
     const studentId = req.user.id;
     const courseId = parseInt(req.params.courseId);
+    const { status, sortBy, order } = req.query;
 
     // Controleer of student is ingeschreven
     const isEnrolled = await studentController.isStudentEnrolledInCourse(studentId, courseId);
@@ -46,7 +51,11 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
       });
     }
 
-    const assignments = await studentController.getCourseAssignments(studentId, courseId);
+    const assignments = await studentController.getCourseAssignments(studentId, courseId, {
+      status,
+      sortBy,
+      order
+    });
 
     res.json({
       success: true,
