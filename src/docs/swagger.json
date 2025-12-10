@@ -3,7 +3,7 @@
   "info": {
     "title": "StuReflect Backend API",
     "version": "1.0.0",
-    "description": "Volledige API-documentatie voor StuReflect backend. Deze API biedt volledige ondersteuning voor authenticatie met JWT-tokens, gebruikersbeheer, cursusbeheer en geavanceerde monitoring van docent-leerling interacties. Alle endpoints ondersteunen JSON request/response format.",
+    "description": "Volledige API-documentatie voor StuReflect backend. Deze API biedt volledige ondersteuning voor authenticatie met JWT-tokens, gebruikersbeheer, cursusbeheer. Alle endpoints ondersteunen JSON request/response format.",
     "contact": {
       "name": "API Ondersteuning",
       "email": "support@stureflect.com"
@@ -36,8 +36,8 @@
       "description": "Endpoints voor cursusbeheer en cursusgegevens"
     },
     {
-      "name": "Docent - Leerlingenbeheer",
-      "description": "Geavanceerde endpoints voor docenten om leerlingen en hun voortgang te beheren, inclusief scorebeheer en feedback"
+      "name": "Studenten",
+      "description": "Endpoints voor student self-service: cursussen en opdrachten bekijken"
     }
   ],
   "paths": {
@@ -46,7 +46,9 @@
         "summary": "Controleert of de API beschikbaar is",
         "description": "Dit endpoint retourneert een welkomstbericht en kan gebruikt worden om te verifiëren dat de API online en beschikbaar is. Dit is handig voor health checks en monitoring.",
         "operationId": "getRootMessage",
-        "tags": ["Algemeen"],
+        "tags": [
+          "Algemeen"
+        ],
         "responses": {
           "200": {
             "description": "De API is beschikbaar en retourneert welkomstbericht",
@@ -62,12 +64,14 @@
         }
       }
     },
-    "/users/login": {
+    "/api/auth/login": {
       "post": {
         "summary": "Gebruiker inloggen",
         "description": "Authenticeert een gebruiker met emailadres en wachtwoord. Bij succesvol inloggen wordt een JWT-token geretourneerd dat 1 uur geldig is. Dit token moet gebruikt worden in de Authorization header voor alle beveiligde endpoints. Het token moet in het formaat 'Bearer <token>' meegegeven worden.",
         "operationId": "loginUser",
-        "tags": ["Authenticatie"],
+        "tags": [
+          "Authenticatie"
+        ],
         "requestBody": {
           "required": true,
           "description": "Gebruiker inloggegevens vereist",
@@ -89,23 +93,56 @@
                     "description": "Wachtwoord van de gebruiker (minimaal 6 tekens). Wachtwoorden zijn case-sensitief."
                   }
                 },
-                "required": ["email", "password"]
+                "required": [
+                  "email",
+                  "password"
+                ]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Succesvol ingelogd - JWT-token ontvangen",
+            "description": "Succesvol ingelogd - JWT-tokens ontvangen",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "token": {
+                    "accessToken": {
                       "type": "string",
                       "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE2OTI4MDAwMDAsImV4cCI6MTY5MjgwMzYwMH0.signature",
-                      "description": "JWT-token met 1 uur geldigheid (3600 seconden). Gebruik dit token in de Authorization header: 'Authorization: Bearer <token>'. Na afloop van 1 uur moet opnieuw ingelogd worden."
+                      "description": "JWT access token met 15 minuten geldigheid (15m). Gebruik dit in Authorization header."
+                    },
+                    "refreshToken": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwiaWF0IjoxNjkyODAwMDAwLCJleHAiOjE3MDA1ODAwMDB9.signature",
+                      "description": "Refresh token met 7 dagen geldigheid. Gebruik dit om een nieuw access token op te vragen via /api/auth/refresh."
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "example": 1,
+                          "description": "Gebruiker ID"
+                        },
+                        "email": {
+                          "type": "string",
+                          "example": "gebruiker@voorbeeld.nl",
+                          "description": "Gebruiker email"
+                        },
+                        "name": {
+                          "type": "string",
+                          "example": "Jan Jansen",
+                          "description": "Gebruiker naam"
+                        },
+                        "role": {
+                          "type": "string",
+                          "example": "student",
+                          "description": "Gebruiker rol (student, docent, beheerder)"
+                        }
+                      }
                     }
                   }
                 }
@@ -179,12 +216,14 @@
         }
       }
     },
-    "/users/register": {
+    "/api/auth/register": {
       "post": {
         "summary": "Nieuw gebruikersaccount aanmaken",
         "description": "Registreert een nieuwe gebruiker in het systeem. Het wachtwoord wordt veilig versleuteld opgeslagen met bcrypt. Na succesvolle registratie kan de gebruiker inloggen met het loginendpoint. Elk emailadres kan slechts eenmaal gebruikt worden.",
         "operationId": "registerUser",
-        "tags": ["Authenticatie"],
+        "tags": [
+          "Authenticatie"
+        ],
         "requestBody": {
           "required": true,
           "description": "Registratiegegevens voor nieuwe gebruiker",
@@ -212,19 +251,27 @@
                   },
                   "role": {
                     "type": "string",
-                    "enum": ["student", "docent", "beheerder"],
+                    "enum": [
+                      "student",
+                      "docent",
+                      "beheerder"
+                    ],
                     "example": "student",
                     "description": "Optioneel: gebruikersrol in het systeem. Standaard is 'student'. Beschikbare rollen: student, docent, beheerder."
                   }
                 },
-                "required": ["email", "name", "password"]
+                "required": [
+                  "email",
+                  "name",
+                  "password"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Gebruiker succesvol aangemaakt - Kan nu inloggen",
+            "description": "Gebruiker succesvol aangemaakt",
             "content": {
               "application/json": {
                 "schema": {
@@ -232,7 +279,7 @@
                   "properties": {
                     "id": {
                       "type": "integer",
-                      "example": 1,
+                      "example": 15,
                       "description": "Unieke gebruiker ID in het systeem"
                     },
                     "email": {
@@ -248,7 +295,18 @@
                     "role": {
                       "type": "string",
                       "example": "student",
-                      "description": "Toegewezen rol van de gebruiker"
+                      "description": "Toegewezen rol van de gebruiker (standaard: student)"
+                    },
+                    "github_id": {
+                      "type": "null",
+                      "example": null,
+                      "description": "GitHub ID (null bij normaal registratie)"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2024-12-10T10:30:00Z",
+                      "description": "Aanmaakdatum van het account"
                     }
                   }
                 }
@@ -256,7 +314,7 @@
             }
           },
           "400": {
-            "description": "Ongeldig verzoek - emailadres al in gebruik of ongeldige gegevens",
+            "description": "Ongeldig verzoek - email of naam of wachtwoord ontbreekt, of email al in gebruik",
             "content": {
               "application/json": {
                 "schema": {
@@ -264,7 +322,7 @@
                   "properties": {
                     "error": {
                       "type": "string",
-                      "example": "Dit emailadres is al geregistreerd in het systeem."
+                      "example": "E-mailadres, naam en wachtwoord zijn verplicht."
                     }
                   }
                 }
@@ -290,12 +348,342 @@
         }
       }
     },
+    "/api/auth/refresh": {
+      "post": {
+        "summary": "Token vernieuwen",
+        "description": "Vernieuwt zowel access token als refresh token. Dit endpoint moet gebruikt worden als het access token verlopen is (na 15 minuten). Retourneert een nieuw access token (15 min geldig) en een nieuw refresh token (7 dagen geldig).",
+        "operationId": "refreshToken",
+        "tags": [
+          "Authenticatie"
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Refresh token vereist",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwiaWF0IjoxNjkyODAwMDAwLCJleHAiOjE3MDA1ODAwMDB9.signature",
+                    "description": "Refresh token ontvangen bij login"
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens succesvol vernieuwd",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE2OTI4MDAwMDAsImV4cCI6MTY5MjgwMzYwMH0.signature",
+                      "description": "Nieuw JWT access token (15 minuten geldig)"
+                    },
+                    "refreshToken": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwiaWF0IjoxNjkyODAwMDAwLCJleHAiOjE3MDA1ODAwMDB9.signature",
+                      "description": "Nieuw refresh token (7 dagen geldig)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refresh token ontbreekt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Refresh token is verplicht."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ongeldige of verlopen refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Ongeldig of verlopen refresh token."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refresh token signature is ongeldig",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Ongeldig refresh token."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout bij token vernieuwen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Interne serverfout bij token vernieuwen."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/profile": {
+      "get": {
+        "summary": "Gebruikersprofiel",
+        "description": "Endpoints om het profiel van de ingelogde gebruiker op te halen. Vereist een geldige JWT access token in de Authorization header. Retourneert gebruikersinformatie zoals ID, email, naam, rol en aanmaakdatum.",
+        "operationId": "getProfile",
+        "tags": [
+          "Authenticatie"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gebruikersprofiel succesvol opgehaald",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "example": 1,
+                      "description": "Gebruiker ID"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "gebruiker@voorbeeld.nl",
+                      "description": "Gebruiker email"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "Jan Jansen",
+                      "description": "Gebruiker naam"
+                    },
+                    "role": {
+                      "type": "string",
+                      "example": "student",
+                      "description": "Gebruiker rol (student, docent, beheerder)"
+                    },
+                    "github_id": {
+                      "type": "null",
+                      "example": null,
+                      "description": "GitHub ID (null als niet gekoppeld)"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2024-12-10T10:30:00Z",
+                      "description": "Aanmaakdatum van het account"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Geen geldige JWT token in Authorization header. Zorg dat je een geldige Bearer token meestuurt. Format: 'Authorization: Bearer <accessToken>'",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Token niet gevonden of ongeldig"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Gebruiker niet gevonden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Gebruiker niet gevonden."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Interne serverfout bij ophalen profiel."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Uitloggen - Token revoke",
+        "description": "Revoke het refresh token van de gebruiker. Dit maakt het refresh token ongeldig en voorkomt dat het kan worden gebruikt om nieuwe access tokens op te vragen. De gebruiker moet daarna opnieuw inloggen.\n\nDit endpoint vereist authenticatie via een geldig access token in de Authorization header.",
+        "operationId": "logoutUser",
+        "tags": [
+          "Authenticatie"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ...",
+                    "description": "Het refresh token dat moet worden gerevoked"
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logout succesvol - refresh token is gerevoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Succesvol uitgelogd."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refresh token ontbreekt in request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Refresh token is verplicht."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - geldige JWT access token vereist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Token niet gevonden of ongeldig"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Interne serverfout bij uitloggen."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/courses": {
       "get": {
         "summary": "Alle beschikbare cursussen ophalen",
         "description": "Retourneert een volledige lijst met alle beschikbare cursussen in het systeem. Elke cursus bevat zijn unieke ID, titel, beschrijving en deelcode. Dit endpoint biedt een overzicht van alle cursussen waar leerlingen zich bij kunnen aansluiten.",
         "operationId": "getAllCourses",
-        "tags": ["Cursussen"],
+        "tags": [
+          "Cursussen"
+        ],
         "responses": {
           "200": {
             "description": "Cursussen succesvol opgehaald",
@@ -312,7 +700,21 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/Cursus"
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
+                        }
                       },
                       "description": "Array met alle beschikbare cursussen"
                     },
@@ -349,42 +751,16 @@
         }
       }
     },
-    "/api/teachers/{teacherId}/classes/{classId}/students": {
+    "/api/students/me/courses": {
       "get": {
-        "summary": "Alle leerlingen van een cursus ophalen",
-        "description": "Haalt een volledige lijst op met alle ingeschreven leerlingen voor een specifieke cursus. Geeft per leerling informatie over hun profiel, inschrijfdatum en voortgang. Kan gesorteerd worden op naam, email of inschrijfdatum. Alleen beschikbaar voor de docent die eigenaar is van deze cursus.",
-        "tags": ["Docent - Leerlingenbeheer"],
-        "parameters": [
-          {
-            "name": "teacherId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de ingelogde docent"
-          },
-          {
-            "name": "classId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de cursus waarvoor leerlingen opgehaald moeten worden"
-          },
-          {
-            "name": "sortBy",
-            "in": "query",
-            "schema": { "type": "string", "enum": ["name", "email", "created_at"], "default": "name" },
-            "description": "Veld waarop gesorteerd moet worden: 'name' (voornaam), 'email' (emailadres) of 'created_at' (inschrijfdatum)"
-          },
-          {
-            "name": "order",
-            "in": "query",
-            "schema": { "type": "string", "enum": ["ASC", "DESC"], "default": "ASC" },
-            "description": "Sorteerrichting: 'ASC' (oplopend) of 'DESC' (aflopend)"
-          }
-        ],
+        "summary": "Haal cursussen van ingelogde student op",
+        "description": "Retourneert alle cursussen waar de ingelogde student voor is ingeschreven, inclusief het aantal opdrachten per cursus.",
+        "operationId": "getStudentCourses",
+        "tags": ["Studenten"],
+        "security": [{ "bearerAuth": [] }],
         "responses": {
           "200": {
-            "description": "Lijst met alle leerlingen van de cursus",
+            "description": "Cursussen succesvol opgehaald",
             "content": {
               "application/json": {
                 "schema": {
@@ -394,223 +770,45 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/LeerlingLijstItem"
-                      },
-                      "description": "Array met leerlingen in de cursus"
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer", "example": 1 },
+                          "title": { "type": "string", "example": "Web Development 101" },
+                          "description": { "type": "string", "example": "Learn the basics of web development" },
+                          "assignment_count": { "type": "string", "example": "5" }
+                        }
+                      }
                     },
-                    "message": { "type": "string", "example": "15 leerlingen gevonden in deze cursus" }
+                    "message": { "type": "string", "example": "3 cursussen gevonden" },
+                    "error": { "type": "null", "example": null }
                   }
                 }
               }
             }
           },
-          "403": {
-            "description": "Geen toegang tot deze cursus",
+          "401": {
+            "description": "Niet geauthenticeerd",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Je hebt geen toegang tot deze cursus" }
+                    "error": { "type": "string", "example": "Geen token verstrekt." }
                   }
                 }
               }
             }
           },
           "500": {
-            "description": "Interne serverfout",
+            "description": "Server error",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Fout bij ophalen leerlingen" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Leerlingen inschrijven in cursus",
-        "description": "Schrijft één of meerdere leerlingen in voor een cursus. Accepteert een array met leerling IDs. Retourneert het aantal succesvol ingeschreven leerlingen en mogelijke fouten. Alleen beschikbaar voor de eigenaar van de cursus.",
-        "tags": ["Docent - Leerlingenbeheer"],
-        "parameters": [
-          {
-            "name": "teacherId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de docent"
-          },
-          {
-            "name": "classId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de cursus"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "description": "Array met leerling IDs die ingeschreven moeten worden",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "studentIds": {
-                    "type": "array",
-                    "items": { "type": "integer" },
-                    "description": "Array van unieke leerling IDs die ingeschreven moeten worden",
-                    "example": [1, 2, 3, 4, 5]
-                  }
-                },
-                "required": ["studentIds"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Leerlingen succesvol ingeschreven",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "enrolled": { "type": "integer", "example": 5, "description": "Aantal succesvol ingeschreven leerlingen" },
-                        "failed": { "type": "integer", "example": 0, "description": "Aantal mislukte inschrijvingen" },
-                        "errors": { "type": "array", "description": "Array met foutmeldingen voor mislukte inschrijvingen" }
-                      }
-                    },
-                    "message": { "type": "string", "example": "5 leerlingen ingeschreven in de cursus" }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Ongeldig verzoek - studentIds ontbreekt of is leeg",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "studentIds moet een niet-lege array zijn" }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Geen toegang tot cursus",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Je bent niet de eigenaar van deze cursus" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "summary": "Meerdere leerlingen uit cursus verwijderen",
-        "description": "Verwijdert meerdere leerlingen in één operatie uit een cursus. Dit is een bulk operatie die handig is voor groepsverwijderingen. Retourneert het aantal succesvol verwijderde leerlingen.",
-        "tags": ["Docent - Leerlingenbeheer"],
-        "parameters": [
-          {
-            "name": "teacherId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de docent"
-          },
-          {
-            "name": "classId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de cursus"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "description": "Array met leerling IDs die verwijderd moeten worden",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "studentIds": {
-                    "type": "array",
-                    "items": { "type": "integer" },
-                    "description": "Array van leerling IDs die uit de cursus verwijderd moeten worden",
-                    "example": [1, 2]
-                  }
-                },
-                "required": ["studentIds"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Leerlingen succesvol verwijderd",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "deleted": { "type": "integer", "example": 2, "description": "Aantal verwijderde leerlingen" },
-                        "failed": { "type": "integer", "example": 0, "description": "Aantal mislukte verwijderingen" }
-                      }
-                    },
-                    "message": { "type": "string", "example": "2 leerlingen uit de cursus verwijderd" }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Ongeldig verzoek",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "studentIds moet een niet-lege array zijn" }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Geen toegang tot cursus",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false }
+                    "message": { "type": "string", "example": "Fout bij ophalen cursussen" },
+                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
                   }
                 }
               }
@@ -619,309 +817,58 @@
         }
       }
     },
-    "/api/teachers/{teacherId}/classes/{classId}/students/{studentId}": {
-      "delete": {
-        "summary": "Enkele leerling uit cursus verwijderen",
-        "description": "Verwijdert een enkele leerling uit een cursus. Dit endpoint verbreekt de koppeling tussen de leerling en de cursus, maar verwijdert niet de leerling zelf uit het systeem.",
-        "tags": ["Docent - Leerlingenbeheer"],
-        "parameters": [
-          {
-            "name": "teacherId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de docent"
-          },
-          {
-            "name": "classId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de cursus"
-          },
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de leerling die verwijderd moet worden"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Leerling succesvol uit cursus verwijderd",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "studentId": { "type": "integer", "example": 5 },
-                        "classId": { "type": "integer", "example": 1 }
-                      }
-                    },
-                    "message": { "type": "string", "example": "Leerling succesvol uit cursus verwijderd" }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Geen toegang tot cursus",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Leerling-cursus combinatie niet gevonden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Deze leerling is niet ingeschreven in deze cursus" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/teachers/{teacherId}/students/{studentId}": {
+    "/api/students/me/courses/{courseId}/assignments": {
       "get": {
-        "summary": "Leerlingprofiel ophalen",
-        "description": "Haalt gedetailleerde profiel- en basisinformatie van een leerling op. Inclusief persoonlijke gegevens, registratiedatum en contactgegevens. Alleen beschikbaar voor docenten die deze leerling in hun cursussen hebben.",
-        "tags": ["Docent - Leerlingenbeheer"],
+        "summary": "Haal opdrachten van een cursus op",
+        "description": "Retourneert alle opdrachten voor een specifieke cursus waar de student is ingeschreven, inclusief submission status per opdracht.",
+        "operationId": "getStudentCourseAssignments",
+        "tags": ["Studenten"],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           {
-            "name": "teacherId",
+            "name": "courseId",
             "in": "path",
             "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de docent"
-          },
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de leerling"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Leerlingprofiel opgehaald",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "data": {
-                      "$ref": "#/components/schemas/LeerlingProfiel"
-                    },
-                    "message": { "type": "string", "example": "Leerlingprofiel opgehaald" }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Geen toegang tot deze leerling",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Leerling niet gevonden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/teachers/{teacherId}/students/{studentId}/progress": {
-      "get": {
-        "summary": "Voortgangsoverzicht leerling",
-        "description": "Haalt een gedetailleerd voortgangsoverzicht op van een leerling met inzendingen, behaalde scores en statistieken. Geeft inzicht in de totale voortgang, gemiddelde score, en verdeling van inzendingen per status.",
-        "tags": ["Docent - Leerlingenbeheer"],
-        "parameters": [
-          {
-            "name": "teacherId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de docent"
-          },
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de leerling"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Voortgangsoverzicht opgehaald",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "data": {
-                      "$ref": "#/components/schemas/LeerlingVoortgang"
-                    },
-                    "message": { "type": "string", "example": "Voortgang opgehaald" }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Geen toegang tot leerling",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/teachers/{teacherId}/students/{studentId}/submissions": {
-      "get": {
-        "summary": "Alle inzendingen van leerling ophalen",
-        "description": "Haalt alle inzendingen (opdrachten) van een leerling op. Kan gefilterd worden op specifieke opdracht of inzendingsstatus. Bevat informatie over scores (AI en handmatig) en GitHub-koppelingen.",
-        "tags": ["Docent - Leerlingenbeheer"],
-        "parameters": [
-          {
-            "name": "teacherId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de docent"
-          },
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de leerling"
-          },
-          {
-            "name": "assignmentId",
-            "in": "query",
-            "schema": { "type": "integer" },
-            "description": "Optioneel: filter inzendingen op specifieke opdracht ID"
+            "description": "ID van de cursus",
+            "schema": { "type": "integer", "example": 1 }
           },
           {
             "name": "status",
             "in": "query",
-            "schema": { "type": "string", "enum": ["pending", "completed", "failed"], "description": "Optioneel: filter op status - 'pending' (in behandeling), 'completed' (afgerond), 'failed' (mislukt)" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Lijst met inzendingen",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Inzending"
-                      },
-                      "description": "Array met alle inzendingen van de leerling"
-                    },
-                    "message": { "type": "string", "example": "8 inzendingen gevonden" }
-                  }
-                }
-              }
+            "required": false,
+            "description": "Filter op submission status",
+            "schema": {
+              "type": "string",
+              "enum": ["submitted", "pending", "all"],
+              "default": "all"
             }
           },
-          "403": {
-            "description": "Geen toegang tot leerling",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/teachers/{teacherId}/students/{studentId}/feedback": {
-      "get": {
-        "summary": "Alle feedback voor leerling ophalen",
-        "description": "Haalt alle feedback (zowel AI-gegenereerde als handmatig ingevoerde feedback van de docent) op voor een leerling. Kan gefilterd worden op specifieke inzending. Feedback bevat details over problemen, suggesties en ernst niveau.",
-        "tags": ["Docent - Leerlingenbeheer"],
-        "parameters": [
           {
-            "name": "teacherId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de docent"
-          },
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de leerling"
-          },
-          {
-            "name": "submissionId",
+            "name": "sortBy",
             "in": "query",
-            "schema": { "type": "integer" },
-            "description": "Optioneel: filter feedback op specifieke inzending ID"
+            "required": false,
+            "description": "Veld om op te sorteren",
+            "schema": {
+              "type": "string",
+              "enum": ["due_date", "title", "created_at"],
+              "default": "due_date"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sorteerrichting",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "asc"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Lijst met feedback",
+            "description": "Opdrachten succesvol opgehaald",
             "content": {
               "application/json": {
                 "schema": {
@@ -931,137 +878,78 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/Feedback"
-                      },
-                      "description": "Array met feedback items"
-                    },
-                    "message": { "type": "string", "example": "15 feedback items gevonden" }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Geen toegang tot leerling",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/teachers/{teacherId}/students/{studentId}/manual-score": {
-      "put": {
-        "summary": "Handmatige score toekennen",
-        "description": "Stelt een handmatige score in voor een inzending. Dit overschrijft of aanvult de automatisch berekende AI-score. De score moet tussen 0 en 100 liggen. Dit endpoint is bedoeld voor docenten om leerlingen feedback te geven op hun prestaties.",
-        "tags": ["Docent - Leerlingenbeheer"],
-        "parameters": [
-          {
-            "name": "teacherId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de docent"
-          },
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" },
-            "description": "Unieke ID van de leerling"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "description": "Inzending ID en handmatige score",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "submissionId": {
-                    "type": "integer",
-                    "description": "Unieke ID van de inzending waarvoor score gegeven wordt",
-                    "example": 42
-                  },
-                  "score": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 100,
-                    "description": "Score gegeven aan de inzending. Moet tussen 0 en 100 liggen.",
-                    "example": 85
-                  }
-                },
-                "required": ["submissionId", "score"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Score succesvol ingesteld",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "submissionId": { "type": "integer", "example": 42 },
-                        "score": { "type": "number", "example": 85 }
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer", "example": 1 },
+                          "title": { "type": "string", "example": "Build a Portfolio Website" },
+                          "description": { "type": "string", "example": "Create a personal portfolio using HTML, CSS, and JavaScript" },
+                          "due_date": { "type": "string", "format": "date-time", "example": "2025-12-17T09:52:40.014Z" },
+                          "created_at": { "type": "string", "format": "date-time", "example": "2025-12-10T09:52:40.654Z" },
+                          "submission_id": { "type": "integer", "nullable": true, "example": 1 },
+                          "submission_status": { "type": "string", "enum": ["submitted", "pending"], "example": "submitted" }
+                        }
                       }
                     },
-                    "message": { "type": "string", "example": "Score succesvol ingesteld op 85" }
+                    "message": { "type": "string", "example": "2 opdrachten gevonden" },
+                    "error": { "type": "null", "example": null }
                   }
                 }
               }
             }
           },
           "400": {
-            "description": "Ongeldig verzoek - score buiten bereik of ontbreekt",
+            "description": "Ongeldig cursus ID",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Score moet een getal tussen 0 en 100 zijn" }
+                    "message": { "type": "string", "example": "Ongeldig cursus ID" },
+                    "error": { "type": "string", "example": "BAD_REQUEST" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Niet geauthenticeerd",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Geen token verstrekt." }
                   }
                 }
               }
             }
           },
           "403": {
-            "description": "Geen toegang tot leerling",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean", "example": false }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Inzending niet gevonden",
+            "description": "Niet ingeschreven voor cursus",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Inzending niet gevonden" }
+                    "message": { "type": "string", "example": "Je bent niet ingeschreven voor deze cursus" },
+                    "error": { "type": "string", "example": "FORBIDDEN" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Fout bij ophalen opdrachten" },
+                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
                   }
                 }
               }
@@ -1072,121 +960,12 @@
     }
   },
   "components": {
-    "schemas": {
-      "LeerlingLijstItem": {
-        "type": "object",
-        "description": "Vereenvoudigd profiel van een leerling in een cursus voor lijstweergave",
-        "properties": {
-          "id": { "type": "integer", "description": "Unieke leerling ID" },
-          "name": { "type": "string", "description": "Volledige naam van de leerling" },
-          "email": { "type": "string", "format": "email", "description": "Email adres van de leerling" },
-          "github_id": { "type": "string", "description": "GitHub gebruikersnaam (indien gekoppeld)" },
-          "enrolled_date": { "type": "string", "format": "date-time", "description": "Datum en tijd van inschrijving in deze cursus" },
-          "submission_count": { "type": "integer", "description": "Totaal aantal inzendingen van deze leerling" },
-          "average_score": { "type": "number", "description": "Gemiddelde score van alle inzendingen (0-100)" }
-        }
-      },
-      "LeerlingProfiel": {
-        "type": "object",
-        "description": "Gedetailleerd profiel van een leerling met persoonlijke informatie",
-        "properties": {
-          "id": { "type": "integer", "description": "Unieke leerling ID in het systeem" },
-          "name": { "type": "string", "description": "Volledige naam van de leerling" },
-          "email": { "type": "string", "format": "email", "description": "Geregistreerd email adres van de leerling" },
-          "github_id": { "type": "string", "description": "GitHub gebruikersnaam van de leerling" },
-          "role": { "type": "string", "enum": ["student", "docent", "beheerder"], "description": "Rol van de leerling in het systeem" },
-          "created_at": { "type": "string", "format": "date-time", "description": "Datum en tijd van accountaanmaak" },
-          "updated_at": { "type": "string", "format": "date-time", "description": "Datum en tijd van laatste wijziging aan profiel" }
-        }
-      },
-      "LeerlingVoortgang": {
-        "type": "object",
-        "description": "Gedetailleerd voortgangsoverzicht van een leerling inclusief statistieken",
-        "properties": {
-          "submissions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Inzending"
-            },
-            "description": "Array met alle inzendingen van de leerling"
-          },
-          "statistics": {
-            "type": "object",
-            "description": "Statistieken over de voortgang van de leerling",
-            "properties": {
-              "total_submissions": { "type": "integer", "description": "Totaal aantal inzendingen" },
-              "completed_submissions": { "type": "integer", "description": "Aantal afgeronde inzendingen" },
-              "pending_submissions": { "type": "integer", "description": "Aantal inzendingen in behandeling" },
-              "average_score": { "type": "number", "description": "Gemiddelde score van alle inzendingen" },
-              "highest_score": { "type": "number", "description": "Hoogste behaalde score" },
-              "lowest_score": { "type": "number", "description": "Laagste behaalde score" }
-            }
-          }
-        }
-      },
-      "Inzending": {
-        "type": "object",
-        "description": "Details van een inzending (opdracht) door een leerling",
-        "properties": {
-          "id": { "type": "integer", "description": "Unieke inzending ID" },
-          "assignment_id": { "type": "integer", "description": "ID van de opdracht waarvan dit een inzending is" },
-          "assignment_title": { "type": "string", "description": "Titel van de opdracht" },
-          "status": { "type": "string", "enum": ["pending", "completed", "failed"], "description": "Status van de inzending: pending (in behandeling), completed (afgerond), failed (mislukt)" },
-          "ai_score": { "type": "integer", "description": "Automatisch berekende score door AI-systeem (0-100)" },
-          "manual_score": { "type": "integer", "description": "Handmatig toegekende score door docent (0-100)" },
-          "final_score": { "type": "integer", "description": "Definitieve score (kan handmatig of automatisch gegenereerd zijn)" },
-          "github_url": { "type": "string", "format": "url", "description": "Link naar de GitHub repository van deze inzending" },
-          "commit_sha": { "type": "string", "description": "Git commit hash van de inzending" },
-          "created_at": { "type": "string", "format": "date-time", "description": "Datum en tijd van inzending" },
-          "updated_at": { "type": "string", "format": "date-time", "description": "Datum en tijd van laatste update" },
-          "feedback_count": { "type": "integer", "description": "Aantal feedback items voor deze inzending" }
-        }
-      },
-      "Feedback": {
-        "type": "object",
-        "description": "Feedback item op een inzending - kan AI-gegenereerd of handmatig zijn",
-        "properties": {
-          "id": { "type": "integer", "description": "Unieke feedback ID" },
-          "submission_id": { "type": "integer", "description": "ID van de inzending waarop dit feedback betrekking heeft" },
-          "assignment_id": { "type": "integer", "description": "ID van de opdracht" },
-          "assignment_title": { "type": "string", "description": "Titel van de opdracht" },
-          "content": { "type": "string", "description": "Inhoud van het feedback bericht" },
-          "reviewer": { "type": "string", "enum": ["ai", "docent"], "description": "Bron van het feedback: 'ai' (automatisch gegenereerd) of 'docent' (handmatig ingevoerd)" },
-          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"], "description": "Ernstgraad van het feedback: low (laag), medium (gemiddeld), high (hoog), critical (kritiek)" },
-          "line_number": { "type": "integer", "description": "Optioneel: regelnummer in de code waarop feedback betrekking heeft" },
-          "suggestion": { "type": "string", "description": "Optioneel: suggestie voor verbetering" },
-          "type": { "type": "string", "description": "Type feedback (bijv. 'syntax error', 'best practice', 'documentation')" },
-          "created_at": { "type": "string", "format": "date-time", "description": "Datum en tijd van feedback creatie" }
-        }
-      },
-      "Cursus": {
-        "type": "object",
-        "description": "Details van een cursus/vak in het systeem",
-        "properties": {
-          "id": { "type": "integer", "description": "Unieke cursus ID" },
-          "title": { "type": "string", "description": "Titel/naam van de cursus" },
-          "description": { "type": "string", "description": "Beschrijving van de cursus inhoud en doelstellingen" },
-          "join_code": { "type": "string", "description": "Unieke deelcode waarmee leerlingen zich kunnen aansluiten bij deze cursus" },
-          "created_at": { "type": "string", "format": "date-time", "description": "Datum en tijd van cursus aanmaak" }
-        }
-      },
-      "Gebruiker": {
-        "type": "object",
-        "description": "Basisgegevens van een gebruiker in het systeem",
-        "properties": {
-          "id": { "type": "integer", "description": "Unieke gebruiker ID" },
-          "email": { "type": "string", "format": "email", "description": "Uniek email adres van de gebruiker" },
-          "name": { "type": "string", "description": "Volledige naam van de gebruiker" },
-          "role": { "type": "string", "enum": ["student", "docent", "beheerder"], "description": "Rol van de gebruiker in het systeem" }
-        }
-      }
-    },
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT Token authenticatie. BELANGRIJK: Voeg het token toe in de Authorization header, NIET in de request body. Format: 'Authorization: Bearer <uw_jwt_token>'. Verkrijg een token via POST /users/login of POST /users/register. Token geldig voor 1 uur (3600 seconden)."
+        "description": "JWT Bearer Token Authentication. All protected endpoints require a valid JWT token in the Authorization header. Format: 'Authorization: Bearer <token>'. Access tokens are valid for 15 minutes; use the refresh endpoint to obtain new tokens. Tokens are case-sensitive and must include the 'Bearer ' prefix."
       }
     }
   }

@@ -1,7 +1,7 @@
 const db = require('../config/db');
 
 /**
- * Controleer of een docent de eigenaar is van een cursus
+ * Controleer of een docent toegang heeft tot een cursus
  * @param {number} teacherId - ID van de docent
  * @param {number} classId - ID van de cursus
  * @returns {Promise<boolean>}
@@ -9,12 +9,12 @@ const db = require('../config/db');
 async function isTeacherOwnerOfClass(teacherId, classId) {
   try {
     const result = await db.query(
-      'SELECT id FROM course WHERE id = $1 AND teacher_id = $2',
+      'SELECT id FROM course_teacher WHERE course_id = $1 AND user_id = $2',
       [classId, teacherId]
     );
     return result.rows.length > 0;
   } catch (error) {
-    console.error('Fout bij controleren eigenaarschap cursus:', error);
+    console.error('Fout bij controleren toegang cursus:', error);
     throw error;
   }
 }
@@ -30,8 +30,8 @@ async function teacherHasAccessToStudent(teacherId, studentId) {
   try {
     const result = await db.query(
       `SELECT e.id FROM enrollment e
-       JOIN course c ON e.course_id = c.id
-       WHERE c.teacher_id = $1 AND e.user_id = $2`,
+       JOIN course_teacher ct ON e.course_id = ct.course_id
+       WHERE ct.user_id = $1 AND e.user_id = $2`,
       [teacherId, studentId]
     );
     return result.rows.length > 0;

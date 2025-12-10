@@ -17,12 +17,35 @@ async function loginUser(req, res) {
     if (!isMatch) {
       return res.status(401).json({ error: 'Ongeldig wachtwoord.' });
     }
-    const token = jwt.sign(
+
+    // Generate access token
+    const accessToken = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m' }
     );
-    res.json({ token });
+
+    // Generate refresh token
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d' }
+    );
+
+    // Save refresh token in database
+    const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await userModel.saveRefreshToken(user.id, refreshToken, tokenExpiresAt);
+
+    res.json({ 
+      accessToken, 
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
   } catch (error) {
     console.error('Fout bij inloggen:', error);
     res.status(500).json({ error: 'Interne serverfout bij login.' });
@@ -59,7 +82,99 @@ async function registerUser(req, res) {
   }
 }
 
+// Refresh access token
+async function refreshAccessToken(req, res) {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token is verplicht.' });
+    }
+
+    // Validate refresh token in database
+    const storedToken = await userModel.getRefreshToken(refreshToken);
+    if (!storedToken) {
+      return res.status(401).json({ error: 'Ongeldig of verlopen refresh token.' });
+    }
+
+    // Verify JWT signature
+    try {
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      
+      // Generate new access token
+      const newAccessToken = jwt.sign(
+        { id: decoded.id, email: decoded.email },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m' }
+      );
+
+      // Generate new refresh token
+      const newRefreshToken = jwt.sign(
+        { id: decoded.id, email: decoded.email },
+        process.env.JWT_REFRESH_SECRET,
+        { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d' }
+      );
+
+      // Save new refresh token in database
+      const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      await userModel.saveRefreshToken(decoded.id, newRefreshToken, tokenExpiresAt);
+
+      res.json({ 
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken
+      });
+    } catch (jwtError) {
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.status(401).json({ error: 'Refresh token is verlopen.' });
+      }
+      return res.status(403).json({ error: 'Ongeldig refresh token.' });
+    }
+  } catch (error) {
+    console.error('Fout bij token vernieuwen:', error);
+    res.status(500).json({ error: 'Interne serverfout bij token vernieuwen.' });
+  }
+}
+
+// Logout user (revoke refresh token)
+async function logoutUser(req, res) {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token is verplicht.' });
+    }
+
+    await userModel.revokeRefreshToken(refreshToken);
+    res.json({ message: 'Succesvol uitgelogd.' });
+  } catch (error) {
+    console.error('Fout bij uitloggen:', error);
+    res.status(500).json({ error: 'Interne serverfout bij uitloggen.' });
+  }
+}
+
+// Get user profile
+async function getProfile(req, res) {
+  try {
+    const userId = req.user.id;
+    const user = await userModel.getUserById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Gebruiker niet gevonden.' });
+    }
+
+    // Return user without password hash
+    const { password_hash, ...userWithoutPassword } = user;
+    res.json(userWithoutPassword);
+  } catch (error) {
+    console.error('Fout bij ophalen profiel:', error);
+    res.status(500).json({ error: 'Interne serverfout bij ophalen profiel.' });
+  }
+}
+
 module.exports = {
   loginUser,
   registerUser,
+  refreshAccessToken,
+  logoutUser,
+  getProfile,
 };

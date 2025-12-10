@@ -1,4 +1,10 @@
 const pool = require('../config/db');
+const crypto = require('crypto');
+
+// Helper functie om token hash te maken
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 // Functie om een gebruiker toe te voegen
 async function createUser({ email, name, github_id, password_hash, role }) {
@@ -47,6 +53,48 @@ async function updateUserPassword(id, password_hash) {
   return result.rows[0];
 }
 
+// Functie om een refresh token op te slaan
+async function saveRefreshToken(userId, token, expiresAt) {
+  const tokenHash = hashToken(token);
+  const query = `
+    INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+    VALUES ($1, $2, $3)
+    RETURNING *;
+  `;
+  const result = await pool.query(query, [userId, tokenHash, expiresAt]);
+  return result.rows[0];
+}
+
+// Functie om een refresh token te valideren
+async function getRefreshToken(token) {
+  const tokenHash = hashToken(token);
+  const query = `
+    SELECT * FROM refresh_tokens 
+    WHERE token_hash = $1 AND expires_at > NOW();
+  `;
+  const result = await pool.query(query, [tokenHash]);
+  return result.rows[0];
+}
+
+// Functie om een refresh token in te trekken
+async function revokeRefreshToken(token) {
+  const tokenHash = hashToken(token);
+  const query = `
+    DELETE FROM refresh_tokens WHERE token_hash = $1 RETURNING *;
+  `;
+  const result = await pool.query(query, [tokenHash]);
+  return result.rows[0];
+}
+
+// Functie om alle refresh tokens van een gebruiker in te trekken
+async function revokeUserRefreshTokens(userId) {
+  const query = `
+    DELETE FROM refresh_tokens WHERE user_id = $1 RETURNING *;
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows;
+}
+
 module.exports = {
   createUser,
   getUserByEmail,
@@ -54,4 +102,8 @@ module.exports = {
   getUserByGithubId,
   deleteUser,
   updateUserPassword,
+  saveRefreshToken,
+  getRefreshToken,
+  revokeRefreshToken,
+  revokeUserRefreshTokens,
 };
