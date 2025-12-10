@@ -33,7 +33,7 @@ router.get('/me/courses', async (req, res) => {
  * Haal alle opdrachten op voor een specifieke cursus
  * Query params:
  *   - status: 'submitted' | 'pending' | 'all' (default: 'all')
- *   - sortBy: 'deadline' | 'title' | 'created_at' (default: 'deadline')
+ *   - sortBy: 'due_date' | 'title' | 'created_at' (default: 'due_date')
  *   - order: 'asc' | 'desc' (default: 'asc')
  */
 router.get('/me/courses/:courseId/assignments', async (req, res) => {

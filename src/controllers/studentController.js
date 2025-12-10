@@ -10,15 +10,15 @@ async function getStudentCourses(studentId) {
     const result = await db.query(
       `SELECT
         c.id,
-        c.name,
+        c.title,
         c.description,
         COUNT(a.id) as assignment_count
       FROM course c
       JOIN enrollment e ON c.id = e.course_id
       LEFT JOIN assignment a ON c.id = a.course_id
       WHERE e.user_id = $1
-      GROUP BY c.id, c.name, c.description
-      ORDER BY c.name ASC`,
+      GROUP BY c.id, c.title, c.description
+      ORDER BY c.title ASC`,
       [studentId]
     );
     return result.rows;
@@ -34,18 +34,18 @@ async function getStudentCourses(studentId) {
  * @param {number} courseId - ID van de cursus
  * @param {object} options - Filter en sort opties
  * @param {string} options.status - Filter op status: 'submitted', 'pending', 'all'
- * @param {string} options.sortBy - Sorteer op: 'deadline', 'title', 'created_at'
+ * @param {string} options.sortBy - Sorteer op: 'due_date', 'title', 'created_at'
  * @param {string} options.order - Sorteerrichting: 'asc', 'desc'
  * @returns {Promise<Array>}
  */
 async function getCourseAssignments(studentId, courseId, options = {}) {
   try {
-    const { status = 'all', sortBy = 'deadline', order = 'asc' } = options;
+    const { status = 'all', sortBy = 'due_date', order = 'asc' } = options;
 
     // Valideer sortBy en order om SQL injection te voorkomen
-    const validSortFields = ['deadline', 'title', 'created_at'];
+    const validSortFields = ['due_date', 'title', 'created_at'];
     const validOrders = ['asc', 'desc'];
-    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'deadline';
+    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'due_date';
     const safeOrder = order && validOrders.includes(order.toLowerCase()) ? order.toUpperCase() : 'ASC';
 
     let query = `
@@ -53,7 +53,7 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
         a.id,
         a.title,
         a.description,
-        a.deadline,
+        a.due_date,
         a.created_at,
         s.id as submission_id,
         CASE
