@@ -17,13 +17,13 @@ CREATE TABLE "user" (
     name               VARCHAR(255) NOT NULL,
     github_id          VARCHAR(255),
     role               user_role NOT NULL DEFAULT 'student',
+    password_hash      VARCHAR(255),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -------------------------------------------------
 -- COURSE TABLE
--- Removed teacher_id (now many-to-many via course_teacher)
 -------------------------------------------------
 CREATE TABLE course (
     id                 SERIAL PRIMARY KEY,
@@ -36,7 +36,6 @@ CREATE TABLE course (
 
 -------------------------------------------------
 -- COURSE_TEACHER TABLE (NEW)
--- Allows multiple teachers per course
 -------------------------------------------------
 CREATE TABLE course_teacher (
     id                 SERIAL PRIMARY KEY,
