@@ -34,6 +34,10 @@
     {
       "name": "Cursussen",
       "description": "Endpoints voor cursusbeheer en cursusgegevens"
+    },
+    {
+      "name": "Studenten",
+      "description": "Endpoints voor student self-service: cursussen en opdrachten bekijken"
     }
   ],
   "paths": {
@@ -638,6 +642,213 @@
                       "type": "string",
                       "example": "Er is een fout opgetreden bij het ophalen van de cursussen uit de database"
                     }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/students/me/courses": {
+      "get": {
+        "summary": "Haal cursussen van ingelogde student op",
+        "description": "Retourneert alle cursussen waar de ingelogde student voor is ingeschreven, inclusief het aantal opdrachten per cursus.",
+        "operationId": "getStudentCourses",
+        "tags": ["Studenten"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Cursussen succesvol opgehaald",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer", "example": 1 },
+                          "title": { "type": "string", "example": "Web Development 101" },
+                          "description": { "type": "string", "example": "Learn the basics of web development" },
+                          "assignment_count": { "type": "string", "example": "5" }
+                        }
+                      }
+                    },
+                    "message": { "type": "string", "example": "3 cursussen gevonden" },
+                    "error": { "type": "null", "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Niet geauthenticeerd",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Geen token verstrekt." }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Fout bij ophalen cursussen" },
+                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/students/me/courses/{courseId}/assignments": {
+      "get": {
+        "summary": "Haal opdrachten van een cursus op",
+        "description": "Retourneert alle opdrachten voor een specifieke cursus waar de student is ingeschreven, inclusief submission status per opdracht.",
+        "operationId": "getStudentCourseAssignments",
+        "tags": ["Studenten"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "description": "ID van de cursus",
+            "schema": { "type": "integer", "example": 1 }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Filter op submission status",
+            "schema": {
+              "type": "string",
+              "enum": ["submitted", "pending", "all"],
+              "default": "all"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "required": false,
+            "description": "Veld om op te sorteren",
+            "schema": {
+              "type": "string",
+              "enum": ["due_date", "title", "created_at"],
+              "default": "due_date"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sorteerrichting",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "asc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Opdrachten succesvol opgehaald",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer", "example": 1 },
+                          "title": { "type": "string", "example": "Build a Portfolio Website" },
+                          "description": { "type": "string", "example": "Create a personal portfolio using HTML, CSS, and JavaScript" },
+                          "due_date": { "type": "string", "format": "date-time", "example": "2025-12-17T09:52:40.014Z" },
+                          "created_at": { "type": "string", "format": "date-time", "example": "2025-12-10T09:52:40.654Z" },
+                          "submission_id": { "type": "integer", "nullable": true, "example": 1 },
+                          "submission_status": { "type": "string", "enum": ["submitted", "pending"], "example": "submitted" }
+                        }
+                      }
+                    },
+                    "message": { "type": "string", "example": "2 opdrachten gevonden" },
+                    "error": { "type": "null", "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ongeldig cursus ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Ongeldig cursus ID" },
+                    "error": { "type": "string", "example": "BAD_REQUEST" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Niet geauthenticeerd",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Geen token verstrekt." }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Niet ingeschreven voor cursus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Je bent niet ingeschreven voor deze cursus" },
+                    "error": { "type": "string", "example": "FORBIDDEN" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Fout bij ophalen opdrachten" },
+                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
                   }
                 }
               }
