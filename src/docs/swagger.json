@@ -575,6 +575,107 @@
         }
       }
     },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Uitloggen - Token revoke",
+        "description": "Revoke het refresh token van de gebruiker. Dit maakt het refresh token ongeldig en voorkomt dat het kan worden gebruikt om nieuwe access tokens op te vragen. De gebruiker moet daarna opnieuw inloggen.\n\nDit endpoint vereist authenticatie via een geldig access token in de Authorization header.",
+        "operationId": "logoutUser",
+        "tags": [
+          "Authenticatie"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ...",
+                    "description": "Het refresh token dat moet worden gerevoked"
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logout succesvol - refresh token is gerevoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Succesvol uitgelogd."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refresh token ontbreekt in request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Refresh token is verplicht."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - geldige JWT access token vereist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Token niet gevonden of ongeldig"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Interne serverfout bij uitloggen."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/courses": {
       "get": {
         "summary": "Alle beschikbare cursussen ophalen",
@@ -864,7 +965,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "🔐 JWT BEARER TOKEN AUTHENTICATIE - BELANGRIJK!\n\n📌 HOE TE GEBRUIKEN:\n1. Login: POST /api/auth/login met email + password\n2. Je krijgt: accessToken (15 minuten geldig) + refreshToken (7 dagen)\n3. Stuur accessToken in ELKE request naar beveiligde endpoints\n\n📋 FORMAAT IN HEADER:\nAuthorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ...\n\n⚠️ BELANGRIJK:\n- Token ALTIJD in Authorization header, NIET in request body!\n- Gebruik \"Bearer \" prefix (met spatie)\n- Token is CASE SENSITIVE\n- Na 15 minuten vervallen: gebruik /api/auth/refresh met refreshToken\n\n🔄 TOKEN VERNIEUWEN:\nPOST /api/auth/refresh met refreshToken (7 dagen geldig)\nJe krijgt nieuw accessToken + nieuw refreshToken\n\n❌ FOUTMELDINGEN:\n401: Token ontbreekt of is ongeldig\n403: Token signature is ongeldig\nCheck Authorization header format!"
+        "description": "JWT Bearer Token Authentication. All protected endpoints require a valid JWT token in the Authorization header. Format: 'Authorization: Bearer <token>'. Access tokens are valid for 15 minutes; use the refresh endpoint to obtain new tokens. Tokens are case-sensitive and must include the 'Bearer ' prefix."
       }
     }
   }
