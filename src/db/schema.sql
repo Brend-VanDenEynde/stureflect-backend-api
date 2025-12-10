@@ -1,6 +1,9 @@
 -- StuReflect PostgreSQL Schema
+-- Updated: Courses can now have multiple teachers
 
+-------------------------------------------------
 -- ENUM TYPES
+-------------------------------------------------
 CREATE TYPE user_role AS ENUM ('student','teacher','admin');
 CREATE TYPE reviewer_type AS ENUM ('ai','teacher');
 CREATE TYPE feedback_severity AS ENUM ('low','medium','high','critical');
@@ -13,7 +16,6 @@ CREATE TABLE "user" (
     email              VARCHAR(255) NOT NULL UNIQUE,
     name               VARCHAR(255) NOT NULL,
     github_id          VARCHAR(255),
-    password_hash      VARCHAR(255),
     role               user_role NOT NULL DEFAULT 'student',
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -21,15 +23,27 @@ CREATE TABLE "user" (
 
 -------------------------------------------------
 -- COURSE TABLE
+-- Removed teacher_id (now many-to-many via course_teacher)
 -------------------------------------------------
 CREATE TABLE course (
     id                 SERIAL PRIMARY KEY,
     title              VARCHAR(255) NOT NULL,
     description        TEXT,
-    teacher_id         INT NOT NULL REFERENCES "user"(id) ON DELETE RESTRICT,
     join_code          VARCHAR(64) UNIQUE,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-------------------------------------------------
+-- COURSE_TEACHER TABLE (NEW)
+-- Allows multiple teachers per course
+-------------------------------------------------
+CREATE TABLE course_teacher (
+    id                 SERIAL PRIMARY KEY,
+    course_id          INT NOT NULL REFERENCES course(id) ON DELETE CASCADE,
+    user_id            INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (course_id, user_id)
 );
 
 -------------------------------------------------
@@ -45,7 +59,7 @@ CREATE TABLE course_settings (
 );
 
 -------------------------------------------------
--- ENROLLMENT (STUDENTEN IN CURSUSSEN)
+-- ENROLLMENT TABLE
 -------------------------------------------------
 CREATE TABLE enrollment (
     id                 SERIAL PRIMARY KEY,
