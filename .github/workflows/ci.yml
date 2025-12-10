@@ -27,6 +27,7 @@ jobs:
 
     env:
       DATABASE_URL: postgres://test:test@localhost:5432/testdb
+      DB_SSL: 'false'
 
     steps:
       - name: Checkout code
