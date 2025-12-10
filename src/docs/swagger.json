@@ -60,7 +60,7 @@
         }
       }
     },
-    "/users/login": {
+    "/api/auth/login": {
       "post": {
         "summary": "Gebruiker inloggen",
         "description": "Authenticeert een gebruiker met emailadres en wachtwoord. Bij succesvol inloggen wordt een JWT-token geretourneerd dat 1 uur geldig is. Dit token moet gebruikt worden in de Authorization header voor alle beveiligde endpoints. Het token moet in het formaat 'Bearer <token>' meegegeven worden.",
@@ -99,16 +99,46 @@
         },
         "responses": {
           "200": {
-            "description": "Succesvol ingelogd - JWT-token ontvangen",
+            "description": "Succesvol ingelogd - JWT-tokens ontvangen",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "token": {
+                    "accessToken": {
                       "type": "string",
                       "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE2OTI4MDAwMDAsImV4cCI6MTY5MjgwMzYwMH0.signature",
-                      "description": "JWT-token met 1 uur geldigheid (3600 seconden). Gebruik dit token in de Authorization header: 'Authorization: Bearer <token>'. Na afloop van 1 uur moet opnieuw ingelogd worden."
+                      "description": "JWT access token met 15 minuten geldigheid (15m). Gebruik dit in Authorization header."
+                    },
+                    "refreshToken": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwiaWF0IjoxNjkyODAwMDAwLCJleHAiOjE3MDA1ODAwMDB9.signature",
+                      "description": "Refresh token met 7 dagen geldigheid. Gebruik dit om een nieuw access token op te vragen via /api/auth/refresh."
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "example": 1,
+                          "description": "Gebruiker ID"
+                        },
+                        "email": {
+                          "type": "string",
+                          "example": "gebruiker@voorbeeld.nl",
+                          "description": "Gebruiker email"
+                        },
+                        "name": {
+                          "type": "string",
+                          "example": "Jan Jansen",
+                          "description": "Gebruiker naam"
+                        },
+                        "role": {
+                          "type": "string",
+                          "example": "student",
+                          "description": "Gebruiker rol (student, docent, beheerder)"
+                        }
+                      }
                     }
                   }
                 }
@@ -182,7 +212,7 @@
         }
       }
     },
-    "/users/register": {
+    "/api/auth/register": {
       "post": {
         "summary": "Nieuw gebruikersaccount aanmaken",
         "description": "Registreert een nieuwe gebruiker in het systeem. Het wachtwoord wordt veilig versleuteld opgeslagen met bcrypt. Na succesvolle registratie kan de gebruiker inloggen met het loginendpoint. Elk emailadres kan slechts eenmaal gebruikt worden.",
@@ -237,7 +267,7 @@
         },
         "responses": {
           "201": {
-            "description": "Gebruiker succesvol aangemaakt - Kan nu inloggen",
+            "description": "Gebruiker succesvol aangemaakt",
             "content": {
               "application/json": {
                 "schema": {
@@ -245,7 +275,7 @@
                   "properties": {
                     "id": {
                       "type": "integer",
-                      "example": 1,
+                      "example": 15,
                       "description": "Unieke gebruiker ID in het systeem"
                     },
                     "email": {
@@ -261,7 +291,18 @@
                     "role": {
                       "type": "string",
                       "example": "student",
-                      "description": "Toegewezen rol van de gebruiker"
+                      "description": "Toegewezen rol van de gebruiker (standaard: student)"
+                    },
+                    "github_id": {
+                      "type": "null",
+                      "example": null,
+                      "description": "GitHub ID (null bij normaal registratie)"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2024-12-10T10:30:00Z",
+                      "description": "Aanmaakdatum van het account"
                     }
                   }
                 }
@@ -269,7 +310,7 @@
             }
           },
           "400": {
-            "description": "Ongeldig verzoek - emailadres al in gebruik of ongeldige gegevens",
+            "description": "Ongeldig verzoek - email of naam of wachtwoord ontbreekt, of email al in gebruik",
             "content": {
               "application/json": {
                 "schema": {
@@ -277,7 +318,7 @@
                   "properties": {
                     "error": {
                       "type": "string",
-                      "example": "Dit emailadres is al geregistreerd in het systeem."
+                      "example": "E-mailadres, naam en wachtwoord zijn verplicht."
                     }
                   }
                 }
@@ -294,6 +335,125 @@
                     "error": {
                       "type": "string",
                       "example": "Er is iets misgegaan bij het registreren van de gebruiker."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "summary": "Token vernieuwen",
+        "description": "Vernieuwt zowel access token als refresh token. Dit endpoint moet gebruikt worden als het access token verlopen is (na 15 minuten). Retourneert een nieuw access token (15 min geldig) en een nieuw refresh token (7 dagen geldig).",
+        "operationId": "refreshToken",
+        "tags": [
+          "Authenticatie"
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Refresh token vereist",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwiaWF0IjoxNjkyODAwMDAwLCJleHAiOjE3MDA1ODAwMDB9.signature",
+                    "description": "Refresh token ontvangen bij login"
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens succesvol vernieuwd",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwicm9sZSI6InN0dWRlbnQiLCJpYXQiOjE2OTI4MDAwMDAsImV4cCI6MTY5MjgwMzYwMH0.signature",
+                      "description": "Nieuw JWT access token (15 minuten geldig)"
+                    },
+                    "refreshToken": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJnZWJydWlrZXJAZm9vcmJlZWxkLm5sIiwiaWF0IjoxNjkyODAwMDAwLCJleHAiOjE3MDA1ODAwMDB9.signature",
+                      "description": "Nieuw refresh token (7 dagen geldig)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refresh token ontbreekt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Refresh token is verplicht."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ongeldige of verlopen refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Ongeldig of verlopen refresh token."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refresh token signature is ongeldig",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Ongeldig refresh token."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout bij token vernieuwen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Interne serverfout bij token vernieuwen."
                     }
                   }
                 }
@@ -327,7 +487,21 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/Cursus"
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          }
+                        }
                       },
                       "description": "Array met alle beschikbare cursussen"
                     },
@@ -371,7 +545,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT Token authenticatie. BELANGRIJK: Voeg het token toe in de Authorization header, NIET in de request body. Format: 'Authorization: Bearer <uw_jwt_token>'. Verkrijg een token via POST /users/login of POST /users/register. Token geldig voor 1 uur (3600 seconden)."
+        "description": "JWT Token authenticatie. BELANGRIJK: Voeg het token toe in de Authorization header, NIET in de request body. Format: 'Authorization: Bearer <uw_jwt_token>'. Verkrijg een token via POST /api/auth/login of POST /api/auth/register. Access token geldig voor 15 minuten, gebruik /api/auth/refresh om te vernieuwen."
       }
     }
   }
