@@ -1,6 +1,7 @@
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger.json');
+const db = require('./config/db'); // Voeg databaseconfiguratie toe
 
 const app = express();
 
@@ -25,10 +26,6 @@ app.get('/api-docs.json', (req, res) => {
 
 // Routes
 const generalRoutes = require('./routes/general');
-const apiRoutes = require('./routes');
-
 app.use('/', generalRoutes);
-app.use('/api', apiRoutes);
-
 
 module.exports = app;
