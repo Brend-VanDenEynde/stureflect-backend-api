@@ -42,6 +42,13 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
     const courseId = parseInt(req.params.courseId);
     const { status, sortBy, order } = req.query;
 
+    if (isNaN(courseId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ongeldig cursus ID'
+      });
+    }
+
     // Controleer of student is ingeschreven
     const isEnrolled = await studentController.isStudentEnrolledInCourse(studentId, courseId);
     if (!isEnrolled) {

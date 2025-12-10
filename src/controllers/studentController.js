@@ -46,7 +46,7 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
     const validSortFields = ['deadline', 'title', 'created_at'];
     const validOrders = ['asc', 'desc'];
     const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'deadline';
-    const safeOrder = validOrders.includes(order.toLowerCase()) ? order.toUpperCase() : 'ASC';
+    const safeOrder = order && validOrders.includes(order.toLowerCase()) ? order.toUpperCase() : 'ASC';
 
     let query = `
       SELECT
