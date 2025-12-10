@@ -24,7 +24,6 @@ CREATE TABLE "user" (
 
 -------------------------------------------------
 -- COURSE TABLE
--- Removed teacher_id (now many-to-many via course_teacher)
 -------------------------------------------------
 CREATE TABLE course (
     id                 SERIAL PRIMARY KEY,
@@ -37,7 +36,6 @@ CREATE TABLE course (
 
 -------------------------------------------------
 -- COURSE_TEACHER TABLE (NEW)
--- Allows multiple teachers per course
 -------------------------------------------------
 CREATE TABLE course_teacher (
     id                 SERIAL PRIMARY KEY,
@@ -116,6 +114,7 @@ CREATE TABLE feedback (
     type               VARCHAR(128),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
