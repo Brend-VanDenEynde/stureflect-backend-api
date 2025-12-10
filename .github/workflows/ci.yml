@@ -56,7 +56,7 @@ jobs:
           node server.js &
           SERVER_PID=$!
           sleep 5
-          curl --fail http://localhost:3000/api/ || exit 1
+          curl --fail http://localhost:3000/ || exit 1
           kill $SERVER_PID
         env:
           NODE_ENV: test
