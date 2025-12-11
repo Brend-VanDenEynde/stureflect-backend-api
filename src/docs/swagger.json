@@ -14,7 +14,7 @@
   },
   "servers": [
     {
-      "url": "https://backend.stureflect.com/api-docs/",
+      "url": "https://backend.stureflect.com",
       "description": "Productieserver"
     },
     {
