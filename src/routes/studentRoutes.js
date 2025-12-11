@@ -33,6 +33,93 @@ router.get('/me/courses', async (req, res) => {
 });
 
 /**
+ * GET /api/students/me/submissions
+ * Haalt alle submissions op van de ingelogde student
+ * Query params:
+ *   - courseId: Filter op cursus ID (optioneel)
+ *   - status: 'pending' | 'completed' | 'graded' (optioneel)
+ */
+router.get('/me/submissions', async (req, res) => {
+  try {
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
+    const { courseId, status } = req.query;
+
+    const filters = {};
+    if (courseId) filters.courseId = parseInt(courseId);
+    if (status) filters.status = status;
+
+    const submissions = await studentController.getStudentSubmissions(studentId, filters);
+
+    res.status(200).json({
+      success: true,
+      data: submissions,
+      message: `${submissions.length} submissions gevonden`,
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij ophalen submissions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen submissions',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/students/me/submissions/:submissionId
+ * Haalt detail van een specifieke submission op
+ * Alleen toegankelijk voor de eigenaar van de submission
+ */
+router.get('/me/submissions/:submissionId', async (req, res) => {
+  try {
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
+    const submissionId = parseInt(req.params.submissionId);
+
+    if (isNaN(submissionId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig submission ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const detail = await studentController.getSubmissionDetail(submissionId);
+
+    if (!detail) {
+      return res.status(404).json({
+        success: false,
+        message: 'Submission niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Autorisatie: check of submission van deze student is
+    if (detail.submission.user_id !== studentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Je hebt geen toegang tot deze submission',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: detail,
+      message: 'Submission detail opgehaald',
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij ophalen submission detail:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen submission detail',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
  * GET /api/students/me/courses/:courseId/assignments
  * Haalt alle opdrachten op voor een specifieke cursus
  * Query params:
