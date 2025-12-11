@@ -4,9 +4,7 @@ const { Pool } = require('pg');
 // Maak een nieuwe pool met de DATABASE_URL uit de .env
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false, // Nodig voor SSL-verbindingen
-  },
+  ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
 });
 
 // Test de verbinding

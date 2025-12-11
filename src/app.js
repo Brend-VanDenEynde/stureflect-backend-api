@@ -3,6 +3,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger.json');
 const session = require('express-session');
 const passport = require('./config/passport');
+const db = require('./config/db'); // Voeg databaseconfiguratie toe
 
 const app = express();
 
@@ -14,7 +15,7 @@ app.use(cors({
     'http://localhost:3001',
     'http://localhost:5173',
     'http://localhost:5174',
-    'stureflect-frontend.vercel.app'
+    'https://stureflect-frontend.vercel.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -58,7 +59,6 @@ app.get('/api-docs.json', (req, res) => {
 // Routes
 const generalRoutes = require('./routes/general');
 const apiRoutes = require('./routes');
-
 app.use('/', generalRoutes);
 app.use('/api', apiRoutes);
 
