@@ -1473,8 +1473,8 @@
     },
     "/api/docent/courses/{courseId}/students": {
       "get": {
-        "summary": "Haal ingeschreven studenten voor een cursus op",
-        "description": "Retourneert een lijst van alle studenten die zijn ingeschreven voor de opgegeven cursus. Dit endpoint is beschikbaar voor docenten die de cursus begeleiden.",
+        "summary": "Haal ingeschreven studenten op",
+        "description": "Haalt een gepagineerde lijst op van studenten die zijn ingeschreven voor een specifieke cursus, met optionele filters en sortering.",
         "operationId": "getEnrolledStudents",
         "tags": ["Docenten"],
         "security": [{ "bearerAuth": [] }],
@@ -1482,106 +1482,82 @@
           {
             "name": "courseId",
             "in": "path",
-            "description": "Het unieke ID van de cursus",
             "required": true,
-            "schema": {
-              "type": "integer",
-              "example": 1
-            }
+            "schema": { "type": "string" },
+            "description": "ID van de cursus"
+          },
+          {
+            "name": "assignmentId",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Filter op opdracht ID"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Filter op inleverstatus"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Zoek op naam of e-mail"
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "default": "name" },
+            "description": "Sorteerveld (name, progress, lastSubmission, avgScore)"
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "default": "asc" },
+            "description": "Sorteervolgorde (asc, desc)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 1 },
+            "description": "Paginanummer"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 50 },
+            "description": "Aantal items per pagina"
           }
         ],
         "responses": {
           "200": {
-            "description": "Studenten succesvol opgehaald",
+            "description": "Lijst met studenten en paginering metadata",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer",
-                            "example": 5
-                          },
-                          "email": {
-                            "type": "string",
-                            "format": "email",
-                            "example": "student@example.com"
-                          },
-                          "name": {
-                            "type": "string",
-                            "example": "Jan Jansen"
-                          },
-                          "enrolled_at": {
-                            "type": "string",
-                            "format": "date-time",
-                            "example": "2024-01-15T10:30:00Z"
-                          }
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "15 studenten gevonden voor deze cursus"
-                    }
+                    "students": { "type": "array", "items": { "type": "object" } },
+                    "pagination": { "type": "object" }
                   }
                 }
               }
             }
           },
-          "404": {
-            "description": "Cursus niet gevonden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Cursus niet gevonden"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Interne serverfout",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Fout bij ophalen studenten"
-                    }
-                  }
-                }
-              }
-            }
-          }
+          "400": { "description": "Ontbrekende verplichte parameters" },
+          "500": { "description": "Interne serverfout" }
         }
       },
       "post": {
-        "summary": "Voeg een student toe aan een cursus",
-        "description": "Schrijft een student in voor de opgegeven cursus. De docent moet het student ID en cursus ID opgeven. Dit endpoint controleert of de student al is ingeschreven en voorkomt dubbele inschrijvingen.",
+        "summary": "Voeg student toe aan cursus",
+        "description": "Voegt een student toe aan een cursus op basis van e-mailadres.",
         "operationId": "addStudentToCourse",
         "tags": ["Docenten"],
         "security": [{ "bearerAuth": [] }],
@@ -1589,131 +1565,66 @@
           {
             "name": "courseId",
             "in": "path",
-            "description": "Het unieke ID van de cursus",
             "required": true,
-            "schema": {
-              "type": "integer",
-              "example": 1
-            }
+            "schema": { "type": "string" },
+            "description": "ID van de cursus"
           }
         ],
         "requestBody": {
           "required": true,
-          "description": "Student gegevens voor inschrijving",
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["studentId"],
                 "properties": {
-                  "studentId": {
-                    "type": "integer",
-                    "example": 5,
-                    "description": "Het unieke ID van de student die moet worden ingeschreven"
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "E-mailadres van de student"
                   }
-                }
+                },
+                "required": ["email"]
               }
             }
           }
         },
         "responses": {
-          "201": {
-            "description": "Student succesvol toegevoegd aan de cursus",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Student succesvol toegevoegd aan cursus"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "enrollmentId": {
-                          "type": "integer",
-                          "example": 42
-                        },
-                        "studentId": {
-                          "type": "integer",
-                          "example": 5
-                        },
-                        "courseId": {
-                          "type": "integer",
-                          "example": 1
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+          "201": { "description": "Student succesvol toegevoegd" },
+          "400": { "description": "Ongeldige input of missende velden" },
+          "404": { "description": "Student niet gevonden" },
+          "409": { "description": "Student is al ingeschreven" },
+          "500": { "description": "Interne serverfout" }
+        }
+      }
+    },
+    "/api/docent/courses/{courseId}/students/{studentId}": {
+      "delete": {
+        "summary": "Verwijder student uit cursus",
+        "description": "Verwijdert een student uit een specifieke cursus.",
+        "operationId": "removeStudentFromCourse",
+        "tags": ["Docenten"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "ID van de cursus"
           },
-          "400": {
-            "description": "Ongeldige request - student ID ontbreekt of student is al ingeschreven",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Student is al ingeschreven voor deze cursus"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Student of cursus niet gevonden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Student of cursus niet gevonden"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Interne serverfout",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Fout bij toevoegen student aan cursus"
-                    }
-                  }
-                }
-              }
-            }
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "ID van de te verwijderen student"
           }
+        ],
+        "responses": {
+          "200": { "description": "Student succesvol verwijderd" },
+          "400": { "description": "Missing parameters" },
+          "404": { "description": "Student niet ingeschreven" },
+          "500": { "description": "Interne serverfout" }
         }
       }
     },
