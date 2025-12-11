@@ -46,6 +46,10 @@
     {
       "name": "Admin",
       "description": "Endpoints voor administratieve taken (alleen voor admins)"
+    },
+    {
+      "name": "Docenten",
+      "description": "Endpoints voor docenten om cursussen en studenten te beheren"
     }
   ],
   "paths": {
@@ -342,17 +346,19 @@
     "/api/auth/github": {
       "get": {
         "summary": "GitHub OAuth login initiëren",
-        "description": "Initieert de GitHub OAuth 2.0 login flow. Redirect de gebruiker naar dit endpoint om inloggen met GitHub in te stellen. De gebruiker wordt naar GitHub gestuurd om toestemming te geven, waarna deze wordt teruggestuurd naar het callback endpoint. **BELANGRIJK: Gebruik /api/auth/github, niet /auth/github!**",
+        "description": "Initieert de GitHub OAuth 2.0 login flow. Redirect de gebruiker naar dit endpoint om inloggen met GitHub in te stellen. De gebruiker wordt naar GitHub gestuurd om toestemming te geven, waarna deze wordt teruggestuurd naar het callback endpoint.",
         "operationId": "githubLogin",
-        "tags": ["GitHub OAuth"],
+        "tags": [
+          "GitHub OAuth"
+        ],
         "responses": {
           "302": {
-            "description": "Redirect naar GitHub OAuth authorize endpoint",
+            "description": "Redirect naar GitHub OAuth authorize endpoint waar de gebruiker wordt gevraagd om toestemming te geven",
             "headers": {
               "Location": {
                 "schema": {
                   "type": "string",
-                  "example": "https://github.com/login/oauth/authorize?client_id=..."
+                  "example": "https://github.com/login/oauth/authorize?client_id=Ov23liaBs0uhu6phGG22&redirect_uri=https://backend.stureflect.com/api/auth/github/callback&scope=user:email,repo"
                 }
               }
             }
@@ -372,9 +378,10 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "a1b2c3d4e5f6g7h8"
             },
-            "description": "Autorisatiecode van GitHub"
+            "description": "Tijdelijke autorisatiecode van GitHub die wordt uitgewisseld voor een access token"
           },
           {
             "name": "state",
@@ -388,10 +395,27 @@
         ],
         "responses": {
           "302": {
-            "description": "Redirect naar frontend na succesvol inloggen"
+            "description": "Succesvolle authenticatie - redirect naar frontend met tokens",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "example": "https://stureflect-frontend.vercel.app/auth-callback?accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...&refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "description": "Redirect URL naar frontend met JWT tokens als query parameters"
+              }
+            }
           },
           "401": {
-            "description": "GitHub authenticatie mislukt"
+            "description": "GitHub authenticatie mislukt - gebruiker heeft toestemming geweigerd of er is een fout opgetreden tijdens OAuth",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "example": "https://stureflect-frontend.vercel.app/auth-error"
+                }
+              }
+            }
           }
         }
       }
@@ -717,7 +741,7 @@
     "/api/courses": {
       "get": {
         "summary": "Alle beschikbare cursussen ophalen",
-        "description": "Retourneert een volledige lijst met alle beschikbare cursussen in het systeem. Elke cursus bevat zijn unieke ID, titel, beschrijving en deelcode. Dit endpoint biedt een overzicht van alle cursussen waar leerlingen zich bij kunnen aansluiten.",
+        "description": "Retourneert een volledige lijst met alle beschikbare cursussen in het systeem. Elke cursus bevat zijn unieke ID, titel, beschrijving en cursuscode. Dit endpoint is publiek toegankelijk en vereist geen authenticatie. **Gebruik:** Dit endpoint wordt gebruikt om een overzicht van alle cursussen te tonen aan studenten voordat ze zich inschrijven, of aan docenten om cursussen te selecteren.",
         "operationId": "getAllCourses",
         "tags": ["Cursussen"],
         "responses": {
@@ -739,20 +763,33 @@
                         "type": "object",
                         "properties": {
                           "id": {
-                            "type": "integer"
+                            "type": "integer",
+                            "example": 1,
+                            "description": "Uniek cursus ID"
                           },
                           "title": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "Web Development 101",
+                            "description": "Titel van de cursus"
                           },
                           "description": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "Learn HTML, CSS, and JavaScript fundamentals",
+                            "description": "Uitgebreide beschrijving van wat de cursus behandelt"
                           },
                           "code": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "WEB101",
+                            "description": "Unieke cursuscode voor identificatie"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2024-01-01T00:00:00Z"
                           }
                         }
                       },
-                      "description": "Array met alle beschikbare cursussen"
+                      "description": "Array met alle beschikbare cursussen inclusief metadata"
                     },
                     "message": {
                       "type": "string",
@@ -790,13 +827,13 @@
     "/api/students/me/courses": {
       "get": {
         "summary": "Haal cursussen van ingelogde student op",
-        "description": "Retourneert alle cursussen waar de ingelogde student voor is ingeschreven, inclusief het aantal opdrachten per cursus.",
+        "description": "Retourneert alle cursussen waar de ingelogde student voor is ingeschreven, inclusief het aantal opdrachten per cursus. De student wordt geïdentificeerd via het JWT token in de Authorization header. **Gebruik:** Dit endpoint wordt gebruikt om het cursusoverzicht van een student te tonen op hun dashboard.",
         "operationId": "getStudentCourses",
         "tags": ["Studenten"],
         "security": [{ "bearerAuth": [] }],
         "responses": {
           "200": {
-            "description": "Cursussen succesvol opgehaald",
+            "description": "Cursussen succesvol opgehaald met opdracht statistieken",
             "content": {
               "application/json": {
                 "schema": {
@@ -808,21 +845,30 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "integer", "example": 1 },
+                          "id": { "type": "integer", "example": 1, "description": "Uniek cursus ID" },
                           "title": {
                             "type": "string",
-                            "example": "Web Development 101"
+                            "example": "Web Development 101",
+                            "description": "Titel van de cursus"
                           },
                           "description": {
                             "type": "string",
-                            "example": "Learn the basics of web development"
+                            "example": "Learn the basics of web development",
+                            "description": "Korte beschrijving van de cursus"
+                          },
+                          "code": {
+                            "type": "string",
+                            "example": "WEB101",
+                            "description": "Cursuscode"
                           },
                           "assignment_count": {
                             "type": "string",
-                            "example": "5"
+                            "example": "5",
+                            "description": "Totaal aantal opdrachten in deze cursus"
                           }
                         }
-                      }
+                      },
+                      "description": "Array met cursussen waar de student voor is ingeschreven"
                     },
                     "message": {
                       "type": "string",
@@ -835,7 +881,7 @@
             }
           },
           "401": {
-            "description": "Niet geauthenticeerd",
+            "description": "Niet geauthenticeerd - JWT token ontbreekt of is ongeldig",
             "content": {
               "application/json": {
                 "schema": {
@@ -843,7 +889,7 @@
                   "properties": {
                     "error": {
                       "type": "string",
-                      "example": "Geen token verstrekt."
+                      "example": "Geen token verstrekt of token is verlopen"
                     }
                   }
                 }
@@ -851,7 +897,7 @@
             }
           },
           "500": {
-            "description": "Server error",
+            "description": "Server error - database of query probleem",
             "content": {
               "application/json": {
                 "schema": {
@@ -876,8 +922,8 @@
     },
     "/api/students/me/courses/{courseId}/assignments": {
       "get": {
-        "summary": "Haal opdrachten van een cursus op",
-        "description": "Retourneert alle opdrachten voor een specifieke cursus waar de student is ingeschreven, inclusief submission status per opdracht.",
+        "summary": "Haal opdrachten van een cursus op voor student",
+        "description": "Retourneert alle opdrachten voor een specifieke cursus waar de student is ingeschreven, inclusief submission status per opdracht. De student kan alleen opdrachten zien van cursussen waar ze voor zijn ingeschreven. **Gebruik:** Dit endpoint toont een overzicht van alle opdrachten binnen een cursus, met informatie of de student ze al heeft ingediend. Ondersteunt filteren op status en sorteren op verschillende velden.",
         "operationId": "getStudentCourseAssignments",
         "tags": ["Studenten"],
         "security": [{ "bearerAuth": [] }],
@@ -886,14 +932,14 @@
             "name": "courseId",
             "in": "path",
             "required": true,
-            "description": "ID van de cursus",
+            "description": "Het unieke ID van de cursus waarvan opdrachten worden opgehaald",
             "schema": { "type": "integer", "example": 1 }
           },
           {
             "name": "status",
             "in": "query",
             "required": false,
-            "description": "Filter op submission status",
+            "description": "Filter opdrachten op submission status: 'submitted' (al ingediend), 'pending' (nog niet ingediend), of 'all' (alle opdrachten)",
             "schema": {
               "type": "string",
               "enum": ["submitted", "pending", "all"],
@@ -904,7 +950,7 @@
             "name": "sortBy",
             "in": "query",
             "required": false,
-            "description": "Veld om op te sorteren",
+            "description": "Veld waarop gesorteerd moet worden: 'due_date' (deadline), 'title' (alfabetisch), of 'created_at' (aanmaakdatum)",
             "schema": {
               "type": "string",
               "enum": ["due_date", "title", "created_at"],
@@ -915,7 +961,7 @@
             "name": "order",
             "in": "query",
             "required": false,
-            "description": "Sorteerrichting",
+            "description": "Sorteerrichting: 'asc' (oplopend) of 'desc' (aflopend)",
             "schema": {
               "type": "string",
               "enum": ["asc", "desc"],
@@ -1058,7 +1104,7 @@
     "/api/students/me/submissions": {
       "get": {
         "summary": "Haal alle submissions van student op",
-        "description": "Retourneert alle submissions van de ingelogde student met optionele filtering op cursus en status.",
+        "description": "Retourneert alle submissions die de ingelogde student heeft ingediend voor alle cursussen, inclusief scores en opdracht details. Ondersteunt filtering op cursus en status. **Gebruik:** Dit endpoint wordt gebruikt voor het student submission overzicht dashboard, waar studenten al hun ingediend werk kunnen bekijken met scores en feedback status.",
         "operationId": "getStudentSubmissions",
         "tags": ["Studenten"],
         "security": [{ "bearerAuth": [] }],
@@ -1066,14 +1112,14 @@
           {
             "name": "courseId",
             "in": "query",
-            "description": "Filter op cursus ID",
+            "description": "Filter submissions op specifieke cursus ID - als niet opgegeven worden alle cursussen getoond",
             "required": false,
-            "schema": { "type": "integer" }
+            "schema": { "type": "integer", "example": 2 }
           },
           {
             "name": "status",
             "in": "query",
-            "description": "Filter op submission status",
+            "description": "Filter op submission status: 'pending' (in behandeling), 'completed' (afgerond), 'graded' (beoordeeld)",
             "required": false,
             "schema": {
               "type": "string",
@@ -1188,7 +1234,7 @@
     "/api/students/me/submissions/{submissionId}": {
       "get": {
         "summary": "Haal submission detail met feedback op",
-        "description": "Retourneert gedetailleerde informatie over een specifieke submission inclusief opdracht info, cursus info en alle feedback. Student kan alleen eigen submissions bekijken (403 als niet eigenaar).",
+        "description": "Retourneert uitgebreide informatie over een specifieke submission inclusief opdracht details, cursus info en alle feedback (AI en manueel). De student kan alleen eigen submissions bekijken - toegang tot andermans submissions resulteert in 403 Forbidden. **Gebruik:** Dit endpoint wordt gebruikt op de submission detail pagina waar studenten hun ingediende werk, scores, en feedback kunnen bekijken.",
         "operationId": "getStudentSubmissionDetail",
         "tags": ["Studenten"],
         "security": [{ "bearerAuth": [] }],
@@ -1196,9 +1242,9 @@
           {
             "name": "submissionId",
             "in": "path",
-            "description": "Submission ID",
+            "description": "Het unieke ID van de submission die moet worden opgehaald",
             "required": true,
-            "schema": { "type": "integer" }
+            "schema": { "type": "integer", "example": 42 }
           },
           {
             "name": "studentId",
@@ -1421,10 +1467,256 @@
         }
       }
     },
+    "/api/docent/courses/{courseId}/students": {
+      "get": {
+        "summary": "Haal ingeschreven studenten voor een cursus op",
+        "description": "Retourneert een lijst van alle studenten die zijn ingeschreven voor de opgegeven cursus. Dit endpoint is beschikbaar voor docenten die de cursus begeleiden.",
+        "operationId": "getEnrolledStudents",
+        "tags": ["Docenten"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "description": "Het unieke ID van de cursus",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Studenten succesvol opgehaald",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "example": 5
+                          },
+                          "email": {
+                            "type": "string",
+                            "format": "email",
+                            "example": "student@example.com"
+                          },
+                          "name": {
+                            "type": "string",
+                            "example": "Jan Jansen"
+                          },
+                          "enrolled_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2024-01-15T10:30:00Z"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "15 studenten gevonden voor deze cursus"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cursus niet gevonden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Cursus niet gevonden"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Fout bij ophalen studenten"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Voeg een student toe aan een cursus",
+        "description": "Schrijft een student in voor de opgegeven cursus. De docent moet het student ID en cursus ID opgeven. Dit endpoint controleert of de student al is ingeschreven en voorkomt dubbele inschrijvingen.",
+        "operationId": "addStudentToCourse",
+        "tags": ["Docenten"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "description": "Het unieke ID van de cursus",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Student gegevens voor inschrijving",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["studentId"],
+                "properties": {
+                  "studentId": {
+                    "type": "integer",
+                    "example": 5,
+                    "description": "Het unieke ID van de student die moet worden ingeschreven"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Student succesvol toegevoegd aan de cursus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Student succesvol toegevoegd aan cursus"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "enrollmentId": {
+                          "type": "integer",
+                          "example": 42
+                        },
+                        "studentId": {
+                          "type": "integer",
+                          "example": 5
+                        },
+                        "courseId": {
+                          "type": "integer",
+                          "example": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ongeldige request - student ID ontbreekt of student is al ingeschreven",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Student is al ingeschreven voor deze cursus"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Student of cursus niet gevonden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Student of cursus niet gevonden"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Interne serverfout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Fout bij toevoegen student aan cursus"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/students": {
       "get": {
-        "summary": "Haal alle studenten op",
-        "description": "Retourneert een lijst van alle studenten in het systeem. Alleen toegankelijk voor admins.",
+        "summary": "Haal alle studenten op (Admin)",
+        "description": "Retourneert een volledige lijst van alle studenten in het systeem met hun profiel informatie. Dit endpoint is **alleen toegankelijk voor gebruikers met admin role**. Bij toegang door niet-admins wordt een 403 Forbidden geretourneerd. **Gebruik:** Dit endpoint wordt gebruikt op het admin dashboard om studentenlijsten te beheren en te monitoren. Inclusief audit logging voor compliance.",
         "operationId": "getAllStudents",
         "tags": ["Admin"],
         "security": [{ "bearerAuth": [] }],
@@ -1432,9 +1724,9 @@
           {
             "name": "adminId",
             "in": "query",
-            "description": "Admin ID (development only - wordt verwijderd in productie)",
+            "description": "Admin ID (development only - wordt verwijderd in productie en vervangen door req.user.id)",
             "required": false,
-            "schema": { "type": "integer" }
+            "schema": { "type": "integer", "example": 1 }
           }
         ],
         "responses": {
