@@ -1,0 +1,219 @@
+{
+    "/api/docent/courses/{courseId}/students": {
+        "get": {
+            "summary": "Haal ingeschreven studenten op",
+            "description": "Haalt een gepagineerde lijst op van studenten die zijn ingeschreven voor een specifieke cursus, met optionele filters en sortering.",
+            "operationId": "getEnrolledStudents",
+            "tags": [
+                "Docenten"
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "ID van de cursus"
+                },
+                {
+                    "name": "assignmentId",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "Filter op opdracht ID"
+                },
+                {
+                    "name": "status",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "Filter op inleverstatus"
+                },
+                {
+                    "name": "search",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "Zoek op naam of e-mail"
+                },
+                {
+                    "name": "sortBy",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string",
+                        "default": "name"
+                    },
+                    "description": "Sorteerveld (name, progress, lastSubmission, avgScore)"
+                },
+                {
+                    "name": "sortOrder",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string",
+                        "default": "asc"
+                    },
+                    "description": "Sorteervolgorde (asc, desc)"
+                },
+                {
+                    "name": "page",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "integer",
+                        "default": 1
+                    },
+                    "description": "Paginanummer"
+                },
+                {
+                    "name": "limit",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "integer",
+                        "default": 50
+                    },
+                    "description": "Aantal items per pagina"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Lijst met studenten en paginering metadata",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "students": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "pagination": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ontbrekende verplichte parameters"
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
+        },
+        "post": {
+            "summary": "Voeg student toe aan cursus",
+            "description": "Voegt een student toe aan een cursus op basis van e-mailadres.",
+            "operationId": "addStudentToCourse",
+            "tags": [
+                "Docenten"
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "ID van de cursus"
+                }
+            ],
+            "requestBody": {
+                "required": true,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "email": {
+                                    "type": "string",
+                                    "format": "email",
+                                    "description": "E-mailadres van de student"
+                                }
+                            },
+                            "required": [
+                                "email"
+                            ]
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "201": {
+                    "description": "Student succesvol toegevoegd"
+                },
+                "400": {
+                    "description": "Ongeldige input of missende velden"
+                },
+                "404": {
+                    "description": "Student niet gevonden"
+                },
+                "409": {
+                    "description": "Student is al ingeschreven"
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
+        }
+    },
+    "/api/docent/courses/{courseId}/students/{studentId}": {
+        "delete": {
+            "summary": "Verwijder student uit cursus",
+            "description": "Verwijdert een student uit een specifieke cursus.",
+            "operationId": "removeStudentFromCourse",
+            "tags": [
+                "Docenten"
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "ID van de cursus"
+                },
+                {
+                    "name": "studentId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "ID van de te verwijderen student"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Student succesvol verwijderd"
+                },
+                "400": {
+                    "description": "Missing parameters"
+                },
+                "404": {
+                    "description": "Student niet ingeschreven"
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
+        }
+    }
+}
