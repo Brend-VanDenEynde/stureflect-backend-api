@@ -141,13 +141,14 @@ async function getStudentSubmissions(studentId, filters = {}) {
 }
 
 /**
- * Haal detail van een specifieke submission op
+ * Haal detail van een specifieke submission op inclusief feedback
  * @param {number} submissionId - ID van de submission
  * @returns {Promise<object|null>}
  */
 async function getSubmissionDetail(submissionId) {
   try {
-    const result = await db.query(
+    // Haal submission, assignment en course op
+    const submissionResult = await db.query(
       `SELECT
         s.id,
         s.github_url,
@@ -170,11 +171,29 @@ async function getSubmissionDetail(submissionId) {
       [submissionId]
     );
 
-    if (result.rows.length === 0) {
+    if (submissionResult.rows.length === 0) {
       return null;
     }
 
-    const row = result.rows[0];
+    // Haal feedback op (volgorde schema: id, submission_id, content, reviewer, severity, line_number, suggestion, type, created_at)
+    const feedbackResult = await db.query(
+      `SELECT
+        id,
+        submission_id,
+        content,
+        reviewer,
+        severity,
+        line_number,
+        suggestion,
+        type,
+        created_at
+      FROM feedback
+      WHERE submission_id = $1
+      ORDER BY created_at ASC`,
+      [submissionId]
+    );
+
+    const row = submissionResult.rows[0];
     return {
       submission: {
         id: row.id,
@@ -195,7 +214,8 @@ async function getSubmissionDetail(submissionId) {
       course: {
         id: row.course_id,
         title: row.course_title
-      }
+      },
+      feedback: feedbackResult.rows
     };
   } catch (error) {
     console.error('Fout bij ophalen submission detail:', error);
