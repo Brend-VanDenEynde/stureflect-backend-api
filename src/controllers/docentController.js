@@ -213,5 +213,43 @@ const addStudentToCourse = async (req, res) => {
   }
 };
 
-module.exports = { getEnrolledStudents, addStudentToCourse };
+const removeStudentFromCourse = async (req, res) => {
+  try {
+    const { courseId, studentId } = req.params;
+
+    if (!courseId) {
+      return res.status(400).json({ error: 'courseId is required' });
+    }
+    if (!studentId) {
+      return res.status(400).json({ error: 'studentId is required' });
+    }
+
+    // Check if the enrollment exists
+    const checkResult = await pool.query(
+      'SELECT id FROM enrollment WHERE course_id = $1 AND user_id = $2',
+      [courseId, studentId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Student is not enrolled in this course' });
+    }
+
+    // Remove the student
+    await pool.query(
+      'DELETE FROM enrollment WHERE course_id = $1 AND user_id = $2',
+      [courseId, studentId]
+    );
+
+    res.json({ message: 'Student successfully removed from the course' });
+
+  } catch (error) {
+    console.error('❌ Error removing student from course:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
+module.exports = { getEnrolledStudents, addStudentToCourse, removeStudentFromCourse };
 
