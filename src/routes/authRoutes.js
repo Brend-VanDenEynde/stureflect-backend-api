@@ -2,12 +2,16 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const userController = require('../controllers/userController');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // Public auth routes
 router.post('/login', userController.loginUser);
 router.post('/register', userController.registerUser);
 router.post('/refresh', userController.refreshAccessToken);
 router.post('/logout', userController.logoutUser);
+
+// Protected routes
+router.get('/profile', authMiddleware, userController.getProfile);
 
 // GitHub OAuth routes
 router.get('/github', passport.authenticate('github'));
