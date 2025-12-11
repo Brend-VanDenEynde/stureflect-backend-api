@@ -352,10 +352,10 @@
         }
       }
     },
-    "/auth/github": {
+    "/api/auth/github": {
       "get": {
         "summary": "GitHub OAuth login initiëren",
-        "description": "Initieert de GitHub OAuth 2.0 login flow. Redirect de gebruiker naar dit endpoint om inloggen met GitHub in te stellen. De gebruiker wordt naar GitHub gestuurd om toestemming te geven, waarna deze wordt teruggestuurd naar het callback endpoint.",
+        "description": "Initieert de GitHub OAuth 2.0 login flow. Redirect de gebruiker naar dit endpoint om inloggen met GitHub in te stellen. De gebruiker wordt naar GitHub gestuurd om toestemming te geven, waarna deze wordt teruggestuurd naar het callback endpoint. **BELANGRIJK: Gebruik /api/auth/github, niet /auth/github!**",
         "operationId": "githubLogin",
         "tags": [
           "GitHub OAuth"
@@ -375,7 +375,7 @@
         }
       }
     },
-    "/auth/github/callback": {
+    "/api/auth/github/callback": {
       "get": {
         "summary": "GitHub OAuth callback",
         "description": "Dit endpoint wordt gebruikt door GitHub om de gebruiker terug te sturen na autorisatie. Dit wordt automatisch behandeld door Passport. De gebruiker wordt ingelogd en krijgt een sessie.",
