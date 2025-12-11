@@ -152,6 +152,40 @@ async function logoutUser(req, res) {
   }
 }
 
+// GitHub OAuth callback
+async function githubCallback(req, res) {
+  try {
+    const user = req.user;
+
+    // Generate access token
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m' }
+    );
+
+    // Generate refresh token
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d' }
+    );
+
+    // Save refresh token in database
+    const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await userModel.saveRefreshToken(user.id, refreshToken, tokenExpiresAt);
+
+    // Redirect to frontend with tokens (or return JSON)
+    // Option 1: Redirect with tokens in URL (not secure, better for dev)
+    const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth-callback?accessToken=${accessToken}&refreshToken=${refreshToken}`;
+    
+    res.redirect(redirectUrl);
+  } catch (error) {
+    console.error('Fout bij GitHub callback:', error);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth-error`);
+  }
+}
+
 // Get user profile
 async function getProfile(req, res) {
   try {
@@ -176,5 +210,6 @@ module.exports = {
   registerUser,
   refreshAccessToken,
   logoutUser,
+  githubCallback,
   getProfile,
 };
