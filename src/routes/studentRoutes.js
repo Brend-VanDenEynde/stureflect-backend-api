@@ -35,11 +35,20 @@ router.get('/me/courses', async (req, res) => {
 /**
  * GET /api/students/me/submissions
  * Haalt alle submissions op van de ingelogde student
+ * Query params:
+ *   - courseId: Filter op cursus ID (optioneel)
+ *   - status: 'pending' | 'completed' | 'graded' (optioneel)
  */
 router.get('/me/submissions', async (req, res) => {
   try {
     const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
-    const submissions = await studentController.getStudentSubmissions(studentId);
+    const { courseId, status } = req.query;
+
+    const filters = {};
+    if (courseId) filters.courseId = parseInt(courseId);
+    if (status) filters.status = status;
+
+    const submissions = await studentController.getStudentSubmissions(studentId, filters);
 
     res.status(200).json({
       success: true,

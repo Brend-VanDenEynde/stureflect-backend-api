@@ -86,12 +86,19 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
 /**
  * Haal alle submissions op van een student
  * @param {number} studentId - ID van de student
+ * @param {object} filters - Filter opties
+ * @param {number} filters.courseId - Filter op cursus (optioneel)
+ * @param {string} filters.status - Filter op status: 'pending', 'completed', 'graded' (optioneel)
  * @returns {Promise<Array>}
  */
-async function getStudentSubmissions(studentId) {
+async function getStudentSubmissions(studentId, filters = {}) {
   try {
-    const result = await db.query(
-      `SELECT
+    const { courseId, status } = filters;
+    const params = [studentId];
+    let paramIndex = 2;
+
+    let query = `
+      SELECT
         s.id,
         s.assignment_id,
         a.title as assignment_title,
@@ -107,9 +114,25 @@ async function getStudentSubmissions(studentId) {
       JOIN assignment a ON s.assignment_id = a.id
       JOIN course c ON a.course_id = c.id
       WHERE s.user_id = $1
-      ORDER BY s.created_at DESC`,
-      [studentId]
-    );
+    `;
+
+    // Filter op courseId
+    if (courseId) {
+      query += ` AND c.id = $${paramIndex}`;
+      params.push(courseId);
+      paramIndex++;
+    }
+
+    // Filter op status (whitelist validation)
+    const validStatuses = ['pending', 'completed', 'graded'];
+    if (status && validStatuses.includes(status)) {
+      query += ` AND s.status = $${paramIndex}`;
+      params.push(status);
+    }
+
+    query += ` ORDER BY s.created_at DESC`;
+
+    const result = await db.query(query, params);
     return result.rows;
   } catch (error) {
     console.error('Fout bij ophalen submissions:', error);
