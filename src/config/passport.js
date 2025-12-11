@@ -3,11 +3,11 @@ const GitHubStrategy = require('passport-github2').Strategy;
 const userModel = require('../models/user');
 
 // Only setup GitHub strategy if environment variables are provided
-if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+if (process.env.GH_CLIENT_ID && process.env.GH_CLIENT_SECRET) {
   passport.use(new GitHubStrategy({
-      clientID: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: process.env.GITHUB_CALLBACK_URL,
+      clientID: process.env.GH_CLIENT_ID,
+      clientSecret: process.env.GH_CLIENT_SECRET,
+      callbackURL: process.env.GH_CALLBACK_URL,
       scope: ['user:email', 'repo']
     },
     async (accessToken, refreshToken, profile, done) => {
@@ -55,7 +55,7 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
     }
   ));
 } else {
-  console.warn('⚠️  GitHub OAuth not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to enable GitHub login.');
+  console.warn('⚠️  GitHub OAuth not configured. Set GH_CLIENT_ID and GH_CLIENT_SECRET to enable GitHub login.');
 }
 
 passport.serializeUser((user, done) => {
