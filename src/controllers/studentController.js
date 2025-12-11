@@ -141,6 +141,69 @@ async function getStudentSubmissions(studentId, filters = {}) {
 }
 
 /**
+ * Haal detail van een specifieke submission op
+ * @param {number} submissionId - ID van de submission
+ * @returns {Promise<object|null>}
+ */
+async function getSubmissionDetail(submissionId) {
+  try {
+    const result = await db.query(
+      `SELECT
+        s.id,
+        s.github_url,
+        s.commit_sha,
+        s.status,
+        s.ai_score,
+        s.manual_score,
+        s.user_id,
+        s.created_at,
+        a.id as assignment_id,
+        a.title as assignment_title,
+        a.description as assignment_description,
+        a.due_date,
+        c.id as course_id,
+        c.title as course_title
+      FROM submission s
+      JOIN assignment a ON s.assignment_id = a.id
+      JOIN course c ON a.course_id = c.id
+      WHERE s.id = $1`,
+      [submissionId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      submission: {
+        id: row.id,
+        github_url: row.github_url,
+        commit_sha: row.commit_sha,
+        status: row.status,
+        ai_score: row.ai_score,
+        manual_score: row.manual_score,
+        user_id: row.user_id,
+        created_at: row.created_at
+      },
+      assignment: {
+        id: row.assignment_id,
+        title: row.assignment_title,
+        description: row.assignment_description,
+        due_date: row.due_date
+      },
+      course: {
+        id: row.course_id,
+        title: row.course_title
+      }
+    };
+  } catch (error) {
+    console.error('Fout bij ophalen submission detail:', error);
+    throw error;
+  }
+}
+
+/**
  * Controleer of een student is ingeschreven in een cursus
  * @param {number} studentId - ID van de student
  * @param {number} courseId - ID van de cursus
@@ -163,5 +226,6 @@ module.exports = {
   getStudentCourses,
   getCourseAssignments,
   getStudentSubmissions,
+  getSubmissionDetail,
   isStudentEnrolledInCourse
 };

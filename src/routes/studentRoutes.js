@@ -67,6 +67,48 @@ router.get('/me/submissions', async (req, res) => {
 });
 
 /**
+ * GET /api/students/me/submissions/:submissionId
+ * Haalt detail van een specifieke submission op
+ */
+router.get('/me/submissions/:submissionId', async (req, res) => {
+  try {
+    const submissionId = parseInt(req.params.submissionId);
+
+    if (isNaN(submissionId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig submission ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const detail = await studentController.getSubmissionDetail(submissionId);
+
+    if (!detail) {
+      return res.status(404).json({
+        success: false,
+        message: 'Submission niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: detail,
+      message: 'Submission detail opgehaald',
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij ophalen submission detail:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen submission detail',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
  * GET /api/students/me/courses/:courseId/assignments
  * Haalt alle opdrachten op voor een specifieke cursus
  * Query params:
