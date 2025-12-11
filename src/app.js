@@ -40,6 +40,7 @@ app.get('/api-docs.json', (req, res) => {
 });
 // Routes
 const generalRoutes = require('./routes/general');
+const apiRoutes = require('./routes');
 app.use('/', generalRoutes);
 app.use('/api', apiRoutes);
 

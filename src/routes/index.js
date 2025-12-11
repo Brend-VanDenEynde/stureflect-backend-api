@@ -19,6 +19,6 @@ router.use('/users', userRoutes);
 router.use('/students', studentRoutes);
 
 // Docent/teacher routes
-router.use('/', docentRoutes);
+router.use('/docent', docentRoutes);
 
 module.exports = router;
