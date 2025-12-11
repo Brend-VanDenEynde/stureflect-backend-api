@@ -69,9 +69,11 @@ router.get('/me/submissions', async (req, res) => {
 /**
  * GET /api/students/me/submissions/:submissionId
  * Haalt detail van een specifieke submission op
+ * Alleen toegankelijk voor de eigenaar van de submission
  */
 router.get('/me/submissions/:submissionId', async (req, res) => {
   try {
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
     const submissionId = parseInt(req.params.submissionId);
 
     if (isNaN(submissionId)) {
@@ -89,6 +91,15 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
         success: false,
         message: 'Submission niet gevonden',
         error: 'NOT_FOUND'
+      });
+    }
+
+    // Autorisatie: check of submission van deze student is
+    if (detail.submission.user_id !== studentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Je hebt geen toegang tot deze submission',
+        error: 'FORBIDDEN'
       });
     }
 

@@ -1,0 +1,243 @@
+{
+  "paths": {
+    "/api/students/me/submissions": {
+      "get": {
+        "tags": ["Student"],
+        "summary": "Get all submissions for logged-in student",
+        "description": "Returns all submissions for the authenticated student with optional filtering by course and status",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "query",
+            "description": "Filter by course ID",
+            "required": false,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by submission status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "completed", "graded"]
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "query",
+            "description": "Student ID (development only - will be removed in production)",
+            "required": false,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Submissions retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer", "example": 1 },
+                          "assignment_id": { "type": "integer", "example": 5 },
+                          "assignment_title": { "type": "string", "example": "JavaScript Basics" },
+                          "course_id": { "type": "integer", "example": 2 },
+                          "course_title": { "type": "string", "example": "Web Development" },
+                          "github_url": { "type": "string", "example": "https://github.com/student/repo" },
+                          "commit_sha": { "type": "string", "example": "abc123def456" },
+                          "status": { "type": "string", "example": "completed" },
+                          "ai_score": { "type": "integer", "nullable": true, "example": 85 },
+                          "manual_score": { "type": "integer", "nullable": true, "example": 90 },
+                          "user_id": { "type": "integer", "example": 1 },
+                          "created_at": { "type": "string", "format": "date-time" },
+                          "due_date": { "type": "string", "format": "date-time" }
+                        }
+                      }
+                    },
+                    "message": { "type": "string", "example": "4 submissions gevonden" },
+                    "error": { "type": "string", "nullable": true, "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Fout bij ophalen submissions" },
+                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/students/me/submissions/{submissionId}": {
+      "get": {
+        "tags": ["Student"],
+        "summary": "Get submission detail with feedback",
+        "description": "Returns detailed information about a specific submission including assignment info, course info, and all feedback. Student can only access their own submissions (403 if not owner).",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "submissionId",
+            "in": "path",
+            "description": "Submission ID",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "studentId",
+            "in": "query",
+            "description": "Student ID (development only - will be removed in production)",
+            "required": false,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Submission detail retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "submission": {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "integer", "example": 1 },
+                            "github_url": { "type": "string", "example": "https://github.com/student/repo" },
+                            "commit_sha": { "type": "string", "example": "abc123def456" },
+                            "status": { "type": "string", "example": "completed" },
+                            "ai_score": { "type": "integer", "nullable": true, "example": 85 },
+                            "manual_score": { "type": "integer", "nullable": true, "example": 90 },
+                            "user_id": { "type": "integer", "example": 1 },
+                            "created_at": { "type": "string", "format": "date-time" }
+                          }
+                        },
+                        "assignment": {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "integer", "example": 5 },
+                            "title": { "type": "string", "example": "JavaScript Basics" },
+                            "description": { "type": "string", "example": "Create a JavaScript application" },
+                            "due_date": { "type": "string", "format": "date-time" }
+                          }
+                        },
+                        "course": {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "integer", "example": 2 },
+                            "title": { "type": "string", "example": "Web Development" }
+                          }
+                        },
+                        "feedback": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "integer", "example": 1 },
+                              "submission_id": { "type": "integer", "example": 1 },
+                              "content": { "type": "string", "example": "Great implementation!" },
+                              "reviewer": { "type": "string", "enum": ["ai", "teacher"], "example": "ai" },
+                              "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"], "example": "low" },
+                              "line_number": { "type": "integer", "nullable": true, "example": 42 },
+                              "suggestion": { "type": "string", "nullable": true, "example": "Consider using const" },
+                              "type": { "type": "string", "nullable": true, "example": "suggestion" },
+                              "created_at": { "type": "string", "format": "date-time" }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "message": { "type": "string", "example": "Submission detail opgehaald" },
+                    "error": { "type": "string", "nullable": true, "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid submission ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Ongeldig submission ID" },
+                    "error": { "type": "string", "example": "BAD_REQUEST" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Student does not own this submission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Je hebt geen toegang tot deze submission" },
+                    "error": { "type": "string", "example": "FORBIDDEN" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Submission not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Submission niet gevonden" },
+                    "error": { "type": "string", "example": "NOT_FOUND" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Fout bij ophalen submission detail" },
+                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
