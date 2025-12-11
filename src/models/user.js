@@ -7,13 +7,13 @@ function hashToken(token) {
 }
 
 // Functie om een gebruiker toe te voegen
-async function createUser({ email, name, github_id, password_hash, role }) {
+async function createUser({ email, name, github_id, github_access_token, password_hash, role }) {
   const query = `
-    INSERT INTO "user" (email, name, github_id, password_hash, role)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO "user" (email, name, github_id, github_access_token, password_hash, role)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING *;
   `;
-  const values = [email, name, github_id, password_hash, role];
+  const values = [email, name, github_id, github_access_token, password_hash, role];
   const result = await pool.query(query, values);
   return result.rows[0];
 }
@@ -50,6 +50,20 @@ async function deleteUser(id) {
 async function updateUserPassword(id, password_hash) {
   const query = `UPDATE "user" SET password_hash = $1 WHERE id = $2 RETURNING *;`;
   const result = await pool.query(query, [password_hash, id]);
+  return result.rows[0];
+}
+
+// Functie om GitHub ID van een gebruiker bij te werken
+async function updateUserGithubId(id, github_id) {
+  const query = `UPDATE "user" SET github_id = $1 WHERE id = $2 RETURNING *;`;
+  const result = await pool.query(query, [github_id, id]);
+  return result.rows[0];
+}
+
+// Functie om GitHub access token van een gebruiker bij te werken
+async function updateUserGithubAccessToken(id, github_access_token) {
+  const query = `UPDATE "user" SET github_access_token = $1 WHERE id = $2 RETURNING *;`;
+  const result = await pool.query(query, [github_access_token, id]);
   return result.rows[0];
 }
 
@@ -102,6 +116,8 @@ module.exports = {
   getUserByGithubId,
   deleteUser,
   updateUserPassword,
+  updateUserGithubId,
+  updateUserGithubAccessToken,
   saveRefreshToken,
   getRefreshToken,
   revokeRefreshToken,

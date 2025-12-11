@@ -32,6 +32,10 @@
       "description": "Endpoints voor gebruiker registratie en inloggen met JWT-authenticatie"
     },
     {
+      "name": "GitHub OAuth",
+      "description": "Endpoints voor GitHub OAuth 2.0 authenticatie en private repository access"
+    },
+    {
       "name": "Cursussen",
       "description": "Endpoints voor cursusbeheer en cursusgegevens"
     },
@@ -344,6 +348,67 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/auth/github": {
+      "get": {
+        "summary": "GitHub OAuth login initiëren",
+        "description": "Initieert de GitHub OAuth 2.0 login flow. Redirect de gebruiker naar dit endpoint om inloggen met GitHub in te stellen. De gebruiker wordt naar GitHub gestuurd om toestemming te geven, waarna deze wordt teruggestuurd naar het callback endpoint.",
+        "operationId": "githubLogin",
+        "tags": [
+          "GitHub OAuth"
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect naar GitHub OAuth authorize endpoint",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "example": "https://github.com/login/oauth/authorize?client_id=..."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/github/callback": {
+      "get": {
+        "summary": "GitHub OAuth callback",
+        "description": "Dit endpoint wordt gebruikt door GitHub om de gebruiker terug te sturen na autorisatie. Dit wordt automatisch behandeld door Passport. De gebruiker wordt ingelogd en krijgt een sessie.",
+        "operationId": "githubCallback",
+        "tags": [
+          "GitHub OAuth"
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Autorisatiecode van GitHub"
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "State parameter voor CSRF-bescherming"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect naar frontend na succesvol inloggen"
+          },
+          "401": {
+            "description": "GitHub authenticatie mislukt"
           }
         }
       }

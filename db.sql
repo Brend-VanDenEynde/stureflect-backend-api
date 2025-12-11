@@ -16,6 +16,7 @@ CREATE TABLE "user" (
     email              VARCHAR(255) NOT NULL UNIQUE,
     name               VARCHAR(255) NOT NULL,
     github_id          VARCHAR(255),
+    github_access_token VARCHAR(2048),
     role               user_role NOT NULL DEFAULT 'student',
     password_hash      VARCHAR(255),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
