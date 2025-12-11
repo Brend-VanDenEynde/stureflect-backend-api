@@ -242,10 +242,85 @@ async function isStudentEnrolledInCourse(studentId, courseId) {
   }
 }
 
+/**
+ * Haal een assignment op met course info
+ * @param {number} assignmentId - ID van de assignment
+ * @returns {Promise<object|null>}
+ */
+async function getAssignmentWithCourse(assignmentId) {
+  try {
+    const result = await db.query(
+      `SELECT
+        a.id,
+        a.title,
+        a.description,
+        a.due_date,
+        a.course_id,
+        c.title as course_title
+      FROM assignment a
+      JOIN course c ON a.course_id = c.id
+      WHERE a.id = $1`,
+      [assignmentId]
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch (error) {
+    console.error('Fout bij ophalen assignment:', error);
+    throw error;
+  }
+}
+
+/**
+ * Check of een student al een submission heeft voor een assignment
+ * @param {number} studentId - ID van de student
+ * @param {number} assignmentId - ID van de assignment
+ * @returns {Promise<object|null>} - Bestaande submission of null
+ */
+async function getExistingSubmission(studentId, assignmentId) {
+  try {
+    const result = await db.query(
+      `SELECT id, github_url, commit_sha, status, created_at
+       FROM submission
+       WHERE user_id = $1 AND assignment_id = $2`,
+      [studentId, assignmentId]
+    );
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch (error) {
+    console.error('Fout bij controleren bestaande submission:', error);
+    throw error;
+  }
+}
+
+/**
+ * Maak een nieuwe submission aan
+ * @param {object} data - Submission data
+ * @param {number} data.assignmentId - ID van de assignment
+ * @param {number} data.userId - ID van de student
+ * @param {string} data.githubUrl - GitHub repository URL
+ * @param {string} data.commitSha - Commit SHA
+ * @returns {Promise<object>} - Aangemaakte submission
+ */
+async function createSubmission({ assignmentId, userId, githubUrl, commitSha }) {
+  try {
+    const result = await db.query(
+      `INSERT INTO submission (assignment_id, user_id, github_url, commit_sha, status)
+       VALUES ($1, $2, $3, $4, 'pending')
+       RETURNING id, assignment_id, user_id, github_url, commit_sha, status, created_at`,
+      [assignmentId, userId, githubUrl, commitSha]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Fout bij aanmaken submission:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getStudentCourses,
   getCourseAssignments,
   getStudentSubmissions,
   getSubmissionDetail,
-  isStudentEnrolledInCourse
+  isStudentEnrolledInCourse,
+  getAssignmentWithCourse,
+  getExistingSubmission,
+  createSubmission
 };
