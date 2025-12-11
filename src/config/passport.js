@@ -2,56 +2,61 @@ const passport = require('passport');
 const GitHubStrategy = require('passport-github2').Strategy;
 const userModel = require('../models/user');
 
-passport.use(new GitHubStrategy({
-    clientID: process.env.GITHUB_CLIENT_ID,
-    clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    callbackURL: process.env.GITHUB_CALLBACK_URL,
-    scope: ['user:email', 'repo']
-  },
-  async (accessToken, refreshToken, profile, done) => {
-    try {
-      const { id, displayName, emails, avatar_url } = profile;
-      const email = emails && emails[0] ? emails[0].value : null;
+// Only setup GitHub strategy if environment variables are provided
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  passport.use(new GitHubStrategy({
+      clientID: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      callbackURL: process.env.GITHUB_CALLBACK_URL,
+      scope: ['user:email', 'repo']
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const { id, displayName, emails, avatar_url } = profile;
+        const email = emails && emails[0] ? emails[0].value : null;
 
-      if (!email) {
-        return done(null, false, { message: 'Geen e-mailadres beschikbaar van GitHub' });
-      }
+        if (!email) {
+          return done(null, false, { message: 'Geen e-mailadres beschikbaar van GitHub' });
+        }
 
-      // Check if user exists by GitHub ID
-      let user = await userModel.getUserByGithubId(id.toString());
+        // Check if user exists by GitHub ID
+        let user = await userModel.getUserByGithubId(id.toString());
 
-      if (user) {
-        // User exists, update access token
-        user = await userModel.updateUserGithubAccessToken(user.id, accessToken);
+        if (user) {
+          // User exists, update access token
+          user = await userModel.updateUserGithubAccessToken(user.id, accessToken);
+          return done(null, user);
+        }
+
+        // Check if user exists by email
+        user = await userModel.getUserByEmail(email);
+
+        if (user) {
+          // User exists, link GitHub ID and access token
+          user = await userModel.updateUserGithubId(user.id, id.toString());
+          user = await userModel.updateUserGithubAccessToken(user.id, accessToken);
+          return done(null, user);
+        }
+
+        // Create new user
+        user = await userModel.createUser({
+          email,
+          name: displayName || email.split('@')[0],
+          github_id: id.toString(),
+          github_access_token: accessToken,
+          password_hash: null,
+          role: 'student'
+        });
+
         return done(null, user);
+      } catch (error) {
+        return done(error);
       }
-
-      // Check if user exists by email
-      user = await userModel.getUserByEmail(email);
-
-      if (user) {
-        // User exists, link GitHub ID and access token
-        user = await userModel.updateUserGithubId(user.id, id.toString());
-        user = await userModel.updateUserGithubAccessToken(user.id, accessToken);
-        return done(null, user);
-      }
-
-      // Create new user
-      user = await userModel.createUser({
-        email,
-        name: displayName || email.split('@')[0],
-        github_id: id.toString(),
-        github_access_token: accessToken,
-        password_hash: null,
-        role: 'student'
-      });
-
-      return done(null, user);
-    } catch (error) {
-      return done(error);
     }
-  }
-));
+  ));
+} else {
+  console.warn('⚠️  GitHub OAuth not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to enable GitHub login.');
+}
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
