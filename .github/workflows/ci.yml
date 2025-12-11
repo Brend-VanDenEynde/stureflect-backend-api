@@ -28,6 +28,9 @@ jobs:
     env:
       DATABASE_URL: postgres://test:test@localhost:5432/testdb
       DB_SSL: 'false'
+      GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
+      GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
+      GH_CALLBACK_URL: ${{ secrets.GH_CALLBACK_URL }}
 
     steps:
       - name: Checkout code
