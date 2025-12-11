@@ -10,7 +10,7 @@ router.post('/refresh', userController.refreshAccessToken);
 router.post('/logout', userController.logoutUser);
 
 // GitHub OAuth routes
-router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
+router.get('/github', passport.authenticate('github'));
 router.get('/github/callback', passport.authenticate('github', { failureRedirect: '/' }), userController.githubCallback);
 
 module.exports = router;
