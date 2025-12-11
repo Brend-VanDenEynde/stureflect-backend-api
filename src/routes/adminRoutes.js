@@ -10,6 +10,16 @@ router.get('/admin/students', async (req, res) => {
   try {
     const students = await adminController.getAllStudents();
 
+    // Validatie: controleer of er studenten beschikbaar zijn
+    if (students.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: 'Geen studenten gevonden',
+        error: null
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: students,

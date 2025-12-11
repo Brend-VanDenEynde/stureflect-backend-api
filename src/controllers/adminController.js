@@ -6,7 +6,7 @@ const db = require('../config/db');
  */
 async function getAllStudents() {
   const result = await db.query(
-    `SELECT id, email, name, github_id, created_at, updated_at
+    `SELECT id, email, name, created_at, updated_at
      FROM "user"
      WHERE role = 'student'
      ORDER BY name ASC`
