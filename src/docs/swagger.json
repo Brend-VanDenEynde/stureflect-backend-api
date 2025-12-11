@@ -50,6 +50,10 @@
     {
       "name": "Docenten",
       "description": "Endpoints voor docenten om cursussen en studenten te beheren"
+    },
+    {
+      "name": "Student Submissions",
+      "description": "Endpoints voor het indienen van GitHub repositories voor opdrachten"
     }
   ],
   "paths": {
@@ -1826,6 +1830,210 @@
                       "type": "string",
                       "example": "INTERNAL_SERVER_ERROR"
                     }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/students/me/assignments/{assignmentId}/submissions": {
+      "post": {
+        "summary": "Dien GitHub repository in voor opdracht",
+        "description": "Dien een GitHub repository in voor een opdracht. De repository wordt gevalideerd, de file tree wordt opgehaald en gefilterd op code bestanden. **Gebruik:** Student dient hun GitHub repo URL in, systeem valideert de URL, controleert of de repo publiek en bereikbaar is, haalt de commit SHA op, en retourneert een overzicht van alle code bestanden.",
+        "operationId": "createGitHubSubmission",
+        "tags": ["Student Submissions"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "description": "ID van de opdracht waarvoor wordt ingediend",
+            "schema": { "type": "integer", "example": 1 }
+          },
+          {
+            "name": "studentId",
+            "in": "query",
+            "required": false,
+            "description": "Student ID (development only - wordt vervangen door JWT)",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["github_url"],
+                "properties": {
+                  "github_url": {
+                    "type": "string",
+                    "description": "GitHub repository URL (publiek)",
+                    "example": "https://github.com/student/my-project"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Inzending succesvol aangemaakt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "integer", "example": 42 },
+                        "assignment_id": { "type": "integer", "example": 1 },
+                        "user_id": { "type": "integer", "example": 1 },
+                        "github_url": { "type": "string", "example": "https://github.com/student/project" },
+                        "commit_sha": { "type": "string", "example": "abc123def456789" },
+                        "status": { "type": "string", "example": "pending" },
+                        "created_at": { "type": "string", "format": "date-time" },
+                        "repository": {
+                          "type": "object",
+                          "properties": {
+                            "owner": { "type": "string", "example": "student" },
+                            "repo": { "type": "string", "example": "project" },
+                            "default_branch": { "type": "string", "example": "main" }
+                          }
+                        },
+                        "files_count": { "type": "integer", "example": 15 },
+                        "files": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": { "type": "string", "example": "src/index.js" },
+                              "size": { "type": "integer", "example": 1024 },
+                              "language": { "type": "string", "example": "javascript" }
+                            }
+                          }
+                        },
+                        "truncated": { "type": "boolean", "example": false }
+                      }
+                    },
+                    "message": { "type": "string", "example": "Inzending succesvol aangemaakt" },
+                    "error": { "type": "null", "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Ongeldige URL of lege repository",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "URL moet een GitHub repository zijn" },
+                    "error": { "type": "string", "enum": ["INVALID_URL", "BAD_REQUEST", "EMPTY_REPO"], "example": "INVALID_URL" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Niet ingeschreven voor cursus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Je bent niet ingeschreven voor deze cursus" },
+                    "error": { "type": "string", "example": "FORBIDDEN" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Opdracht of repository niet gevonden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Opdracht niet gevonden" },
+                    "error": { "type": "string", "enum": ["NOT_FOUND", "REPO_NOT_FOUND"], "example": "NOT_FOUND" }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - Al een inzending voor deze opdracht",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Je hebt al een inzending voor deze opdracht" },
+                    "error": { "type": "string", "example": "CONFLICT" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "existing_submission_id": { "type": "integer", "example": 5 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests - GitHub API rate limit bereikt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "GitHub API limiet bereikt, probeer later opnieuw" },
+                    "error": { "type": "string", "example": "RATE_LIMITED" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Fout bij aanmaken inzending" },
+                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway - GitHub API fout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Fout bij ophalen repository bestanden" },
+                    "error": { "type": "string", "example": "GITHUB_ERROR" }
                   }
                 }
               }
