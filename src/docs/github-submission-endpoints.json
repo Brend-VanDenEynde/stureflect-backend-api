@@ -1,0 +1,311 @@
+{
+  "paths": {
+    "/api/students/me/assignments/{assignmentId}/submissions": {
+      "post": {
+        "tags": ["Student Submissions"],
+        "summary": "Submit GitHub repository for assignment",
+        "description": "Dien een GitHub repository in voor een opdracht. De repository wordt gevalideerd en de bestanden worden opgehaald.",
+        "operationId": "createGitHubSubmission",
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "description": "ID van de opdracht",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "query",
+            "required": false,
+            "description": "Student ID (development only, wordt vervangen door JWT)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["github_url"],
+                "properties": {
+                  "github_url": {
+                    "type": "string",
+                    "description": "GitHub repository URL",
+                    "example": "https://github.com/student/my-project"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Inzending succesvol aangemaakt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "Submission ID"
+                        },
+                        "assignment_id": {
+                          "type": "integer"
+                        },
+                        "user_id": {
+                          "type": "integer"
+                        },
+                        "github_url": {
+                          "type": "string"
+                        },
+                        "commit_sha": {
+                          "type": "string",
+                          "description": "Git commit SHA"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": ["pending", "completed", "graded"]
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "repository": {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
+                            },
+                            "repo": {
+                              "type": "string"
+                            },
+                            "default_branch": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "files_count": {
+                          "type": "integer",
+                          "description": "Aantal code bestanden"
+                        },
+                        "files": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "size": {
+                                "type": "integer"
+                              },
+                              "language": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "truncated": {
+                          "type": "boolean",
+                          "description": "True als niet alle bestanden zijn opgehaald"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Inzending succesvol aangemaakt"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Ongeldige input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_url": {
+                    "summary": "Ongeldige GitHub URL",
+                    "value": {
+                      "success": false,
+                      "message": "Ongeldige GitHub URL format. Verwacht: https://github.com/owner/repo",
+                      "error": "INVALID_URL"
+                    }
+                  },
+                  "empty_repo": {
+                    "summary": "Repository bevat geen code",
+                    "value": {
+                      "success": false,
+                      "message": "Repository bevat geen code bestanden",
+                      "error": "EMPTY_REPO"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Niet ingeschreven voor cursus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Je bent niet ingeschreven voor deze cursus",
+                  "error": "FORBIDDEN"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Opdracht of repository niet gevonden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "assignment_not_found": {
+                    "summary": "Opdracht niet gevonden",
+                    "value": {
+                      "success": false,
+                      "message": "Opdracht niet gevonden",
+                      "error": "NOT_FOUND"
+                    }
+                  },
+                  "repo_not_found": {
+                    "summary": "GitHub repository niet gevonden",
+                    "value": {
+                      "success": false,
+                      "message": "Repository niet gevonden of niet publiek",
+                      "error": "REPO_NOT_FOUND"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - Al ingediend",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Je hebt al een inzending voor deze opdracht"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "CONFLICT"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "existing_submission_id": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests - GitHub API rate limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "GitHub API limiet bereikt, probeer later opnieuw",
+                  "error": "RATE_LIMITED"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Fout bij aanmaken inzending",
+                  "error": "INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway - GitHub API fout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Fout bij ophalen repository bestanden",
+                  "error": "GITHUB_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
