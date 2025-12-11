@@ -8,6 +8,27 @@ const adminController = require('../controllers/adminController');
  */
 router.get('/admin/students', async (req, res) => {
   try {
+    // Development: query param fallback, Productie: alleen req.user.id
+    const adminId = req.user?.id || parseInt(req.query.adminId);
+
+    // Autorisatie: controleer of gebruiker admin is
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze data',
+        error: 'FORBIDDEN'
+      });
+    }
+
     const students = await adminController.getAllStudents();
 
     // Validatie: controleer of er studenten beschikbaar zijn
