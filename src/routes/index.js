@@ -6,6 +6,7 @@ const courseRoutes = require('./courseRoutes');
 const userRoutes = require('./userRoutes');
 const docentRoutes = require('./docentRoutes');
 const studentRoutes = require('./studentRoutes');
+const adminRoutes = require('./adminRoutes');
 
 // Auth routes (public)
 router.use('/auth', authRoutes);
@@ -20,5 +21,8 @@ router.use('/students', studentRoutes);
 
 // Docent/teacher routes
 router.use('/docent', docentRoutes);
+
+// Admin routes
+router.use('/', adminRoutes);
 
 module.exports = router;
