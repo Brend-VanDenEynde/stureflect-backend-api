@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../middleware/authMiddleware');
 const studentController = require('../controllers/studentController');
+const githubService = require('../services/githubService');
 
 // TODO: Authenticatie tijdelijk uitgeschakeld voor testing
 // router.use(authenticateToken);
@@ -169,6 +170,150 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen opdrachten',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * POST /api/students/me/assignments/:assignmentId/submissions
+ * Dien een GitHub repository in voor een opdracht
+ * Body: { github_url: string }
+ */
+router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
+  try {
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
+    const assignmentId = parseInt(req.params.assignmentId);
+    const { github_url } = req.body;
+
+    // Valideer assignmentId
+    if (isNaN(assignmentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig opdracht ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Valideer GitHub URL
+    const urlValidation = githubService.validateGitHubUrl(github_url);
+    if (!urlValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: urlValidation.error,
+        error: 'INVALID_URL'
+      });
+    }
+
+    // Haal assignment op en check of deze bestaat
+    const assignment = await studentController.getAssignmentWithCourse(assignmentId);
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Opdracht niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Check of student ingeschreven is voor de cursus
+    const isEnrolled = await studentController.isStudentEnrolledInCourse(studentId, assignment.course_id);
+    if (!isEnrolled) {
+      return res.status(403).json({
+        success: false,
+        message: 'Je bent niet ingeschreven voor deze cursus',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Check of student al een submission heeft
+    const existingSubmission = await studentController.getExistingSubmission(studentId, assignmentId);
+    if (existingSubmission) {
+      return res.status(409).json({
+        success: false,
+        message: 'Je hebt al een inzending voor deze opdracht',
+        error: 'CONFLICT',
+        data: { existing_submission_id: existingSubmission.id }
+      });
+    }
+
+    // Check of GitHub repository toegankelijk is
+    const { owner, repo } = urlValidation;
+    const repoAccess = await githubService.checkRepositoryAccess(owner, repo);
+    if (!repoAccess.accessible) {
+      const statusCode = repoAccess.errorCode === 'RATE_LIMITED' ? 429 : 404;
+      return res.status(statusCode).json({
+        success: false,
+        message: repoAccess.error,
+        error: repoAccess.errorCode
+      });
+    }
+
+    // Haal laatste commit SHA op
+    const commitResult = await githubService.getLatestCommitSha(owner, repo);
+    if (!commitResult.success) {
+      const statusCode = commitResult.errorCode === 'RATE_LIMITED' ? 429 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        message: commitResult.error,
+        error: commitResult.errorCode
+      });
+    }
+
+    // Haal file tree op en filter
+    const treeResult = await githubService.getRepositoryTree(owner, repo, commitResult.sha);
+    if (!treeResult.success) {
+      return res.status(502).json({
+        success: false,
+        message: treeResult.error,
+        error: treeResult.errorCode
+      });
+    }
+
+    const codeFiles = githubService.filterCodeFiles(treeResult.files);
+    if (codeFiles.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Repository bevat geen code bestanden',
+        error: 'EMPTY_REPO'
+      });
+    }
+
+    // Maak submission aan
+    const submission = await studentController.createSubmission({
+      assignmentId,
+      userId: studentId,
+      githubUrl: github_url,
+      commitSha: commitResult.sha
+    });
+
+    // Voeg extra info toe aan response
+    const filesWithLanguage = codeFiles.map(f => ({
+      path: f.path,
+      size: f.size,
+      language: githubService.detectLanguage(f.path)
+    }));
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...submission,
+        repository: {
+          owner,
+          repo,
+          default_branch: repoAccess.repoData.default_branch
+        },
+        files_count: codeFiles.length,
+        files: filesWithLanguage,
+        truncated: treeResult.truncated
+      },
+      message: 'Inzending succesvol aangemaakt',
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij aanmaken submission:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij aanmaken inzending',
       error: 'INTERNAL_SERVER_ERROR'
     });
   }
