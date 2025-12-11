@@ -14,7 +14,7 @@
   },
   "servers": [
     {
-      "url": "https://stureflect-backend-api.vercel.app",
+      "url": "https://backend.stureflect.com/api-docs/",
       "description": "Productieserver"
     },
     {
@@ -54,9 +54,7 @@
         "summary": "Controleert of de API beschikbaar is",
         "description": "Dit endpoint retourneert een welkomstbericht en kan gebruikt worden om te verifiëren dat de API online en beschikbaar is. Dit is handig voor health checks en monitoring.",
         "operationId": "getRootMessage",
-        "tags": [
-          "Algemeen"
-        ],
+        "tags": ["Algemeen"],
         "responses": {
           "200": {
             "description": "De API is beschikbaar en retourneert welkomstbericht",
@@ -77,9 +75,7 @@
         "summary": "Gebruiker inloggen",
         "description": "Authenticeert een gebruiker met emailadres en wachtwoord. Bij succesvol inloggen wordt een JWT-token geretourneerd dat 1 uur geldig is. Dit token moet gebruikt worden in de Authorization header voor alle beveiligde endpoints. Het token moet in het formaat 'Bearer <token>' meegegeven worden.",
         "operationId": "loginUser",
-        "tags": [
-          "Authenticatie"
-        ],
+        "tags": ["Authenticatie"],
         "requestBody": {
           "required": true,
           "description": "Gebruiker inloggegevens vereist",
@@ -101,10 +97,7 @@
                     "description": "Wachtwoord van de gebruiker (minimaal 6 tekens). Wachtwoorden zijn case-sensitief."
                   }
                 },
-                "required": [
-                  "email",
-                  "password"
-                ]
+                "required": ["email", "password"]
               }
             }
           }
@@ -229,9 +222,7 @@
         "summary": "Nieuw gebruikersaccount aanmaken",
         "description": "Registreert een nieuwe gebruiker in het systeem. Het wachtwoord wordt veilig versleuteld opgeslagen met bcrypt. Na succesvolle registratie kan de gebruiker inloggen met het loginendpoint. Elk emailadres kan slechts eenmaal gebruikt worden.",
         "operationId": "registerUser",
-        "tags": [
-          "Authenticatie"
-        ],
+        "tags": ["Authenticatie"],
         "requestBody": {
           "required": true,
           "description": "Registratiegegevens voor nieuwe gebruiker",
@@ -259,20 +250,12 @@
                   },
                   "role": {
                     "type": "string",
-                    "enum": [
-                      "student",
-                      "docent",
-                      "beheerder"
-                    ],
+                    "enum": ["student", "docent", "beheerder"],
                     "example": "student",
                     "description": "Optioneel: gebruikersrol in het systeem. Standaard is 'student'. Beschikbare rollen: student, docent, beheerder."
                   }
                 },
-                "required": [
-                  "email",
-                  "name",
-                  "password"
-                ]
+                "required": ["email", "name", "password"]
               }
             }
           }
@@ -361,9 +344,7 @@
         "summary": "GitHub OAuth login initiëren",
         "description": "Initieert de GitHub OAuth 2.0 login flow. Redirect de gebruiker naar dit endpoint om inloggen met GitHub in te stellen. De gebruiker wordt naar GitHub gestuurd om toestemming te geven, waarna deze wordt teruggestuurd naar het callback endpoint. **BELANGRIJK: Gebruik /api/auth/github, niet /auth/github!**",
         "operationId": "githubLogin",
-        "tags": [
-          "GitHub OAuth"
-        ],
+        "tags": ["GitHub OAuth"],
         "responses": {
           "302": {
             "description": "Redirect naar GitHub OAuth authorize endpoint",
@@ -384,9 +365,7 @@
         "summary": "GitHub OAuth callback",
         "description": "Dit endpoint wordt gebruikt door GitHub om de gebruiker terug te sturen na autorisatie. Dit wordt automatisch behandeld door Passport. De gebruiker wordt ingelogd en krijgt een sessie.",
         "operationId": "githubCallback",
-        "tags": [
-          "GitHub OAuth"
-        ],
+        "tags": ["GitHub OAuth"],
         "parameters": [
           {
             "name": "code",
@@ -422,9 +401,7 @@
         "summary": "Token vernieuwen",
         "description": "Vernieuwt zowel access token als refresh token. Dit endpoint moet gebruikt worden als het access token verlopen is (na 15 minuten). Retourneert een nieuw access token (15 min geldig) en een nieuw refresh token (7 dagen geldig).",
         "operationId": "refreshToken",
-        "tags": [
-          "Authenticatie"
-        ],
+        "tags": ["Authenticatie"],
         "requestBody": {
           "required": true,
           "description": "Refresh token vereist",
@@ -439,9 +416,7 @@
                     "description": "Refresh token ontvangen bij login"
                   }
                 },
-                "required": [
-                  "refreshToken"
-                ]
+                "required": ["refreshToken"]
               }
             }
           }
@@ -541,9 +516,7 @@
         "summary": "Gebruikersprofiel",
         "description": "Endpoints om het profiel van de ingelogde gebruiker op te halen. Vereist een geldige JWT access token in de Authorization header. Retourneert gebruikersinformatie zoals ID, email, naam, rol en aanmaakdatum.",
         "operationId": "getProfile",
-        "tags": [
-          "Authenticatie"
-        ],
+        "tags": ["Authenticatie"],
         "security": [
           {
             "bearerAuth": []
@@ -649,9 +622,7 @@
         "summary": "Uitloggen - Token revoke",
         "description": "Revoke het refresh token van de gebruiker. Dit maakt het refresh token ongeldig en voorkomt dat het kan worden gebruikt om nieuwe access tokens op te vragen. De gebruiker moet daarna opnieuw inloggen.\n\nDit endpoint vereist authenticatie via een geldig access token in de Authorization header.",
         "operationId": "logoutUser",
-        "tags": [
-          "Authenticatie"
-        ],
+        "tags": ["Authenticatie"],
         "security": [
           {
             "bearerAuth": []
@@ -670,9 +641,7 @@
                     "description": "Het refresh token dat moet worden gerevoked"
                   }
                 },
-                "required": [
-                  "refreshToken"
-                ]
+                "required": ["refreshToken"]
               }
             }
           }
@@ -750,9 +719,7 @@
         "summary": "Alle beschikbare cursussen ophalen",
         "description": "Retourneert een volledige lijst met alle beschikbare cursussen in het systeem. Elke cursus bevat zijn unieke ID, titel, beschrijving en deelcode. Dit endpoint biedt een overzicht van alle cursussen waar leerlingen zich bij kunnen aansluiten.",
         "operationId": "getAllCourses",
-        "tags": [
-          "Cursussen"
-        ],
+        "tags": ["Cursussen"],
         "responses": {
           "200": {
             "description": "Cursussen succesvol opgehaald",
@@ -842,13 +809,25 @@
                         "type": "object",
                         "properties": {
                           "id": { "type": "integer", "example": 1 },
-                          "title": { "type": "string", "example": "Web Development 101" },
-                          "description": { "type": "string", "example": "Learn the basics of web development" },
-                          "assignment_count": { "type": "string", "example": "5" }
+                          "title": {
+                            "type": "string",
+                            "example": "Web Development 101"
+                          },
+                          "description": {
+                            "type": "string",
+                            "example": "Learn the basics of web development"
+                          },
+                          "assignment_count": {
+                            "type": "string",
+                            "example": "5"
+                          }
                         }
                       }
                     },
-                    "message": { "type": "string", "example": "3 cursussen gevonden" },
+                    "message": {
+                      "type": "string",
+                      "example": "3 cursussen gevonden"
+                    },
                     "error": { "type": "null", "example": null }
                   }
                 }
@@ -862,7 +841,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "error": { "type": "string", "example": "Geen token verstrekt." }
+                    "error": {
+                      "type": "string",
+                      "example": "Geen token verstrekt."
+                    }
                   }
                 }
               }
@@ -876,8 +858,14 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Fout bij ophalen cursussen" },
-                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                    "message": {
+                      "type": "string",
+                      "example": "Fout bij ophalen cursussen"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "INTERNAL_SERVER_ERROR"
+                    }
                   }
                 }
               }
@@ -950,16 +938,41 @@
                         "type": "object",
                         "properties": {
                           "id": { "type": "integer", "example": 1 },
-                          "title": { "type": "string", "example": "Build a Portfolio Website" },
-                          "description": { "type": "string", "example": "Create a personal portfolio using HTML, CSS, and JavaScript" },
-                          "due_date": { "type": "string", "format": "date-time", "example": "2025-12-17T09:52:40.014Z" },
-                          "created_at": { "type": "string", "format": "date-time", "example": "2025-12-10T09:52:40.654Z" },
-                          "submission_id": { "type": "integer", "nullable": true, "example": 1 },
-                          "submission_status": { "type": "string", "enum": ["submitted", "pending"], "example": "submitted" }
+                          "title": {
+                            "type": "string",
+                            "example": "Build a Portfolio Website"
+                          },
+                          "description": {
+                            "type": "string",
+                            "example": "Create a personal portfolio using HTML, CSS, and JavaScript"
+                          },
+                          "due_date": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2025-12-17T09:52:40.014Z"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2025-12-10T09:52:40.654Z"
+                          },
+                          "submission_id": {
+                            "type": "integer",
+                            "nullable": true,
+                            "example": 1
+                          },
+                          "submission_status": {
+                            "type": "string",
+                            "enum": ["submitted", "pending"],
+                            "example": "submitted"
+                          }
                         }
                       }
                     },
-                    "message": { "type": "string", "example": "2 opdrachten gevonden" },
+                    "message": {
+                      "type": "string",
+                      "example": "2 opdrachten gevonden"
+                    },
                     "error": { "type": "null", "example": null }
                   }
                 }
@@ -974,7 +987,10 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Ongeldig cursus ID" },
+                    "message": {
+                      "type": "string",
+                      "example": "Ongeldig cursus ID"
+                    },
                     "error": { "type": "string", "example": "BAD_REQUEST" }
                   }
                 }
@@ -988,7 +1004,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "error": { "type": "string", "example": "Geen token verstrekt." }
+                    "error": {
+                      "type": "string",
+                      "example": "Geen token verstrekt."
+                    }
                   }
                 }
               }
@@ -1002,7 +1021,10 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Je bent niet ingeschreven voor deze cursus" },
+                    "message": {
+                      "type": "string",
+                      "example": "Je bent niet ingeschreven voor deze cursus"
+                    },
                     "error": { "type": "string", "example": "FORBIDDEN" }
                   }
                 }
@@ -1017,8 +1039,14 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Fout bij ophalen opdrachten" },
-                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                    "message": {
+                      "type": "string",
+                      "example": "Fout bij ophalen opdrachten"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "INTERNAL_SERVER_ERROR"
+                    }
                   }
                 }
               }
@@ -1076,22 +1104,58 @@
                         "properties": {
                           "id": { "type": "integer", "example": 1 },
                           "assignment_id": { "type": "integer", "example": 5 },
-                          "assignment_title": { "type": "string", "example": "JavaScript Basics" },
+                          "assignment_title": {
+                            "type": "string",
+                            "example": "JavaScript Basics"
+                          },
                           "course_id": { "type": "integer", "example": 2 },
-                          "course_title": { "type": "string", "example": "Web Development" },
-                          "github_url": { "type": "string", "example": "https://github.com/student/repo" },
-                          "commit_sha": { "type": "string", "example": "abc123def456" },
-                          "status": { "type": "string", "example": "completed" },
-                          "ai_score": { "type": "integer", "nullable": true, "example": 85 },
-                          "manual_score": { "type": "integer", "nullable": true, "example": 90 },
+                          "course_title": {
+                            "type": "string",
+                            "example": "Web Development"
+                          },
+                          "github_url": {
+                            "type": "string",
+                            "example": "https://github.com/student/repo"
+                          },
+                          "commit_sha": {
+                            "type": "string",
+                            "example": "abc123def456"
+                          },
+                          "status": {
+                            "type": "string",
+                            "example": "completed"
+                          },
+                          "ai_score": {
+                            "type": "integer",
+                            "nullable": true,
+                            "example": 85
+                          },
+                          "manual_score": {
+                            "type": "integer",
+                            "nullable": true,
+                            "example": 90
+                          },
                           "user_id": { "type": "integer", "example": 1 },
-                          "created_at": { "type": "string", "format": "date-time" },
-                          "due_date": { "type": "string", "format": "date-time" }
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "due_date": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
                         }
                       }
                     },
-                    "message": { "type": "string", "example": "4 submissions gevonden" },
-                    "error": { "type": "string", "nullable": true, "example": null }
+                    "message": {
+                      "type": "string",
+                      "example": "4 submissions gevonden"
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
                   }
                 }
               }
@@ -1105,8 +1169,14 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Fout bij ophalen submissions" },
-                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                    "message": {
+                      "type": "string",
+                      "example": "Fout bij ophalen submissions"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "INTERNAL_SERVER_ERROR"
+                    }
                   }
                 }
               }
@@ -1154,29 +1224,61 @@
                           "type": "object",
                           "properties": {
                             "id": { "type": "integer", "example": 1 },
-                            "github_url": { "type": "string", "example": "https://github.com/student/repo" },
-                            "commit_sha": { "type": "string", "example": "abc123def456" },
-                            "status": { "type": "string", "example": "completed" },
-                            "ai_score": { "type": "integer", "nullable": true, "example": 85 },
-                            "manual_score": { "type": "integer", "nullable": true, "example": 90 },
+                            "github_url": {
+                              "type": "string",
+                              "example": "https://github.com/student/repo"
+                            },
+                            "commit_sha": {
+                              "type": "string",
+                              "example": "abc123def456"
+                            },
+                            "status": {
+                              "type": "string",
+                              "example": "completed"
+                            },
+                            "ai_score": {
+                              "type": "integer",
+                              "nullable": true,
+                              "example": 85
+                            },
+                            "manual_score": {
+                              "type": "integer",
+                              "nullable": true,
+                              "example": 90
+                            },
                             "user_id": { "type": "integer", "example": 1 },
-                            "created_at": { "type": "string", "format": "date-time" }
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
                           }
                         },
                         "assignment": {
                           "type": "object",
                           "properties": {
                             "id": { "type": "integer", "example": 5 },
-                            "title": { "type": "string", "example": "JavaScript Basics" },
-                            "description": { "type": "string", "example": "Create a JavaScript application" },
-                            "due_date": { "type": "string", "format": "date-time" }
+                            "title": {
+                              "type": "string",
+                              "example": "JavaScript Basics"
+                            },
+                            "description": {
+                              "type": "string",
+                              "example": "Create a JavaScript application"
+                            },
+                            "due_date": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
                           }
                         },
                         "course": {
                           "type": "object",
                           "properties": {
                             "id": { "type": "integer", "example": 2 },
-                            "title": { "type": "string", "example": "Web Development" }
+                            "title": {
+                              "type": "string",
+                              "example": "Web Development"
+                            }
                           }
                         },
                         "feedback": {
@@ -1185,21 +1287,57 @@
                             "type": "object",
                             "properties": {
                               "id": { "type": "integer", "example": 1 },
-                              "submission_id": { "type": "integer", "example": 1 },
-                              "content": { "type": "string", "example": "Great implementation!" },
-                              "reviewer": { "type": "string", "enum": ["ai", "teacher"], "example": "ai" },
-                              "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"], "example": "low" },
-                              "line_number": { "type": "integer", "nullable": true, "example": 42 },
-                              "suggestion": { "type": "string", "nullable": true, "example": "Consider using const" },
-                              "type": { "type": "string", "nullable": true, "example": "suggestion" },
-                              "created_at": { "type": "string", "format": "date-time" }
+                              "submission_id": {
+                                "type": "integer",
+                                "example": 1
+                              },
+                              "content": {
+                                "type": "string",
+                                "example": "Great implementation!"
+                              },
+                              "reviewer": {
+                                "type": "string",
+                                "enum": ["ai", "teacher"],
+                                "example": "ai"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high", "critical"],
+                                "example": "low"
+                              },
+                              "line_number": {
+                                "type": "integer",
+                                "nullable": true,
+                                "example": 42
+                              },
+                              "suggestion": {
+                                "type": "string",
+                                "nullable": true,
+                                "example": "Consider using const"
+                              },
+                              "type": {
+                                "type": "string",
+                                "nullable": true,
+                                "example": "suggestion"
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
                             }
                           }
                         }
                       }
                     },
-                    "message": { "type": "string", "example": "Submission detail opgehaald" },
-                    "error": { "type": "string", "nullable": true, "example": null }
+                    "message": {
+                      "type": "string",
+                      "example": "Submission detail opgehaald"
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
                   }
                 }
               }
@@ -1213,7 +1351,10 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Ongeldig submission ID" },
+                    "message": {
+                      "type": "string",
+                      "example": "Ongeldig submission ID"
+                    },
                     "error": { "type": "string", "example": "BAD_REQUEST" }
                   }
                 }
@@ -1228,7 +1369,10 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Je hebt geen toegang tot deze submission" },
+                    "message": {
+                      "type": "string",
+                      "example": "Je hebt geen toegang tot deze submission"
+                    },
                     "error": { "type": "string", "example": "FORBIDDEN" }
                   }
                 }
@@ -1243,7 +1387,10 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Submission niet gevonden" },
+                    "message": {
+                      "type": "string",
+                      "example": "Submission niet gevonden"
+                    },
                     "error": { "type": "string", "example": "NOT_FOUND" }
                   }
                 }
@@ -1258,8 +1405,14 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Fout bij ophalen submission detail" },
-                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                    "message": {
+                      "type": "string",
+                      "example": "Fout bij ophalen submission detail"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "INTERNAL_SERVER_ERROR"
+                    }
                   }
                 }
               }
@@ -1299,15 +1452,31 @@
                         "type": "object",
                         "properties": {
                           "id": { "type": "integer", "example": 1 },
-                          "email": { "type": "string", "example": "student@example.com" },
+                          "email": {
+                            "type": "string",
+                            "example": "student@example.com"
+                          },
                           "name": { "type": "string", "example": "Jan Jansen" },
-                          "created_at": { "type": "string", "format": "date-time" },
-                          "updated_at": { "type": "string", "format": "date-time" }
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
                         }
                       }
                     },
-                    "message": { "type": "string", "example": "10 studenten gevonden" },
-                    "error": { "type": "string", "nullable": true, "example": null }
+                    "message": {
+                      "type": "string",
+                      "example": "10 studenten gevonden"
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
                   }
                 }
               }
@@ -1321,7 +1490,10 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Admin ID is verplicht" },
+                    "message": {
+                      "type": "string",
+                      "example": "Admin ID is verplicht"
+                    },
                     "error": { "type": "string", "example": "BAD_REQUEST" }
                   }
                 }
@@ -1336,7 +1508,10 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Alleen admins hebben toegang tot deze data" },
+                    "message": {
+                      "type": "string",
+                      "example": "Alleen admins hebben toegang tot deze data"
+                    },
                     "error": { "type": "string", "example": "FORBIDDEN" }
                   }
                 }
@@ -1351,8 +1526,14 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Fout bij ophalen studenten" },
-                    "error": { "type": "string", "example": "INTERNAL_SERVER_ERROR" }
+                    "message": {
+                      "type": "string",
+                      "example": "Fout bij ophalen studenten"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "INTERNAL_SERVER_ERROR"
+                    }
                   }
                 }
               }
