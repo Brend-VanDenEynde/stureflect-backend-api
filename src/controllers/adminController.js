@@ -27,7 +27,39 @@ async function isUserAdmin(userId) {
   return result.rows.length > 0;
 }
 
+/**
+ * Controleert of een gebruiker bestaat
+ * @param {number} userId - ID van de gebruiker
+ * @returns {Promise<Object|null>} Gebruikersobject of null
+ */
+async function getUserById(userId) {
+  const result = await db.query(
+    `SELECT id, email, name, role FROM "user" WHERE id = $1`,
+    [userId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
+ * Wijzigt de rol van een gebruiker
+ * @param {number} userId - ID van de gebruiker
+ * @param {string} newRole - Nieuwe rol ('student', 'teacher', 'admin')
+ * @returns {Promise<Object>} Bijgewerkte gebruikersgegevens
+ */
+async function changeUserRole(userId, newRole) {
+  const result = await db.query(
+    `UPDATE "user" 
+     SET role = $1, updated_at = NOW() 
+     WHERE id = $2 
+     RETURNING id, email, name, role, updated_at`,
+    [newRole, userId]
+  );
+  return result.rows[0];
+}
+
 module.exports = {
   getAllStudents,
-  isUserAdmin
+  isUserAdmin,
+  getUserById,
+  changeUserRole
 };
