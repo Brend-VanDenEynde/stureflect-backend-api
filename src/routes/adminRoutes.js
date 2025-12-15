@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const authenticateToken = require('../middleware/authMiddleware');
 
 /**
  * GET /api/admin/students
  * Haalt alle studenten op (alleen voor admins)
  */
-router.get('/admin/students', async (req, res) => {
+router.get('/admin/students', authenticateToken, async (req, res) => {
   // Development: query param fallback, Productie: alleen req.user.id
   const adminId = req.user?.id || parseInt(req.query.adminId);
 
@@ -60,6 +61,324 @@ router.get('/admin/students', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen studenten',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:userId/role/teacher
+ * Zet een student account om naar een docent account (alleen voor admins)
+ */
+router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id;
+  const targetUserId = parseInt(req.params.userId);
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to teacher at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer admin ID
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID in token`);
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins kunnen rollen wijzigen',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Validatie: controleer of target user bestaat
+    const targetUser = await adminController.getUserById(targetUserId);
+    if (!targetUser) {
+      console.log(`[AUDIT] User ${targetUserId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Gebruiker niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Validatie: controleer of gebruiker student is
+    if (targetUser.role !== 'student') {
+      console.log(`[AUDIT] User ${targetUserId} is not a student (current role: ${targetUser.role})`);
+      return res.status(400).json({
+        success: false,
+        message: `Gebruiker heeft al de rol '${targetUser.role}'. Alleen studenten kunnen naar docent worden omgezet.`,
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Rol wijzigen
+    const updatedUser = await adminController.changeUserRole(targetUserId, 'teacher');
+
+    console.log(`[AUDIT] Admin ${adminId} changed user ${targetUserId} role from student to teacher`);
+
+    res.status(200).json({
+      success: true,
+      data: updatedUser,
+      message: 'Gebruiker is succesvol omgezet naar docent',
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to change user ${targetUserId} to teacher:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij wijzigen van gebruikersrol',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:userId/role/student
+ * Zet een docent account om naar een student account (alleen voor admins)
+ */
+router.put('/admin/users/:userId/role/student', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id;
+  const targetUserId = parseInt(req.params.userId);
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to student at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer admin ID
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID in token`);
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins kunnen rollen wijzigen',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Validatie: controleer of target user bestaat
+    const targetUser = await adminController.getUserById(targetUserId);
+    if (!targetUser) {
+      console.log(`[AUDIT] User ${targetUserId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Gebruiker niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Validatie: controleer of gebruiker docent is
+    if (targetUser.role !== 'teacher') {
+      console.log(`[AUDIT] User ${targetUserId} is not a teacher (current role: ${targetUser.role})`);
+      return res.status(400).json({
+        success: false,
+        message: `Gebruiker heeft al de rol '${targetUser.role}'. Alleen docenten kunnen naar student worden omgezet.`,
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Rol wijzigen
+    const updatedUser = await adminController.changeUserRole(targetUserId, 'student');
+
+    console.log(`[AUDIT] Admin ${adminId} changed user ${targetUserId} role from teacher to student`);
+
+    res.status(200).json({
+      success: true,
+      data: updatedUser,
+      message: 'Gebruiker is succesvol omgezet naar student',
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to change user ${targetUserId} to student:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij wijzigen van gebruikersrol',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:userId/role/admin
+ * Zet een gebruiker om naar een admin account (alleen voor admins)
+ */
+router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id;
+  const targetUserId = parseInt(req.params.userId);
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to admin at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer admin ID
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID in token`);
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins kunnen rollen wijzigen',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Validatie: controleer of target user bestaat
+    const targetUser = await adminController.getUserById(targetUserId);
+    if (!targetUser) {
+      console.log(`[AUDIT] User ${targetUserId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Gebruiker niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Validatie: controleer of gebruiker al admin is
+    if (targetUser.role === 'admin') {
+      console.log(`[AUDIT] User ${targetUserId} is already an admin`);
+      return res.status(400).json({
+        success: false,
+        message: 'Gebruiker is al een admin',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Rol wijzigen
+    const updatedUser = await adminController.changeUserRole(targetUserId, 'admin');
+
+    console.log(`[AUDIT] Admin ${adminId} changed user ${targetUserId} role from ${targetUser.role} to admin`);
+
+    res.status(200).json({
+      success: true,
+      data: updatedUser,
+      message: 'Gebruiker is succesvol omgezet naar admin',
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to change user ${targetUserId} to admin:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij wijzigen van gebruikersrol',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:userId/demote
+ * Zet een admin account om naar student of docent (alleen voor admins)
+ * Body: { "newRole": "student" } of { "newRole": "teacher" }
+ */
+router.put('/admin/users/:userId/demote', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id;
+  const targetUserId = parseInt(req.params.userId);
+  const { newRole } = req.body;
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to demote user ${targetUserId} to ${newRole} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer admin ID
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID in token`);
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins kunnen rollen wijzigen',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Validatie: controleer of newRole is opgegeven en geldig is
+    if (!newRole || (newRole !== 'student' && newRole !== 'teacher')) {
+      console.log(`[AUDIT] Invalid role specified: ${newRole}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Nieuwe rol moet "student" of "teacher" zijn',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Validatie: controleer of target user bestaat
+    const targetUser = await adminController.getUserById(targetUserId);
+    if (!targetUser) {
+      console.log(`[AUDIT] User ${targetUserId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Gebruiker niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Validatie: controleer of gebruiker admin is
+    if (targetUser.role !== 'admin') {
+      console.log(`[AUDIT] User ${targetUserId} is not an admin (current role: ${targetUser.role})`);
+      return res.status(400).json({
+        success: false,
+        message: `Gebruiker is geen admin (huidige rol: ${targetUser.role}). Alleen admins kunnen worden gedemoveerd.`,
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Validatie: voorkom dat admin zichzelf demoveert
+    if (adminId === targetUserId) {
+      console.log(`[AUDIT] Admin ${adminId} attempted to demote themselves`);
+      return res.status(400).json({
+        success: false,
+        message: 'Je kunt jezelf niet demoveren',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Rol wijzigen
+    const updatedUser = await adminController.changeUserRole(targetUserId, newRole);
+
+    console.log(`[AUDIT] Admin ${adminId} demoted user ${targetUserId} from admin to ${newRole}`);
+
+    res.status(200).json({
+      success: true,
+      data: updatedUser,
+      message: `Gebruiker is succesvol omgezet naar ${newRole}`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to demote user ${targetUserId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij wijzigen van gebruikersrol',
       error: 'INTERNAL_SERVER_ERROR'
     });
   }
