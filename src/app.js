@@ -41,8 +41,8 @@ app.use(passport.session());
 // Middleware
 app.use(express.json());
 
-// Swagger versie voor cache busting - verhoog dit nummer bij elke API wijziging
-const SWAGGER_VERSION = '0.1.0';
+// Swagger versie voor cache busting - gebruik timestamp voor ALTIJD verse versie
+const SWAGGER_VERSION = Date.now().toString();
 
 // Voeg versie toe aan swagger spec
 const swaggerSpecWithVersion = {
@@ -53,20 +53,28 @@ const swaggerSpecWithVersion = {
   }
 };
 
-// Swagger UI opties met versie parameter om caching te voorkomen
+// Swagger UI opties met agressieve cache busting op alle assets
 const swaggerUiOptions = {
-  customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui.min.css',
+  customCssUrl: `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui.min.css?v=${SWAGGER_VERSION}`,
   customJs: [
-    'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-bundle.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-standalone-preset.js',
-  ]
+    `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-bundle.js?v=${SWAGGER_VERSION}`,
+    `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-standalone-preset.js?v=${SWAGGER_VERSION}`,
+  ],
+  swaggerOptions: {
+    persistAuthorization: false,
+    displayRequestDuration: true,
+    filter: true,
+    tryItOutEnabled: true
+  }
 };
 
 // Middleware om caching uit te schakelen voor Swagger endpoints
 app.use('/api-docs', (req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   next();
 });
 
@@ -74,10 +82,11 @@ app.use('/api-docs', (req, res, next) => {
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecWithVersion, swaggerUiOptions));
 app.get('/api-docs.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.send(swaggerSpec);
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.send(swaggerSpecWithVersion);
 });
 // Routes
 const generalRoutes = require('./routes/general');
