@@ -2,7 +2,7 @@
   "paths": {
     "/api/students/me/submissions": {
       "get": {
-        "tags": ["Student"],
+        "tags": ["Studenten"],
         "summary": "Get all submissions for logged-in student",
         "description": "Returns all submissions for the authenticated student with optional filtering by course and status",
         "security": [{ "bearerAuth": [] }],
@@ -131,7 +131,7 @@
     },
     "/api/students/me/submissions/{submissionId}": {
       "get": {
-        "tags": ["Student"],
+        "tags": ["Studenten"],
         "summary": "Get submission detail with feedback",
         "description": "Returns detailed information about a specific submission including assignment info, course info, and all feedback. Student can only access their own submissions (403 if not owner).",
         "security": [{ "bearerAuth": [] }],

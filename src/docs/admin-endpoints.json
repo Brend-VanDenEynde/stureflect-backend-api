@@ -1,0 +1,320 @@
+{
+  "paths": {
+    "/api/admin/students": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Haal alle studenten op",
+        "description": "Verkrijg een lijst van alle geregistreerde studenten (alleen voor admins)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lijst van studenten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen admin rechten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/teachers": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Haal alle docenten op",
+        "description": "Verkrijg een lijst van alle geregistreerde docenten (alleen voor admins)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lijst van docenten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen admin rechten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/role/teacher": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Promoveer gebruiker naar docent",
+        "description": "Wijzig de rol van een gebruiker naar 'teacher' (alleen voor admins)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID van de gebruiker"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gebruiker succesvol gepromoveerd naar docent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Gebruiker succesvol gepromoveerd naar docent"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen admin rechten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Gebruiker niet gevonden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/role/student": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Zet gebruiker terug naar student",
+        "description": "Wijzig de rol van een gebruiker naar 'student' (alleen voor admins)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID van de gebruiker"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gebruiker succesvol teruggezet naar student",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Gebruiker succesvol teruggezet naar student"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen admin rechten"
+          },
+          "404": {
+            "description": "Gebruiker niet gevonden"
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/role/admin": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Promoveer gebruiker naar admin",
+        "description": "Wijzig de rol van een gebruiker naar 'admin' (alleen voor admins)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID van de gebruiker"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gebruiker succesvol gepromoveerd naar admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Gebruiker succesvol gepromoveerd naar admin"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen admin rechten"
+          },
+          "404": {
+            "description": "Gebruiker niet gevonden"
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/demote": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Degradeer gebruiker",
+        "description": "Verwijder speciale rechten van een gebruiker (alleen voor admins)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID van de gebruiker"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gebruiker succesvol gedegradeerd",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Gebruiker succesvol gedegradeerd"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen admin rechten"
+          },
+          "404": {
+            "description": "Gebruiker niet gevonden"
+          }
+        }
+      }
+    }
+  }
+}

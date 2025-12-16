@@ -1,8 +1,8 @@
 {
-  "endpoints": {
+  "paths": {
     "/api/students/me/courses": {
       "get": {
-        "tags": ["Students"],
+        "tags": ["Studenten"],
         "summary": "Haal cursussen van ingelogde student op",
         "description": "Retourneert alle cursussen waar de ingelogde student voor is ingeschreven, inclusief het aantal opdrachten per cursus.",
         "security": [{ "bearerAuth": [] }],
@@ -67,7 +67,7 @@
     },
     "/api/students/me/courses/{courseId}/assignments": {
       "get": {
-        "tags": ["Students"],
+        "tags": ["Studenten"],
         "summary": "Haal opdrachten van een cursus op",
         "description": "Retourneert alle opdrachten voor een specifieke cursus waar de student is ingeschreven, inclusief submission status per opdracht.",
         "security": [{ "bearerAuth": [] }],
@@ -205,11 +205,5 @@
         }
       }
     }
-  },
-  "tags": [
-    {
-      "name": "Students",
-      "description": "Endpoints voor student self-service: cursussen en opdrachten bekijken"
-    }
-  ]
+  }
 }

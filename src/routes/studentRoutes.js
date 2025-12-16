@@ -9,8 +9,49 @@ const { getFeedbackBySubmission } = require('../controllers/webhookController');
 // router.use(authenticateToken);
 
 /**
- * GET /api/students/me/courses
- * Haalt alle cursussen op waar de ingelogde student is ingeschreven
+ * @swagger
+ * /api/students/me/courses:
+ *   get:
+ *     tags:
+ *       - Studenten
+ *     summary: Haal cursussen van ingelogde student op
+ *     description: Retourneert alle cursussen waar de ingelogde student voor is ingeschreven, inclusief het aantal opdrachten per cursus.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Cursussen succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       title:
+ *                         type: string
+ *                         example: Web Development 101
+ *                       description:
+ *                         type: string
+ *                       assignment_count:
+ *                         type: string
+ *                         example: "5"
+ *                 message:
+ *                   type: string
+ *                   example: 3 cursussen gevonden
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       500:
+ *         description: Server error
  */
 router.get('/me/courses', async (req, res) => {
   try {
@@ -35,12 +76,34 @@ router.get('/me/courses', async (req, res) => {
 });
 
 /**
- * GET /api/students/me/submissions
- * Haalt alle submissions op van de ingelogde student
- * Query params:
- *   - courseId: Filter op cursus ID (optioneel)
- *   - status: 'pending' | 'completed' | 'graded' (optioneel)
- *   - branch: Filter op branch naam (optioneel)
+ * @swagger
+ * /api/students/me/submissions:
+ *   get:
+ *     tags:
+ *       - Studenten
+ *     summary: Haal alle submissions van student op
+ *     description: Haalt alle submissions op van de ingelogde student met optionele filters
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: courseId
+ *         schema:
+ *           type: integer
+ *         description: Filter op cursus ID (optioneel)
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, completed, graded]
+ *         description: Filter op status (optioneel)
+ *     responses:
+ *       200:
+ *         description: Submissions succesvol opgehaald
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       500:
+ *         description: Server error
  */
 router.get('/me/submissions', async (req, res) => {
   try {
@@ -71,9 +134,43 @@ router.get('/me/submissions', async (req, res) => {
 });
 
 /**
- * GET /api/students/me/submissions/:submissionId
- * Haalt detail van een specifieke submission op
- * Alleen toegankelijk voor de eigenaar van de submission
+ * @swagger
+ * /api/students/me/submissions/{submissionId}:
+ *   get:
+ *     tags:
+ *       - Studenten
+ *     summary: Haal submission detail op
+ *     description: Haalt detail van een specifieke submission op inclusief feedback. Alleen toegankelijk voor de eigenaar.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: submissionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de submission
+ *     responses:
+ *       200:
+ *         description: Submission detail succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Submission'
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen toegang tot deze submission
+ *       404:
+ *         description: Submission niet gevonden
+ *       500:
+ *         description: Server error
  */
 router.get('/me/submissions/:submissionId', async (req, res) => {
   try {
@@ -217,6 +314,64 @@ router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
  *   - status: 'submitted' | 'pending' | 'all' (default: 'all')
  *   - sortBy: 'due_date' | 'title' | 'created_at' (default: 'due_date')
  *   - order: 'asc' | 'desc' (default: 'asc')
+ * @swagger
+ * /api/students/me/courses/{courseId}/assignments:
+ *   get:
+ *     tags:
+ *       - Studenten
+ *     summary: Haal opdrachten van een cursus op
+ *     description: Haalt alle opdrachten op voor een specifieke cursus waar de student is ingeschreven
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de cursus
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [submitted, pending, all]
+ *           default: all
+ *         description: Filter op submission status
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [due_date, title, created_at]
+ *           default: due_date
+ *         description: Veld om op te sorteren
+ *       - in: query
+ *         name: order
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: asc
+ *         description: Sorteerrichting
+ *     responses:
+ *       200:
+ *         description: Opdrachten succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Assignment'
+ *       400:
+ *         description: Ongeldig cursus ID
+ *       403:
+ *         description: Niet ingeschreven voor cursus
+ *       500:
+ *         description: Server error
  */
 router.get('/me/courses/:courseId/assignments', async (req, res) => {
   try {
@@ -266,9 +421,59 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
 });
 
 /**
- * POST /api/students/me/assignments/:assignmentId/submissions
- * Dien een GitHub repository in voor een opdracht
- * Body: { github_url: string }
+ * @swagger
+ * /api/students/me/assignments/{assignmentId}/submissions:
+ *   post:
+ *     tags:
+ *       - Studenten
+ *     summary: Dien GitHub repository in
+ *     description: Dien een GitHub repository in voor een opdracht. De repository wordt gevalideerd.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - github_url
+ *             properties:
+ *               github_url:
+ *                 type: string
+ *                 format: uri
+ *                 example: https://github.com/username/repository
+ *                 description: GitHub repository URL
+ *     responses:
+ *       201:
+ *         description: Submission succesvol aangemaakt
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Submission'
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldige GitHub URL of assignment ID
+ *       403:
+ *         description: Niet ingeschreven voor cursus
+ *       404:
+ *         description: Opdracht niet gevonden
+ *       409:
+ *         description: Al een submission voor deze opdracht
  */
 router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
   try {
