@@ -319,6 +319,29 @@ async function createSubmission({ assignmentId, userId, githubUrl, commitSha }) 
   }
 }
 
+/**
+ * Update submission met webhook informatie
+ * @param {number} submissionId - ID van de submission
+ * @param {string} webhookId - GitHub webhook ID
+ * @param {string} webhookSecret - Webhook secret voor signature verificatie
+ * @returns {Promise<object>} - Bijgewerkte submission
+ */
+async function updateSubmissionWebhook(submissionId, webhookId, webhookSecret) {
+  try {
+    const result = await db.query(
+      `UPDATE submission
+       SET webhook_id = $1, webhook_secret = $2
+       WHERE id = $3
+       RETURNING id, webhook_id, webhook_secret`,
+      [webhookId, webhookSecret, submissionId]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Fout bij updaten submission webhook:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getStudentCourses,
   getCourseAssignments,
@@ -327,5 +350,6 @@ module.exports = {
   isStudentEnrolledInCourse,
   getAssignmentWithCourse,
   getExistingSubmission,
-  createSubmission
+  createSubmission,
+  updateSubmissionWebhook
 };

@@ -1,9 +1,11 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const authenticateToken = require('../middleware/authMiddleware');
 const studentController = require('../controllers/studentController');
 const githubService = require('../services/githubService');
 const { getFeedbackBySubmission } = require('../controllers/webhookController');
+const { getUserById } = require('../models/user');
 
 // TODO: Authenticatie tijdelijk uitgeschakeld voor testing
 // router.use(authenticateToken);
@@ -581,6 +583,62 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
       commitSha: commitResult.sha
     });
 
+    // Registreer webhook automatisch voor push events
+    let webhookInfo = { registered: false };
+    try {
+      // Haal student's GitHub token op
+      const student = await getUserById(studentId);
+      const githubToken = student?.github_access_token;
+
+      if (githubToken) {
+        // Genereer webhook secret
+        const webhookSecret = crypto.randomBytes(32).toString('hex');
+        const webhookUrl = `${process.env.BACKEND_URL || 'https://backend.stureflect.com'}/api/webhooks/github`;
+
+        // Registreer webhook op GitHub
+        const webhookResult = await githubService.registerWebhook(
+          owner,
+          repo,
+          webhookUrl,
+          webhookSecret,
+          githubToken
+        );
+
+        if (webhookResult.success) {
+          // Sla webhook info op in submission
+          await studentController.updateSubmissionWebhook(
+            submission.id,
+            String(webhookResult.webhookId),
+            webhookSecret
+          );
+          webhookInfo = {
+            registered: true,
+            webhookId: webhookResult.webhookId
+          };
+          console.log(`[WEBHOOK] Webhook geregistreerd voor ${owner}/${repo} (ID: ${webhookResult.webhookId})`);
+        } else {
+          console.warn(`[WEBHOOK] Kon webhook niet registreren: ${webhookResult.error}`);
+          webhookInfo = {
+            registered: false,
+            error: webhookResult.error,
+            errorCode: webhookResult.errorCode
+          };
+        }
+      } else {
+        console.warn('[WEBHOOK] Student heeft geen GitHub token, webhook niet geregistreerd');
+        webhookInfo = {
+          registered: false,
+          error: 'Geen GitHub token beschikbaar'
+        };
+      }
+    } catch (webhookError) {
+      console.error('[WEBHOOK] Fout bij registreren webhook:', webhookError);
+      webhookInfo = {
+        registered: false,
+        error: 'Interne fout bij webhook registratie'
+      };
+    }
+
     // Voeg extra info toe aan response
     const filesWithLanguage = codeFiles.map(f => ({
       path: f.path,
@@ -599,9 +657,12 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
         },
         files_count: codeFiles.length,
         files: filesWithLanguage,
-        truncated: treeResult.truncated
+        truncated: treeResult.truncated,
+        webhook: webhookInfo
       },
-      message: 'Inzending succesvol aangemaakt',
+      message: webhookInfo.registered
+        ? 'Inzending succesvol aangemaakt met automatische webhook'
+        : 'Inzending aangemaakt (webhook registratie mislukt)',
       error: null
     });
   } catch (error) {

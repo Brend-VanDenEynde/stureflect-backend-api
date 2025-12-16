@@ -665,10 +665,23 @@ async function getBlob(owner, repo, sha) {
  * @param {string} repo - Repository naam
  * @param {string} webhookUrl - URL voor webhook callbacks
  * @param {string} secret - Webhook secret voor signature verificatie
+ * @param {string} userToken - GitHub access token van de gebruiker (optioneel)
  * @returns {Promise<{ success: boolean, webhookId?: number, error?: string, errorCode?: string }>}
  */
-async function registerWebhook(owner, repo, webhookUrl, secret) {
+async function registerWebhook(owner, repo, webhookUrl, secret, userToken = null) {
   try {
+    // Gebruik user token als beschikbaar, anders server token
+    const headers = {
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': GITHUB_API_VERSION
+    };
+
+    if (userToken) {
+      headers['Authorization'] = `Bearer ${userToken}`;
+    } else if (process.env.GITHUB_TOKEN) {
+      headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+
     const response = await axios.post(
       `${GITHUB_API_BASE}/repos/${owner}/${repo}/hooks`,
       {
@@ -683,7 +696,7 @@ async function registerWebhook(owner, repo, webhookUrl, secret) {
         }
       },
       {
-        headers: getGitHubHeadersWithAuth(),
+        headers,
         timeout: 60000
       }
     );
