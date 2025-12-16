@@ -216,6 +216,245 @@
                 }
             }
         }
+    },
+    "/api/docent/courses/{courseId}/student-status": {
+        "get": {
+            "summary": "Haal uitgebreide status van alle studenten op",
+            "description": "Haalt een gepagineerde lijst op van studenten met gedetailleerde statistieken per student en per opdracht voor een specifieke cursus.",
+            "operationId": "getStudentStatusByCourse",
+            "tags": [
+                "Docenten"
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "ID van de cursus"
+                },
+                {
+                    "name": "search",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "Zoek op naam of e-mail"
+                },
+                {
+                    "name": "sortBy",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string",
+                        "default": "name",
+                        "enum": ["name", "progress", "lastSubmission", "avgScore"]
+                    },
+                    "description": "Sorteerveld"
+                },
+                {
+                    "name": "sortOrder",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string",
+                        "default": "asc",
+                        "enum": ["asc", "desc"]
+                    },
+                    "description": "Sorteervolgorde"
+                },
+                {
+                    "name": "page",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "integer",
+                        "default": 1
+                    },
+                    "description": "Paginanummer"
+                },
+                {
+                    "name": "limit",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "integer",
+                        "default": 50
+                    },
+                    "description": "Aantal items per pagina"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Lijst met studenten, hun statistieken en opdrachtenstatus",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "students": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {"type": "integer"},
+                                                "name": {"type": "string"},
+                                                "email": {"type": "string"},
+                                                "githubId": {"type": "string"},
+                                                "statistics": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "totalAssignments": {"type": "integer"},
+                                                        "totalSubmissions": {"type": "integer"},
+                                                        "completedAssignments": {"type": "integer"},
+                                                        "gradedAssignments": {"type": "integer"},
+                                                        "pendingAssignments": {"type": "integer"},
+                                                        "avgScore": {"type": "number", "nullable": true},
+                                                        "avgFeedbackSeverity": {"type": "number", "nullable": true},
+                                                        "lastSubmission": {"type": "string", "format": "date-time", "nullable": true},
+                                                        "lastStatus": {"type": "string", "nullable": true},
+                                                        "completionRate": {"type": "number"},
+                                                        "gradedRate": {"type": "number"}
+                                                    }
+                                                },
+                                                "assignments": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "assignmentId": {"type": "integer"},
+                                                            "title": {"type": "string"},
+                                                            "dueDate": {"type": "string", "format": "date-time"},
+                                                            "status": {"type": "string"},
+                                                            "lastSubmission": {"type": "string", "format": "date-time", "nullable": true},
+                                                            "aiScore": {"type": "integer", "nullable": true},
+                                                            "manualScore": {"type": "integer", "nullable": true},
+                                                            "feedbackSeverity": {"type": "number", "nullable": true}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "pagination": {
+                                        "type": "object",
+                                        "properties": {
+                                            "currentPage": {"type": "integer"},
+                                            "totalPages": {"type": "integer"},
+                                            "totalItems": {"type": "integer"},
+                                            "itemsPerPage": {"type": "integer"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ontbrekende verplichte parameters"
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
+        }
+    },
+    "/api/docent/courses/{courseId}/students/{studentId}/status": {
+        "get": {
+            "summary": "Haal status van één specifieke student op",
+            "description": "Haalt gedetailleerde statistieken en opdrachtenstatus op voor één specifieke student in een cursus.",
+            "operationId": "getStudentStatusForStudent",
+            "tags": [
+                "Docenten"
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "ID van de cursus"
+                },
+                {
+                    "name": "studentId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "ID van de student"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Studentgegevens met statistieken en opdrachtenstatus",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "student": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "integer"},
+                                            "name": {"type": "string"},
+                                            "email": {"type": "string"},
+                                            "githubId": {"type": "string"},
+                                            "statistics": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "totalAssignments": {"type": "integer"},
+                                                    "totalSubmissions": {"type": "integer"},
+                                                    "completedAssignments": {"type": "integer"},
+                                                    "gradedAssignments": {"type": "integer"},
+                                                    "pendingAssignments": {"type": "integer"},
+                                                    "avgScore": {"type": "number", "nullable": true},
+                                                    "avgFeedbackSeverity": {"type": "number", "nullable": true},
+                                                    "lastSubmission": {"type": "string", "format": "date-time", "nullable": true},
+                                                    "lastStatus": {"type": "string", "nullable": true},
+                                                    "completionRate": {"type": "number"},
+                                                    "gradedRate": {"type": "number"}
+                                                }
+                                            },
+                                            "assignments": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "assignmentId": {"type": "integer"},
+                                                        "title": {"type": "string"},
+                                                        "dueDate": {"type": "string", "format": "date-time"},
+                                                        "status": {"type": "string"},
+                                                        "lastSubmission": {"type": "string", "format": "date-time", "nullable": true},
+                                                        "aiScore": {"type": "integer", "nullable": true},
+                                                        "manualScore": {"type": "integer", "nullable": true},
+                                                        "feedbackSeverity": {"type": "number", "nullable": true}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ontbrekende verplichte parameters"
+                },
+                "404": {
+                    "description": "Student niet gevonden in deze cursus"
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
+        }
     }
   }
 }
