@@ -707,6 +707,7 @@ router.get('/admin/courses', authenticateToken, async (req, res) => {
  *             type: object
  *             required:
  *               - title
+ *               - teacher_id
  *             properties:
  *               title:
  *                 type: string
@@ -720,6 +721,10 @@ router.get('/admin/courses', authenticateToken, async (req, res) => {
  *                 type: string
  *                 description: Join code voor het vak (optioneel, moet uniek zijn)
  *                 example: "WEB2024"
+ *               teacher_id:
+ *                 type: integer
+ *                 description: ID van de docent die eigenaar wordt van het vak
+ *                 example: 5
  *     responses:
  *       201:
  *         description: Vak succesvol aangemaakt
@@ -746,16 +751,27 @@ router.get('/admin/courses', authenticateToken, async (req, res) => {
  *                       type: string
  *                     updated_at:
  *                       type: string
+ *                     teacher:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         name:
+ *                           type: string
+ *                         email:
+ *                           type: string
  *       400:
- *         description: Ongeldige input
+ *         description: Ongeldige input of docent is geen teacher
  *       403:
  *         description: Geen admin rechten
+ *       404:
+ *         description: Docent niet gevonden
  *       409:
  *         description: Join code is al in gebruik
  */
 router.post('/admin/courses', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
-  const { title, description, join_code } = req.body;
+  const { title, description, join_code, teacher_id } = req.body;
 
   console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to create course at ${new Date().toISOString()}`);
 
@@ -788,6 +804,33 @@ router.post('/admin/courses', authenticateToken, async (req, res) => {
       });
     }
 
+    // Validatie: teacher_id is verplicht
+    if (!teacher_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Een docent (teacher_id) is verplicht bij het aanmaken van een vak',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Validatie: controleer of teacher bestaat en een docent is
+    const teacher = await adminController.getUserById(teacher_id);
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: 'Docent niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    if (teacher.role !== 'teacher') {
+      return res.status(400).json({
+        success: false,
+        message: `Gebruiker is geen docent (huidige rol: ${teacher.role})`,
+        error: 'BAD_REQUEST'
+      });
+    }
+
     // Create het vak
     const newCourse = await adminController.createCourse({
       title: title.trim(),
@@ -795,12 +838,22 @@ router.post('/admin/courses', authenticateToken, async (req, res) => {
       join_code
     });
 
-    console.log(`[AUDIT] Admin ${adminId} created course ${newCourse.id}: ${newCourse.title}`);
+    // Voeg docent toe aan het vak
+    await adminController.addTeacherToCourse(newCourse.id, teacher_id);
+
+    console.log(`[AUDIT] Admin ${adminId} created course ${newCourse.id}: ${newCourse.title} with teacher ${teacher.name}`);
 
     res.status(201).json({
       success: true,
-      data: newCourse,
-      message: `Vak '${newCourse.title}' succesvol aangemaakt`,
+      data: {
+        ...newCourse,
+        teacher: {
+          id: teacher.id,
+          name: teacher.name,
+          email: teacher.email
+        }
+      },
+      message: `Vak '${newCourse.title}' succesvol aangemaakt met docent '${teacher.name}'`,
       error: null
     });
   } catch (error) {
