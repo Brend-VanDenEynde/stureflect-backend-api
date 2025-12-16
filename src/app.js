@@ -1,7 +1,6 @@
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
-const fs = require('fs');
-const path = require('path');
+const swaggerSpec = require('./docs/swagger.json');
 const session = require('express-session');
 const passport = require('./config/passport');
 const db = require('./config/db'); // Voeg databaseconfiguratie toe
@@ -42,50 +41,21 @@ app.use(passport.session());
 // Middleware
 app.use(express.json());
 
-// Functie om swagger spec ALTIJD vers in te laden
-function getSwaggerSpec() {
-  // Delete from require cache to force fresh load
-  const swaggerPath = path.join(__dirname, 'docs', 'swagger.json');
-  delete require.cache[require.resolve('./docs/swagger.json')];
-  
-  const swaggerSpec = require('./docs/swagger.json');
-  
-  // Voeg unieke versie toe gebaseerd op tijdstip
-  swaggerSpec.info.version = Date.now().toString();
-  
-  return swaggerSpec;
-}
+// Swagger UI opties
+const swaggerUiOptions = {
+  customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui.min.css',
+  customJs: [
+    'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-bundle.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-standalone-preset.js',
+  ]
+};
 
-// Middleware om caching VOLLEDIG uit te schakelen voor Swagger endpoints
-app.use(/^\/api-docs/, (req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  next();
-});
-
-// Swagger JSON endpoint - laadt dynamisch
+// Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 app.get('/api-docs.json', (req, res) => {
-  const swaggerSpec = getSwaggerSpec();
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
-
-// Swagger UI setup - herlaadt spec bij elke request
-app.use('/api-docs', (req, res, next) => {
-  const swaggerSpec = getSwaggerSpec();
-  
-  const swaggerUiOptions = {
-    swaggerOptions: {
-      persistAuthorization: false,
-    }
-  };
-  
-  // Gebruik de standaard swagger-ui-express setup
-  return swaggerUi.setup(swaggerSpec, swaggerUiOptions)(req, res, next);
-}, swaggerUi.serve);
 // Routes
 const generalRoutes = require('./routes/general');
 const apiRoutes = require('./routes');
