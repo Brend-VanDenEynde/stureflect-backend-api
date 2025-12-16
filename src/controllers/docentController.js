@@ -635,11 +635,51 @@ const removeStudentFromCourse = async (req, res) => {
   }
 };
 
+const getDocentCourses = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await pool.query(`
+      SELECT 
+        c.id,
+        c.title,
+        c.description,
+        c.join_code as "joinCode",
+        c.created_at as "createdAt",
+        c.updated_at as "updatedAt",
+        COUNT(DISTINCT e.user_id) as "studentCount",
+        COUNT(DISTINCT a.id) as "assignmentCount"
+      FROM course c
+      INNER JOIN course_teacher ct ON c.id = ct.course_id
+      LEFT JOIN enrollment e ON c.id = e.course_id
+      LEFT JOIN assignment a ON c.id = a.course_id
+      WHERE ct.user_id = $1
+      GROUP BY c.id, c.title, c.description, c.join_code, c.created_at, c.updated_at
+      ORDER BY c.created_at DESC
+    `, [userId]);
+
+    const courses = result.rows.map(course => ({
+      ...course,
+      studentCount: parseInt(course.studentCount) || 0,
+      assignmentCount: parseInt(course.assignmentCount) || 0
+    }));
+
+    res.status(200).json({ courses });
+  } catch (error) {
+    console.error('❌ Error fetching docent courses:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
   getStudentStatusForStudent,
   addStudentToCourse,
-  removeStudentFromCourse
+  removeStudentFromCourse,
+  getDocentCourses
 };
 
