@@ -82,8 +82,89 @@ const {
  *         description: Student is al ingeschreven
  */
 router.get('/courses/:courseId/students', getEnrolledStudents);
+
+/**
+ * @swagger
+ * /api/docent/courses/{courseId}/student-status:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal student status per cursus op
+ *     description: Haalt de status op van alle studenten voor een specifieke cursus
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de cursus
+ *     responses:
+ *       200:
+ *         description: Status informatie van alle studenten in de cursus
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: Ontbrekende cursus ID
+ *       500:
+ *         description: Interne serverfout
+ */
 router.get('/courses/:courseId/student-status', getStudentStatusByCourse);
+
+/**
+ * @swagger
+ * /api/docent/courses/{courseId}/students/{studentId}/status:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal status voor specifieke student op
+ *     description: Haalt gedetailleerde statusinformatie op voor een specifieke student in een cursus
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de cursus
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de student
+ *     responses:
+ *       200:
+ *         description: Gedetailleerde status informatie van de student
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Ontbrekende parameters
+ *       404:
+ *         description: Student of cursus niet gevonden
+ *       500:
+ *         description: Interne serverfout
+ */
 router.get('/courses/:courseId/students/:studentId/status', getStudentStatusForStudent);
+
 router.post('/courses/:courseId/students', addStudentToCourse);
 
 /**
