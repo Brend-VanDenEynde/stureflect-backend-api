@@ -13,6 +13,11 @@ const {
   getMultipleFileContents,
   filterCodeFiles
 } = require('../services/githubService');
+const {
+  analyzeFiles,
+  calculateScore,
+  logAIEvent
+} = require('../services/aiService');
 
 /**
  * GitHub Webhook Handler
@@ -129,13 +134,37 @@ router.post('/github', async (req, res) => {
       return;
     }
 
-    // TODO: Checkpoint 3 - AI analyse triggeren met validFiles en courseSettings
-    // TODO: Checkpoint 4 - Feedback opslaan
+    // Checkpoint 3: AI analyse triggeren
+    logAIEvent('start', `Analyseer ${validFiles.length} bestanden voor ${repoFullName}`);
 
-    // Tijdelijk: markeer als pending (wordt vervangen in checkpoint 3)
-    await updateSubmissionStatus(submission.id, latestCommitSha, 'pending');
+    const analysisResult = await analyzeFiles(validFiles, courseSettings);
 
-    logWebhookEvent(event, repoFullName, 'success', `Webhook processed - ${validFiles.length} files ready for analysis`);
+    if (!analysisResult.success) {
+      logWebhookEvent(event, repoFullName, 'error', 'AI analysis failed');
+      await updateSubmissionStatus(submission.id, latestCommitSha, 'failed');
+      return;
+    }
+
+    // Bereken AI score
+    const aiScore = calculateScore(analysisResult.feedback);
+
+    logAIEvent('complete', `${analysisResult.summary.total_feedback} feedback items, score: ${aiScore}`);
+    logWebhookEvent(event, repoFullName, 'info', `AI analysis complete: ${analysisResult.summary.total_feedback} feedback items, score: ${aiScore}`);
+
+    // TODO: Checkpoint 4 - Feedback opslaan in database
+    // Voor nu: log de feedback en update status
+    console.log('[AI FEEDBACK]', JSON.stringify({
+      submission_id: submission.id,
+      commit_sha: latestCommitSha,
+      score: aiScore,
+      summary: analysisResult.summary,
+      feedback_count: analysisResult.feedback.length
+    }, null, 2));
+
+    // Update submission met AI score en status
+    await updateSubmissionStatus(submission.id, latestCommitSha, 'analyzed');
+
+    logWebhookEvent(event, repoFullName, 'success', `Analysis complete - score: ${aiScore}, feedback items: ${analysisResult.feedback.length}`);
 
   } catch (error) {
     console.error('[WEBHOOK ERROR]', error);
