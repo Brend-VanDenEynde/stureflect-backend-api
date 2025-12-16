@@ -57,9 +57,7 @@ app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
   console.log(`\n[REQUEST] [${timestamp}] ${req.method} ${req.url}`);
   
-  if (req.method !== 'GET') {
-    console.log(`[REQUEST]    Body:`, JSON.stringify(req.body).substring(0, 100));
-  }
+  // Niet loggen van request body - bevat mogelijk gevoelige data zoals wachtwoorden
   
   if (req.headers.authorization) {
     console.log(`[REQUEST]    Auth: Bearer token aanwezig`);
