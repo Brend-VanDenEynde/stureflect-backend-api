@@ -309,6 +309,126 @@ async function addTeacherToCourse(courseId, teacherId) {
   return { exists: false, ...infoResult.rows[0] };
 }
 
+/**
+ * Haalt alle studenten op die ingeschreven zijn voor een vak
+ * @param {number} courseId - ID van het vak
+ * @returns {Promise<Array>} Array met studentgegevens
+ */
+async function getCourseStudents(courseId) {
+  const result = await db.query(
+    `SELECT u.id, u.email, u.name, e.created_at as enrolled_at
+     FROM enrollment e
+     JOIN "user" u ON e.user_id = u.id
+     WHERE e.course_id = $1
+     ORDER BY u.name ASC`,
+    [courseId]
+  );
+  return result.rows;
+}
+
+/**
+ * Schrijft een student in voor een vak
+ * @param {number} courseId - ID van het vak
+ * @param {number} studentId - ID van de student
+ * @returns {Promise<Object>} Object met enrollment info
+ */
+async function enrollStudent(courseId, studentId) {
+  // Controleer of enrollment al bestaat
+  const checkResult = await db.query(
+    `SELECT id FROM enrollment
+     WHERE course_id = $1 AND user_id = $2`,
+    [courseId, studentId]
+  );
+
+  if (checkResult.rows.length > 0) {
+    return { exists: true }; // Al ingeschreven
+  }
+
+  // Schrijf student in
+  await db.query(
+    `INSERT INTO enrollment (course_id, user_id, created_at)
+     VALUES ($1, $2, NOW())`,
+    [courseId, studentId]
+  );
+
+  // Haal student en vak info op
+  const infoResult = await db.query(
+    `SELECT u.id, u.name, u.email, c.title as course_title, c.id as course_id
+     FROM "user" u, course c
+     WHERE u.id = $1 AND c.id = $2`,
+    [studentId, courseId]
+  );
+
+  return { exists: false, ...infoResult.rows[0] };
+}
+
+/**
+ * Schrijft een student uit van een vak
+ * @param {number} courseId - ID van het vak
+ * @param {number} studentId - ID van de student
+ * @returns {Promise<Object>} Object met uitgeschreven enrollment info
+ */
+async function unenrollStudent(courseId, studentId) {
+  // Controleer of enrollment bestaat
+  const checkResult = await db.query(
+    `SELECT e.id, u.name, u.email, c.title as course_title
+     FROM enrollment e
+     JOIN "user" u ON e.user_id = u.id
+     JOIN course c ON e.course_id = c.id
+     WHERE e.course_id = $1 AND e.user_id = $2`,
+    [courseId, studentId]
+  );
+
+  if (checkResult.rows.length === 0) {
+    return null; // Niet ingeschreven
+  }
+
+  const enrollmentInfo = checkResult.rows[0];
+
+  // Verwijder enrollment
+  await db.query(
+    `DELETE FROM enrollment
+     WHERE course_id = $1 AND user_id = $2`,
+    [courseId, studentId]
+  );
+
+  return enrollmentInfo;
+}
+
+/**
+ * Haalt alle assignments op van een vak
+ * @param {number} courseId - ID van het vak
+ * @returns {Promise<Array>} Array met assignment gegevens
+ */
+async function getCourseAssignments(courseId) {
+  const result = await db.query(
+    `SELECT a.id, a.title, a.description, a.due_date, a.created_at, a.updated_at,
+            COUNT(DISTINCT s.id) as submission_count
+     FROM assignment a
+     LEFT JOIN submission s ON a.id = s.assignment_id
+     WHERE a.course_id = $1
+     GROUP BY a.id, a.title, a.description, a.due_date, a.created_at, a.updated_at
+     ORDER BY a.due_date DESC NULLS LAST, a.created_at DESC`,
+    [courseId]
+  );
+  return result.rows;
+}
+
+/**
+ * Verwijdert een assignment
+ * @param {number} assignmentId - ID van het assignment
+ * @returns {Promise<Object>} Verwijderd assignment object
+ */
+async function deleteAssignment(assignmentId) {
+  const result = await db.query(
+    `DELETE FROM assignment
+     WHERE id = $1
+     RETURNING id, title, description, course_id, due_date`,
+    [assignmentId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
 module.exports = {
   getAllStudents,
   getAllTeachers,
@@ -322,5 +442,10 @@ module.exports = {
   updateCourse,
   removeTeacherFromCourse,
   createCourse,
-  addTeacherToCourse
+  addTeacherToCourse,
+  getCourseStudents,
+  enrollStudent,
+  unenrollStudent,
+  getCourseAssignments,
+  deleteAssignment
 };
