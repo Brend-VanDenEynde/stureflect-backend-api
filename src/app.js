@@ -1,6 +1,7 @@
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./docs/swagger.json');
+const fs = require('fs');
+const path = require('path');
 const session = require('express-session');
 const passport = require('./config/passport');
 const db = require('./config/db'); // Voeg databaseconfiguratie toe
@@ -41,52 +42,57 @@ app.use(passport.session());
 // Middleware
 app.use(express.json());
 
-// Swagger versie voor cache busting - gebruik timestamp voor ALTIJD verse versie
-const SWAGGER_VERSION = Date.now().toString();
+// Functie om swagger spec ALTIJD vers in te laden
+function getSwaggerSpec() {
+  const swaggerPath = path.join(__dirname, 'docs', 'swagger.json');
+  const swaggerFile = fs.readFileSync(swaggerPath, 'utf8');
+  const swaggerSpec = JSON.parse(swaggerFile);
+  
+  // Voeg unieke versie toe gebaseerd op tijdstip
+  swaggerSpec.info.version = Date.now().toString();
+  
+  return swaggerSpec;
+}
 
-// Voeg versie toe aan swagger spec
-const swaggerSpecWithVersion = {
-  ...swaggerSpec,
-  info: {
-    ...swaggerSpec.info,
-    version: SWAGGER_VERSION
-  }
-};
-
-// Swagger UI opties met agressieve cache busting op alle assets
-const swaggerUiOptions = {
-  customCssUrl: `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui.min.css?v=${SWAGGER_VERSION}`,
-  customJs: [
-    `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-bundle.js?v=${SWAGGER_VERSION}`,
-    `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-standalone-preset.js?v=${SWAGGER_VERSION}`,
-  ],
-  swaggerOptions: {
-    persistAuthorization: false,
-    displayRequestDuration: true,
-    filter: true,
-    tryItOutEnabled: true
-  }
-};
-
-// Middleware om caching uit te schakelen voor Swagger endpoints
-app.use('/api-docs', (req, res, next) => {
+// Middleware om caching VOLLEDIG uit te schakelen voor Swagger endpoints
+app.use(/^\/api-docs/, (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.setHeader('Surrogate-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('ETag', Date.now().toString()); // Unieke ETag per request
   next();
 });
 
-// Documentation - geef spec direct mee met versie
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecWithVersion, swaggerUiOptions));
+// Swagger UI - laadt spec dynamisch bij elke request
+app.get('/api-docs', (req, res, next) => {
+  const swaggerSpec = getSwaggerSpec();
+  const version = swaggerSpec.info.version;
+  
+  const swaggerUiOptions = {
+    customCssUrl: `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui.min.css?v=${version}`,
+    customJs: [
+      `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-bundle.js?v=${version}`,
+      `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-standalone-preset.js?v=${version}`,
+    ],
+    swaggerOptions: {
+      persistAuthorization: false,
+      displayRequestDuration: true,
+      filter: true,
+      tryItOutEnabled: true
+    }
+  };
+  
+  const html = swaggerUi.generateHTML(swaggerSpec, swaggerUiOptions);
+  res.send(html);
+});
+
+// Swagger JSON endpoint - laadt ook dynamisch
 app.get('/api-docs.json', (req, res) => {
+  const swaggerSpec = getSwaggerSpec();
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
-  res.send(swaggerSpecWithVersion);
+  res.send(swaggerSpec);
 });
 // Routes
 const generalRoutes = require('./routes/general');
