@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "StuReflect Backend API",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "description": "Volledige API-documentatie voor StuReflect backend. Deze API biedt volledige ondersteuning voor authenticatie met JWT-tokens, gebruikersbeheer, cursusbeheer. Alle endpoints ondersteunen JSON request/response format.",
     "contact": {
       "name": "API Ondersteuning",
