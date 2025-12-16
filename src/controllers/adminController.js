@@ -15,6 +15,20 @@ async function getAllStudents() {
 }
 
 /**
+ * Haalt alle docenten op uit de database
+ * @returns {Promise<Array>} Array met docentgegevens
+ */
+async function getAllTeachers() {
+  const result = await db.query(
+    `SELECT id, email, name, created_at, updated_at
+     FROM "user"
+     WHERE role = 'teacher'
+     ORDER BY name ASC`
+  );
+  return result.rows;
+}
+
+/**
  * Controleert of een gebruiker admin is
  * @param {number} userId - ID van de gebruiker
  * @returns {Promise<boolean>} True als gebruiker admin is
@@ -59,6 +73,7 @@ async function changeUserRole(userId, newRole) {
 
 module.exports = {
   getAllStudents,
+  getAllTeachers,
   isUserAdmin,
   getUserById,
   changeUserRole
