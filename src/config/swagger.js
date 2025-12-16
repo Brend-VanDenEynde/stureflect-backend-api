@@ -1,7 +1,7 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 const path = require('path');
 
-console.log('📚 Initialiseren van Swagger documentatie...');
+console.log('[SWAGGER] Initialiseren van Swagger documentatie...');
 
 const options = {
   definition: {
@@ -201,22 +201,22 @@ const options = {
   ]
 };
 
-console.log('📂 Scannen van bestanden voor JSDoc comments...');
-console.log('   - Routes:', path.join(__dirname, '../routes/*.js'));
-console.log('   - Controllers:', path.join(__dirname, '../controllers/*.js'));
+console.log('[SWAGGER] Scannen van bestanden voor JSDoc comments...');
+console.log('[SWAGGER]    - Routes:', path.join(__dirname, '../routes/*.js'));
+console.log('[SWAGGER]    - Controllers:', path.join(__dirname, '../controllers/*.js'));
 
 const swaggerSpec = swaggerJsdoc(options);
 
 const pathCount = Object.keys(swaggerSpec.paths || {}).length;
-console.log(`✅ Swagger spec gegenereerd met ${pathCount} endpoints`);
+console.log(`[SUCCESS] Swagger spec gegenereerd met ${pathCount} endpoints`);
 
 if (pathCount === 0) {
-  console.log('⚠️  WAARSCHUWING: Geen endpoints gevonden! Check JSDoc comments.');
+  console.log('[WARNING] Geen endpoints gevonden! Check JSDoc comments.');
 } else {
-  console.log('📋 Gevonden endpoints:');
+  console.log('[SWAGGER] Gevonden endpoints:');
   Object.keys(swaggerSpec.paths).forEach(path => {
     const methods = Object.keys(swaggerSpec.paths[path]);
-    console.log(`   - ${methods.map(m => m.toUpperCase()).join(', ')} ${path}`);
+    console.log(`[SWAGGER]    - ${methods.map(m => m.toUpperCase()).join(', ')} ${path}`);
   });
 }
 
