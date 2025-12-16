@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 
 console.log('[APP] Laden van Swagger configuratie...');
@@ -11,6 +12,9 @@ const db = require('./config/db'); // Voeg databaseconfiguratie toe
 
 console.log('[APP] Initialiseren van Express app...');
 const app = express();
+
+// Static files voor test UI
+app.use(express.static(path.join(__dirname, 'public')));
 
 // CORS Middleware
 const cors = require('cors');
@@ -49,6 +53,14 @@ app.use(passport.session());
 console.log('[SUCCESS] [APP] Passport geïnitialiseerd');
 
 // Middleware
+// Bewaar raw body voor webhook signature verificatie
+app.use(express.json({
+  verify: (req, res, buf) => {
+    if (req.originalUrl.startsWith('/api/webhooks')) {
+      req.rawBody = buf.toString('utf8');
+    }
+  }
+}));
 app.use(express.json());
 console.log('[SUCCESS] [APP] JSON middleware geladen');
 

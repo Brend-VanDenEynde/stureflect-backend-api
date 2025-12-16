@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const router = express.Router();
 
 /**
@@ -19,6 +20,8 @@ const router = express.Router();
  *               example: Hello from Express on Vercel!
  */
 router.get('/', (req, res) => {
+  // Serveer test UI voor development
+  res.sendFile(path.join(__dirname, '../public/index.html'));
   console.log('[ROOT] Root endpoint aangeroepen');
   res.send('Hello from Express on Vercel!');
 });

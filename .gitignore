@@ -32,3 +32,6 @@ build/
 # instructions
 .claude/
 .instructions/
+
+# design docs
+docs/plans/

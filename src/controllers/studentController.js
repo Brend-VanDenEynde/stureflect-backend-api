@@ -89,6 +89,7 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
  * @param {object} filters - Filter opties
  * @param {number} filters.courseId - Filter op cursus (optioneel)
  * @param {string} filters.status - Filter op status: 'pending', 'completed', 'graded' (optioneel)
+ * @param {string} filters.branch - Filter op branch naam (optioneel)
  * @returns {Promise<Array>}
  */
 async function getStudentSubmissions(studentId, filters = {}) {
@@ -105,10 +106,12 @@ async function getStudentSubmissions(studentId, filters = {}) {
         c.id as course_id,
         c.title as course_title,
         s.github_url,
+        s.commit_sha,
         s.status,
         s.ai_score,
         s.manual_score,
         s.created_at,
+        s.updated_at,
         a.due_date
       FROM submission s
       JOIN assignment a ON s.assignment_id = a.id
@@ -124,13 +127,13 @@ async function getStudentSubmissions(studentId, filters = {}) {
     }
 
     // Filter op status (whitelist validation)
-    const validStatuses = ['pending', 'completed', 'graded'];
+    const validStatuses = ['pending', 'completed', 'graded', 'processing', 'analyzed', 'failed'];
     if (status && validStatuses.includes(status)) {
       query += ` AND s.status = $${paramIndex}`;
       params.push(status);
     }
 
-    query += ` ORDER BY s.created_at DESC`;
+    query += ` ORDER BY s.updated_at DESC`;
 
     const result = await db.query(query, params);
     return result.rows;
@@ -158,6 +161,7 @@ async function getSubmissionDetail(submissionId) {
         s.manual_score,
         s.user_id,
         s.created_at,
+        s.updated_at,
         a.id as assignment_id,
         a.title as assignment_title,
         a.description as assignment_description,
@@ -175,7 +179,7 @@ async function getSubmissionDetail(submissionId) {
       return null;
     }
 
-    // Haal feedback op (volgorde schema: id, submission_id, content, reviewer, severity, line_number, suggestion, type, created_at)
+    // Haal feedback op
     const feedbackResult = await db.query(
       `SELECT
         id,
@@ -189,7 +193,7 @@ async function getSubmissionDetail(submissionId) {
         created_at
       FROM feedback
       WHERE submission_id = $1
-      ORDER BY created_at ASC`,
+      ORDER BY severity DESC, line_number ASC NULLS LAST, created_at ASC`,
       [submissionId]
     );
 
@@ -203,7 +207,8 @@ async function getSubmissionDetail(submissionId) {
         ai_score: row.ai_score,
         manual_score: row.manual_score,
         user_id: row.user_id,
-        created_at: row.created_at
+        created_at: row.created_at,
+        updated_at: row.updated_at
       },
       assignment: {
         id: row.assignment_id,

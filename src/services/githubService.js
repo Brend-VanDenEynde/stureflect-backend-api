@@ -7,6 +7,13 @@ const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 
 /**
+ * Configuratie constanten (ruime limieten voor development)
+ */
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB max per bestand
+const MAX_FILES_PER_COMMIT = 100; // Max bestanden per commit
+const MAX_CONCURRENT_REQUESTS = 20; // Max parallelle requests
+
+/**
  * Toegestane code bestand extensies
  */
 const CODE_EXTENSIONS = [
@@ -150,7 +157,7 @@ function validateGitHubUrl(url) {
 }
 
 /**
- * Maak GitHub API headers aan
+ * Maak GitHub API headers aan (zonder auth)
  * @returns {object}
  */
 function getGitHubHeaders() {
@@ -158,6 +165,24 @@ function getGitHubHeaders() {
     'Accept': 'application/vnd.github+json',
     'X-GitHub-Api-Version': GITHUB_API_VERSION
   };
+}
+
+/**
+ * Maak GitHub API headers aan met authenticatie
+ * @returns {object}
+ */
+function getGitHubHeadersWithAuth() {
+  const token = process.env.GITHUB_TOKEN;
+  const headers = {
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': GITHUB_API_VERSION
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
 }
 
 /**
@@ -351,7 +376,14 @@ async function getRepositoryTree(owner, repo, sha) {
  * @returns {Array} - Gefilterde array van code bestanden
  */
 function filterCodeFiles(files) {
+  if (!Array.isArray(files)) return [];
+
   return files.filter(file => {
+    // Null safety check
+    if (!file || !file.path || typeof file.path !== 'string') {
+      return false;
+    }
+
     const path = file.path.toLowerCase();
 
     // Check of pad in excluded paths zit
@@ -377,7 +409,13 @@ function filterCodeFiles(files) {
  * @returns {string} - Programmeertaal
  */
 function detectLanguage(filePath) {
-  const ext = '.' + filePath.split('.').pop().toLowerCase();
+  if (!filePath || typeof filePath !== 'string') return 'unknown';
+
+  // Check of bestand een extensie heeft
+  const parts = filePath.split('.');
+  if (parts.length < 2) return 'unknown'; // Geen extensie (bijv. Makefile, Dockerfile)
+
+  const ext = '.' + parts.pop().toLowerCase();
 
   const languageMap = {
     '.js': 'javascript', '.jsx': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript',
@@ -408,6 +446,357 @@ function detectLanguage(filePath) {
   return languageMap[ext] || 'unknown';
 }
 
+/**
+ * Haal gewijzigde bestanden op voor een specifieke commit
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository naam
+ * @param {string} commitSha - Commit SHA
+ * @returns {Promise<{ success: boolean, files?: Array, error?: string, errorCode?: string }>}
+ */
+async function getCommitFiles(owner, repo, commitSha) {
+  try {
+    const response = await axios.get(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/commits/${commitSha}`,
+      {
+        headers: getGitHubHeadersWithAuth(),
+        timeout: 60000 // 60s timeout voor Dokploy
+      }
+    );
+
+    const files = (response.data.files || []).map(file => ({
+      path: file.filename,
+      status: file.status, // added, modified, removed, renamed
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.changes,
+      patch: file.patch || null // diff patch indien beschikbaar
+    }));
+
+    return {
+      success: true,
+      files,
+      commit: {
+        sha: response.data.sha,
+        message: response.data.commit?.message || '',
+        author: response.data.commit?.author?.name || 'unknown'
+      }
+    };
+  } catch (error) {
+    if (error.response) {
+      const status = error.response.status;
+
+      if (status === 404) {
+        return {
+          success: false,
+          error: 'Commit niet gevonden',
+          errorCode: 'COMMIT_NOT_FOUND'
+        };
+      }
+
+      if (status === 403) {
+        const rateLimitRemaining = error.response.headers['x-ratelimit-remaining'];
+        if (rateLimitRemaining === '0') {
+          return {
+            success: false,
+            error: 'GitHub API limiet bereikt, probeer later opnieuw',
+            errorCode: 'RATE_LIMITED'
+          };
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Fout bij ophalen commit bestanden',
+      errorCode: 'GITHUB_ERROR'
+    };
+  }
+}
+
+/**
+ * Haal de inhoud van een bestand op
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository naam
+ * @param {string} path - Bestandspad
+ * @param {string} ref - Branch of commit SHA (optioneel)
+ * @returns {Promise<{ success: boolean, content?: string, error?: string, errorCode?: string }>}
+ */
+async function getFileContent(owner, repo, path, ref = null) {
+  try {
+    const params = ref ? { ref } : {};
+
+    const response = await axios.get(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${path}`,
+      {
+        headers: getGitHubHeadersWithAuth(),
+        params,
+        timeout: 60000
+      }
+    );
+
+    // Check file size limit
+    if (response.data.size > MAX_FILE_SIZE) {
+      return {
+        success: false,
+        error: `Bestand te groot (${Math.round(response.data.size / 1024)}KB > ${MAX_FILE_SIZE / 1024}KB)`,
+        errorCode: 'FILE_TOO_LARGE'
+      };
+    }
+
+    // GitHub retourneert content als base64
+    if (response.data.encoding === 'base64' && response.data.content) {
+      try {
+        const content = Buffer.from(response.data.content, 'base64').toString('utf8');
+        return {
+          success: true,
+          content,
+          size: response.data.size,
+          sha: response.data.sha
+        };
+      } catch (decodeError) {
+        return {
+          success: false,
+          error: 'Kan bestandsinhoud niet decoderen (mogelijk binair bestand)',
+          errorCode: 'DECODE_ERROR'
+        };
+      }
+    }
+
+    // Als bestand via blob API moet (grote bestanden die toch binnen limiet vallen)
+    if (response.data.sha) {
+      return await getBlob(owner, repo, response.data.sha);
+    }
+
+    return {
+      success: false,
+      error: 'Kan bestandsinhoud niet decoderen',
+      errorCode: 'DECODE_ERROR'
+    };
+  } catch (error) {
+    if (error.response) {
+      const status = error.response.status;
+
+      if (status === 404) {
+        return {
+          success: false,
+          error: 'Bestand niet gevonden',
+          errorCode: 'FILE_NOT_FOUND'
+        };
+      }
+
+      if (status === 403) {
+        // Mogelijk te groot, probeer blob API
+        return {
+          success: false,
+          error: 'Bestand te groot of toegang geweigerd',
+          errorCode: 'FILE_TOO_LARGE'
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Fout bij ophalen bestand',
+      errorCode: 'GITHUB_ERROR'
+    };
+  }
+}
+
+/**
+ * Haal blob content op (voor grote bestanden)
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository naam
+ * @param {string} sha - Blob SHA
+ * @returns {Promise<{ success: boolean, content?: string, error?: string }>}
+ */
+async function getBlob(owner, repo, sha) {
+  try {
+    const response = await axios.get(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/git/blobs/${sha}`,
+      {
+        headers: getGitHubHeadersWithAuth(),
+        timeout: 60000
+      }
+    );
+
+    // Check file size limit
+    if (response.data.size > MAX_FILE_SIZE) {
+      return {
+        success: false,
+        error: `Bestand te groot (${Math.round(response.data.size / 1024)}KB > ${MAX_FILE_SIZE / 1024}KB)`,
+        errorCode: 'FILE_TOO_LARGE'
+      };
+    }
+
+    if (response.data.encoding === 'base64' && response.data.content) {
+      try {
+        const content = Buffer.from(response.data.content, 'base64').toString('utf8');
+        return {
+          success: true,
+          content,
+          size: response.data.size
+        };
+      } catch (decodeError) {
+        return {
+          success: false,
+          error: 'Kan blob niet decoderen (mogelijk binair bestand)',
+          errorCode: 'DECODE_ERROR'
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Kan blob niet decoderen',
+      errorCode: 'DECODE_ERROR'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: 'Fout bij ophalen blob',
+      errorCode: 'GITHUB_ERROR'
+    };
+  }
+}
+
+/**
+ * Registreer een webhook op een repository
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository naam
+ * @param {string} webhookUrl - URL voor webhook callbacks
+ * @param {string} secret - Webhook secret voor signature verificatie
+ * @returns {Promise<{ success: boolean, webhookId?: number, error?: string, errorCode?: string }>}
+ */
+async function registerWebhook(owner, repo, webhookUrl, secret) {
+  try {
+    const response = await axios.post(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/hooks`,
+      {
+        name: 'web',
+        active: true,
+        events: ['push'],
+        config: {
+          url: webhookUrl,
+          content_type: 'json',
+          secret: secret,
+          insecure_ssl: '0'
+        }
+      },
+      {
+        headers: getGitHubHeadersWithAuth(),
+        timeout: 60000
+      }
+    );
+
+    return {
+      success: true,
+      webhookId: response.data.id
+    };
+  } catch (error) {
+    if (error.response) {
+      const status = error.response.status;
+
+      if (status === 404) {
+        return {
+          success: false,
+          error: 'Repository niet gevonden of geen toegang',
+          errorCode: 'REPO_NOT_FOUND'
+        };
+      }
+
+      if (status === 403) {
+        return {
+          success: false,
+          error: 'Geen rechten om webhook te registreren',
+          errorCode: 'FORBIDDEN'
+        };
+      }
+
+      if (status === 422) {
+        // Webhook bestaat mogelijk al
+        const message = error.response.data?.errors?.[0]?.message || '';
+        if (message.includes('already exists')) {
+          return {
+            success: false,
+            error: 'Webhook bestaat al voor deze URL',
+            errorCode: 'WEBHOOK_EXISTS'
+          };
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Fout bij registreren webhook',
+      errorCode: 'GITHUB_ERROR'
+    };
+  }
+}
+
+/**
+ * Verwijder een webhook van een repository
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository naam
+ * @param {number} webhookId - Webhook ID
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+async function deleteWebhook(owner, repo, webhookId) {
+  try {
+    await axios.delete(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/hooks/${webhookId}`,
+      {
+        headers: getGitHubHeadersWithAuth(),
+        timeout: 60000
+      }
+    );
+
+    return { success: true };
+  } catch (error) {
+    if (error.response?.status === 404) {
+      // Webhook bestaat niet meer, beschouw als success
+      return { success: true };
+    }
+
+    return {
+      success: false,
+      error: 'Fout bij verwijderen webhook'
+    };
+  }
+}
+
+/**
+ * Haal meerdere bestandsinhouden op met rate limiting
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository naam
+ * @param {Array<string>} paths - Array van bestandspaden
+ * @param {string} ref - Branch of commit SHA
+ * @returns {Promise<Array<{ path: string, content?: string, error?: string }>>}
+ */
+async function getMultipleFileContents(owner, repo, paths, ref) {
+  // Limiteer aantal bestanden
+  const limitedPaths = paths.slice(0, MAX_FILES_PER_COMMIT);
+
+  // Verwerk in batches om rate limiting te voorkomen
+  const results = [];
+  for (let i = 0; i < limitedPaths.length; i += MAX_CONCURRENT_REQUESTS) {
+    const batch = limitedPaths.slice(i, i + MAX_CONCURRENT_REQUESTS);
+    const batchResults = await Promise.all(
+      batch.map(async (path) => {
+        const result = await getFileContent(owner, repo, path, ref);
+        return {
+          path,
+          content: result.success ? result.content : null,
+          error: result.error || null,
+          language: detectLanguage(path)
+        };
+      })
+    );
+    results.push(...batchResults);
+  }
+
+  return results;
+}
+
 module.exports = {
   parseGitHubUrl,
   validateGitHubUrl,
@@ -416,8 +805,18 @@ module.exports = {
   getRepositoryTree,
   filterCodeFiles,
   detectLanguage,
+  getCommitFiles,
+  getFileContent,
+  getBlob,
+  registerWebhook,
+  deleteWebhook,
+  getMultipleFileContents,
+  getGitHubHeadersWithAuth,
   CODE_EXTENSIONS,
   EXCLUDED_PATHS,
   GITHUB_API_BASE,
-  GITHUB_API_VERSION
+  GITHUB_API_VERSION,
+  MAX_FILE_SIZE,
+  MAX_FILES_PER_COMMIT,
+  MAX_CONCURRENT_REQUESTS
 };

@@ -3,6 +3,7 @@ const router = express.Router();
 const authenticateToken = require('../middleware/authMiddleware');
 const studentController = require('../controllers/studentController');
 const githubService = require('../services/githubService');
+const { getFeedbackBySubmission } = require('../controllers/webhookController');
 
 // TODO: Authenticatie tijdelijk uitgeschakeld voor testing
 // router.use(authenticateToken);
@@ -107,11 +108,12 @@ router.get('/me/courses', async (req, res) => {
 router.get('/me/submissions', async (req, res) => {
   try {
     const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
-    const { courseId, status } = req.query;
+    const { courseId, status, branch } = req.query;
 
     const filters = {};
     if (courseId) filters.courseId = parseInt(courseId);
     if (status) filters.status = status;
+    if (branch) filters.branch = branch;
 
     const submissions = await studentController.getStudentSubmissions(studentId, filters);
 
@@ -219,6 +221,99 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
 });
 
 /**
+ * GET /api/students/me/submissions/:submissionId/feedback
+ * Haalt feedback op voor een specifieke submission met filter opties
+ * Query params:
+ *   - reviewer: 'ai' | 'teacher' | 'all' (default: 'all')
+ *   - severity: 'critical' | 'high' | 'medium' | 'low' (optioneel)
+ */
+router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
+  try {
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
+    const submissionId = parseInt(req.params.submissionId);
+    const { reviewer = 'all', severity } = req.query;
+
+    if (isNaN(submissionId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig submission ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Haal submission op om eigenaar te controleren
+    const detail = await studentController.getSubmissionDetail(submissionId);
+
+    if (!detail) {
+      return res.status(404).json({
+        success: false,
+        message: 'Submission niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Autorisatie: check of submission van deze student is
+    if (detail.submission.user_id !== studentId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Je hebt geen toegang tot deze feedback',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Haal feedback op met filters
+    const feedback = await getFeedbackBySubmission(submissionId, { reviewer, severity });
+
+    // Groepeer feedback per bestand voor betere leesbaarheid
+    const feedbackByFile = {};
+    const feedbackWithoutFile = [];
+
+    for (const item of feedback) {
+      if (item.type && item.line_number) {
+        // Als we file_path hebben opgeslagen in type (tijdelijk), groepeer op type
+        const key = item.type;
+        if (!feedbackByFile[key]) {
+          feedbackByFile[key] = [];
+        }
+        feedbackByFile[key].push(item);
+      } else {
+        feedbackWithoutFile.push(item);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        submission_id: submissionId,
+        total_count: feedback.length,
+        feedback: feedback,
+        summary: {
+          critical: feedback.filter(f => f.severity === 'critical').length,
+          high: feedback.filter(f => f.severity === 'high').length,
+          medium: feedback.filter(f => f.severity === 'medium').length,
+          low: feedback.filter(f => f.severity === 'low').length
+        }
+      },
+      message: `${feedback.length} feedback items gevonden`,
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij ophalen feedback:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen feedback',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/students/me/courses/:courseId/assignments
+ * Haalt alle opdrachten op voor een specifieke cursus
+ * Query params:
+ *   - status: 'submitted' | 'pending' | 'all' (default: 'all')
+ *   - sortBy: 'due_date' | 'title' | 'created_at' (default: 'due_date')
+ *   - order: 'asc' | 'desc' (default: 'asc')
  * @swagger
  * /api/students/me/courses/{courseId}/assignments:
  *   get:
