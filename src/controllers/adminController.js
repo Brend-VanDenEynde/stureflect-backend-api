@@ -172,6 +172,143 @@ async function deleteCourse(courseId) {
   return result.rows.length > 0 ? result.rows[0] : null;
 }
 
+/**
+ * Werkt vakgegevens bij
+ * @param {number} courseId - ID van het vak
+ * @param {Object} updateData - Object met te updaten velden (title, description, join_code)
+ * @returns {Promise<Object>} Bijgewerkt vakobject
+ */
+async function updateCourse(courseId, updateData) {
+  const { title, description, join_code } = updateData;
+  
+  // Build dynamic query based on provided fields
+  const updates = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (title !== undefined) {
+    updates.push(`title = $${paramCount}`);
+    values.push(title);
+    paramCount++;
+  }
+
+  if (description !== undefined) {
+    updates.push(`description = $${paramCount}`);
+    values.push(description);
+    paramCount++;
+  }
+
+  if (join_code !== undefined) {
+    updates.push(`join_code = $${paramCount}`);
+    values.push(join_code);
+    paramCount++;
+  }
+
+  if (updates.length === 0) {
+    return null; // No updates provided
+  }
+
+  updates.push(`updated_at = NOW()`);
+  values.push(courseId);
+
+  const query = `
+    UPDATE course
+    SET ${updates.join(', ')}
+    WHERE id = $${paramCount}
+    RETURNING id, title, description, join_code, created_at, updated_at
+  `;
+
+  const result = await db.query(query, values);
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
+ * Verwijdert een docent van een vak
+ * @param {number} courseId - ID van het vak
+ * @param {number} teacherId - ID van de docent
+ * @returns {Promise<Object>} Object met verwijderde relatie info
+ */
+async function removeTeacherFromCourse(courseId, teacherId) {
+  // Controleer eerst of de docent aan het vak gekoppeld is
+  const checkResult = await db.query(
+    `SELECT ct.id, u.name, u.email, c.title as course_title
+     FROM course_teacher ct
+     JOIN "user" u ON ct.user_id = u.id
+     JOIN course c ON ct.course_id = c.id
+     WHERE ct.course_id = $1 AND ct.user_id = $2`,
+    [courseId, teacherId]
+  );
+
+  if (checkResult.rows.length === 0) {
+    return null; // Relatie bestaat niet
+  }
+
+  const relationInfo = checkResult.rows[0];
+
+  // Verwijder de relatie
+  await db.query(
+    `DELETE FROM course_teacher
+     WHERE course_id = $1 AND user_id = $2`,
+    [courseId, teacherId]
+  );
+
+  return relationInfo;
+}
+
+/**
+ * Maakt een nieuw vak aan
+ * @param {Object} courseData - Object met vakgegevens (title, description, join_code)
+ * @returns {Promise<Object>} Nieuw aangemaakt vak
+ */
+async function createCourse(courseData) {
+  const { title, description, join_code } = courseData;
+  
+  const result = await db.query(
+    `INSERT INTO course (title, description, join_code, created_at, updated_at)
+     VALUES ($1, $2, $3, NOW(), NOW())
+     RETURNING id, title, description, join_code, created_at, updated_at`,
+    [title, description || null, join_code || null]
+  );
+  
+  return result.rows[0];
+}
+
+/**
+ * Voegt een docent toe aan een vak
+ * @param {number} courseId - ID van het vak
+ * @param {number} teacherId - ID van de docent
+ * @returns {Promise<Object>} Object met toegevoegde relatie info
+ */
+async function addTeacherToCourse(courseId, teacherId) {
+  // Controleer of de relatie al bestaat
+  const checkResult = await db.query(
+    `SELECT id FROM course_teacher
+     WHERE course_id = $1 AND user_id = $2`,
+    [courseId, teacherId]
+  );
+
+  if (checkResult.rows.length > 0) {
+    return { exists: true }; // Relatie bestaat al
+  }
+
+  // Voeg de relatie toe
+  await db.query(
+    `INSERT INTO course_teacher (course_id, user_id, created_at)
+     VALUES ($1, $2, NOW())`,
+    [courseId, teacherId]
+  );
+
+  // Haal de docent en vak info op voor de response
+  const infoResult = await db.query(
+    `SELECT u.id, u.name, u.email, c.title as course_title, c.id as course_id
+     FROM "user" u, course c
+     WHERE u.id = $1 AND c.id = $2`,
+    [teacherId, courseId]
+  );
+
+  return { exists: false, ...infoResult.rows[0] };
+}
+
 module.exports = {
   getAllStudents,
   getAllTeachers,
@@ -181,5 +318,9 @@ module.exports = {
   changeUserRole,
   getAllCourses,
   getCourseDetails,
-  deleteCourse
+  deleteCourse,
+  updateCourse,
+  removeTeacherFromCourse,
+  createCourse,
+  addTeacherToCourse
 };
