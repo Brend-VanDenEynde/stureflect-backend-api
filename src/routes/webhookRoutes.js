@@ -167,8 +167,76 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
 }
 
 /**
- * GitHub Webhook Handler
- * POST /api/webhooks/github
+ * @swagger
+ * /api/webhooks/github:
+ *   post:
+ *     tags:
+ *       - Webhooks
+ *     summary: GitHub Webhook Handler
+ *     description: |
+ *       Ontvangt push events van GitHub en start automatische AI code analyse.
+ *       Dit endpoint wordt aangeroepen door GitHub wanneer er naar een repository wordt gepusht.
+ *
+ *       **Flow:**
+ *       1. Verifieer webhook signature
+ *       2. Zoek bijbehorende submission
+ *       3. Haal gewijzigde bestanden op
+ *       4. Analyseer code met AI (GPT-4o-mini)
+ *       5. Sla feedback en score op
+ *     parameters:
+ *       - in: header
+ *         name: X-GitHub-Event
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Type GitHub event (push, ping, etc.)
+ *       - in: header
+ *         name: X-Hub-Signature-256
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: HMAC-SHA256 signature voor verificatie
+ *       - in: header
+ *         name: X-GitHub-Delivery
+ *         schema:
+ *           type: string
+ *         description: Unieke delivery ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ref:
+ *                 type: string
+ *                 example: refs/heads/main
+ *               after:
+ *                 type: string
+ *                 description: Commit SHA na de push
+ *               repository:
+ *                 type: object
+ *                 properties:
+ *                   full_name:
+ *                     type: string
+ *                     example: username/repository
+ *               commits:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       200:
+ *         description: Webhook ontvangen (verwerking gebeurt async)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 received:
+ *                   type: boolean
+ *                   example: true
+ *                 delivery_id:
+ *                   type: string
  */
 router.post('/github', async (req, res) => {
   const event = req.headers['x-github-event'];
@@ -228,8 +296,48 @@ router.post('/github', async (req, res) => {
 });
 
 /**
- * Retry een failed submission
- * POST /api/webhooks/retry/:submissionId
+ * @swagger
+ * /api/webhooks/retry/{submissionId}:
+ *   post:
+ *     tags:
+ *       - Webhooks
+ *     summary: Retry een gefaalde submission
+ *     description: |
+ *       Start de AI analyse opnieuw voor een submission die eerder is mislukt.
+ *       Verwerking gebeurt asynchroon - response wordt direct teruggegeven.
+ *     parameters:
+ *       - in: path
+ *         name: submissionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de submission om opnieuw te analyseren
+ *     responses:
+ *       202:
+ *         description: Retry gestart (verwerking is async)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Retry started
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     submission_id:
+ *                       type: integer
+ *                     status:
+ *                       type: string
+ *                       example: processing
+ *       400:
+ *         description: Ongeldig submission ID of submission wordt al verwerkt
+ *       404:
+ *         description: Submission niet gevonden
  */
 router.post('/retry/:submissionId', async (req, res) => {
   try {
@@ -315,8 +423,43 @@ router.post('/retry/:submissionId', async (req, res) => {
 });
 
 /**
- * Haal failed submissions op
- * GET /api/webhooks/failed
+ * @swagger
+ * /api/webhooks/failed:
+ *   get:
+ *     tags:
+ *       - Webhooks
+ *     summary: Haal gefaalde submissions op
+ *     description: Retourneert alle submissions met status 'failed' binnen een bepaalde periode
+ *     parameters:
+ *       - in: query
+ *         name: maxAge
+ *         schema:
+ *           type: integer
+ *           default: 24
+ *         description: Maximum leeftijd in uren (default 24 uur)
+ *     responses:
+ *       200:
+ *         description: Lijst met gefaalde submissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     count:
+ *                       type: integer
+ *                       example: 3
+ *                     submissions:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Submission'
+ *       500:
+ *         description: Server error
  */
 router.get('/failed', async (req, res) => {
   try {
@@ -340,8 +483,33 @@ router.get('/failed', async (req, res) => {
 });
 
 /**
- * Health check endpoint
- * GET /api/webhooks/health
+ * @swagger
+ * /api/webhooks/health:
+ *   get:
+ *     tags:
+ *       - Webhooks
+ *     summary: Health check voor webhook service
+ *     description: Controleert of de webhook service operationeel is
+ *     responses:
+ *       200:
+ *         description: Service is gezond
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                       example: healthy
+ *                     timestamp:
+ *                       type: string
+ *                       format: date-time
  */
 router.get('/health', (req, res) => {
   res.json({
@@ -354,8 +522,74 @@ router.get('/health', (req, res) => {
 });
 
 /**
- * Direct test - analyze GitHub repo without database
- * POST /api/webhooks/test
+ * @swagger
+ * /api/webhooks/test:
+ *   post:
+ *     tags:
+ *       - Webhooks
+ *     summary: Direct test endpoint voor AI analyse
+ *     description: |
+ *       Test de AI code analyse direct op een GitHub repository zonder database of webhook.
+ *       Handig voor development en debugging.
+ *
+ *       **Let op:** Dit endpoint slaat geen data op in de database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - github_url
+ *             properties:
+ *               github_url:
+ *                 type: string
+ *                 format: uri
+ *                 example: https://github.com/username/repository
+ *                 description: GitHub repository URL om te analyseren
+ *     responses:
+ *       200:
+ *         description: Analyse succesvol
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     repository:
+ *                       type: string
+ *                       example: username/repository
+ *                     commit:
+ *                       type: string
+ *                       example: abc1234
+ *                     files_analyzed:
+ *                       type: integer
+ *                       example: 5
+ *                     score:
+ *                       type: integer
+ *                       example: 85
+ *                     feedback:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Feedback'
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         total_files:
+ *                           type: integer
+ *                         total_feedback:
+ *                           type: integer
+ *                         by_severity:
+ *                           type: object
+ *       400:
+ *         description: Ongeldige GitHub URL of geen code bestanden gevonden
+ *       500:
+ *         description: AI analyse mislukt
  */
 router.post('/test', async (req, res) => {
   const { github_url } = req.body;

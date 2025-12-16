@@ -223,11 +223,87 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
 });
 
 /**
- * GET /api/students/me/submissions/:submissionId/feedback
- * Haalt feedback op voor een specifieke submission met filter opties
- * Query params:
- *   - reviewer: 'ai' | 'teacher' | 'all' (default: 'all')
- *   - severity: 'critical' | 'high' | 'medium' | 'low' (optioneel)
+ * @swagger
+ * /api/students/me/submissions/{submissionId}/feedback:
+ *   get:
+ *     tags:
+ *       - Studenten
+ *     summary: Haal feedback op voor een submission
+ *     description: |
+ *       Haalt alle feedback items op voor een specifieke submission.
+ *       Kan gefilterd worden op reviewer type en severity level.
+ *
+ *       **Severity levels:**
+ *       - critical: Kritieke fouten (-20 punten)
+ *       - high: Ernstige problemen (-10 punten)
+ *       - medium: Matige problemen (-5 punten)
+ *       - low: Kleine verbeterpunten (-2 punten)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: submissionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de submission
+ *       - in: query
+ *         name: reviewer
+ *         schema:
+ *           type: string
+ *           enum: [ai, teacher, all]
+ *           default: all
+ *         description: Filter op reviewer type
+ *       - in: query
+ *         name: severity
+ *         schema:
+ *           type: string
+ *           enum: [critical, high, medium, low]
+ *         description: Filter op severity level
+ *     responses:
+ *       200:
+ *         description: Feedback succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     submission_id:
+ *                       type: integer
+ *                     total_count:
+ *                       type: integer
+ *                       example: 15
+ *                     feedback:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Feedback'
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         critical:
+ *                           type: integer
+ *                           example: 2
+ *                         high:
+ *                           type: integer
+ *                           example: 5
+ *                         medium:
+ *                           type: integer
+ *                           example: 6
+ *                         low:
+ *                           type: integer
+ *                           example: 2
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen toegang tot deze feedback
+ *       404:
+ *         description: Submission niet gevonden
  */
 router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
   try {
