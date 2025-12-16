@@ -625,9 +625,9 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
  *                       join_code:
  *                         type: string
  *                       student_count:
- *                         type: string
+ *                         type: integer
  *                       teacher_count:
- *                         type: string
+ *                         type: integer
  *                       created_at:
  *                         type: string
  *                       updated_at:

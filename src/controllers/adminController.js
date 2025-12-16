@@ -92,8 +92,8 @@ async function changeUserRole(userId, newRole) {
 async function getAllCourses() {
   const result = await db.query(
     `SELECT c.id, c.title, c.description, c.join_code, c.created_at, c.updated_at,
-            COUNT(DISTINCT e.user_id) as student_count,
-            COUNT(DISTINCT ct.user_id) as teacher_count
+            CAST(COUNT(DISTINCT e.user_id) AS INTEGER) as student_count,
+            CAST(COUNT(DISTINCT ct.user_id) AS INTEGER) as teacher_count
      FROM course c
      LEFT JOIN enrollment e ON c.id = e.course_id
      LEFT JOIN course_teacher ct ON c.id = ct.course_id
