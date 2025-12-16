@@ -37,7 +37,8 @@ async function findSubmissionByRepo(repoFullName) {
   try {
     const githubUrl = `https://github.com/${repoFullName}`;
 
-    const result = await db.query(
+    // Zoek eerst exact match, dan case-insensitive als fallback
+    let result = await db.query(
       `SELECT
         s.id,
         s.assignment_id,
@@ -49,11 +50,32 @@ async function findSubmissionByRepo(repoFullName) {
         a.course_id
       FROM submission s
       JOIN assignment a ON s.assignment_id = a.id
-      WHERE LOWER(s.github_url) = LOWER($1)
+      WHERE s.github_url = $1
       ORDER BY s.created_at DESC
       LIMIT 1`,
       [githubUrl]
     );
+
+    // Fallback: case-insensitive zoeken (voor oude data of variaties)
+    if (result.rows.length === 0) {
+      result = await db.query(
+        `SELECT
+          s.id,
+          s.assignment_id,
+          s.user_id,
+          s.github_url,
+          s.commit_sha,
+          s.status,
+          s.webhook_secret,
+          a.course_id
+        FROM submission s
+        JOIN assignment a ON s.assignment_id = a.id
+        WHERE LOWER(s.github_url) = LOWER($1)
+        ORDER BY s.created_at DESC
+        LIMIT 1`,
+        [githubUrl]
+      );
+    }
 
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {

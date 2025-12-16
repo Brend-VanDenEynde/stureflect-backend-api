@@ -7,6 +7,12 @@ const {
   getCourseSettings,
   logWebhookEvent
 } = require('../controllers/webhookController');
+const {
+  parseGitHubUrl,
+  getCommitFiles,
+  getMultipleFileContents,
+  filterCodeFiles
+} = require('../services/githubService');
 
 /**
  * GitHub Webhook Handler
@@ -27,6 +33,11 @@ router.post('/github', async (req, res) => {
     // Gebruik raw body voor signature verificatie, parsed body voor data
     const payload = req.rawBody;
     const data = req.body;
+
+    // Valideer dat rawBody beschikbaar is
+    if (!payload) {
+      console.warn('[WEBHOOK] rawBody not available - middleware may not be configured correctly');
+    }
 
     // Log inkomende webhook
     const repoFullName = data.repository?.full_name || 'unknown';
@@ -70,23 +81,61 @@ router.post('/github', async (req, res) => {
     // Haal course settings op voor AI context
     const courseSettings = await getCourseSettings(submission.course_id);
 
-    // Verzamel gewijzigde bestanden uit commits
-    const changedFiles = new Set();
-    for (const commit of data.commits) {
-      (commit.added || []).forEach(file => changedFiles.add({ path: file, status: 'added' }));
-      (commit.modified || []).forEach(file => changedFiles.add({ path: file, status: 'modified' }));
+    // Parse repository info
+    const repoInfo = parseGitHubUrl(`https://github.com/${repoFullName}`);
+    if (!repoInfo) {
+      logWebhookEvent(event, repoFullName, 'error', 'Could not parse repository URL');
+      return;
     }
 
-    logWebhookEvent(event, repoFullName, 'info', `Changed files: ${changedFiles.size}`);
+    // Haal gewijzigde bestanden op via GitHub API
+    const commitResult = await getCommitFiles(repoInfo.owner, repoInfo.repo, latestCommitSha);
+    if (!commitResult.success) {
+      logWebhookEvent(event, repoFullName, 'error', `Failed to get commit files: ${commitResult.error}`);
+      await updateSubmissionStatus(submission.id, latestCommitSha, 'failed');
+      return;
+    }
 
-    // TODO: Checkpoint 2 - Gewijzigde bestanden ophalen via GitHub API
-    // TODO: Checkpoint 3 - AI analyse triggeren
+    // Filter alleen code bestanden (geen node_modules, lock files, etc.)
+    const codeFiles = filterCodeFiles(commitResult.files);
+
+    // Filter alleen added en modified bestanden (niet removed)
+    const filesToAnalyze = codeFiles.filter(f => f.status === 'added' || f.status === 'modified');
+
+    if (filesToAnalyze.length === 0) {
+      logWebhookEvent(event, repoFullName, 'skipped', 'No code files to analyze in commit');
+      await updateSubmissionStatus(submission.id, latestCommitSha, 'completed');
+      return;
+    }
+
+    logWebhookEvent(event, repoFullName, 'info', `Code files to analyze: ${filesToAnalyze.length}`);
+
+    // Haal file contents op
+    const filePaths = filesToAnalyze.map(f => f.path);
+    const fileContents = await getMultipleFileContents(
+      repoInfo.owner,
+      repoInfo.repo,
+      filePaths,
+      latestCommitSha
+    );
+
+    // Filter bestanden die succesvol opgehaald zijn
+    const validFiles = fileContents.filter(f => f.content !== null);
+    logWebhookEvent(event, repoFullName, 'info', `Files retrieved successfully: ${validFiles.length}/${filesToAnalyze.length}`);
+
+    if (validFiles.length === 0) {
+      logWebhookEvent(event, repoFullName, 'error', 'No file contents could be retrieved');
+      await updateSubmissionStatus(submission.id, latestCommitSha, 'failed');
+      return;
+    }
+
+    // TODO: Checkpoint 3 - AI analyse triggeren met validFiles en courseSettings
     // TODO: Checkpoint 4 - Feedback opslaan
 
-    // Tijdelijk: markeer als completed (wordt vervangen in checkpoint 3)
+    // Tijdelijk: markeer als pending (wordt vervangen in checkpoint 3)
     await updateSubmissionStatus(submission.id, latestCommitSha, 'pending');
 
-    logWebhookEvent(event, repoFullName, 'success', 'Webhook processed successfully');
+    logWebhookEvent(event, repoFullName, 'success', `Webhook processed - ${validFiles.length} files ready for analysis`);
 
   } catch (error) {
     console.error('[WEBHOOK ERROR]', error);
