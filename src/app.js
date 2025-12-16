@@ -65,7 +65,15 @@ app.use(/^\/api-docs/, (req, res, next) => {
   next();
 });
 
-// Swagger UI - laadt spec dynamisch bij elke request
+// Swagger JSON endpoint - laadt dynamisch
+app.get('/api-docs.json', (req, res) => {
+  const swaggerSpec = getSwaggerSpec();
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
+// Swagger UI - gebruik serve middleware voor assets en laad spec dynamisch
+app.use('/api-docs', swaggerUi.serve);
 app.get('/api-docs', (req, res, next) => {
   const swaggerSpec = getSwaggerSpec();
   const version = swaggerSpec.info.version;
@@ -84,15 +92,8 @@ app.get('/api-docs', (req, res, next) => {
     }
   };
   
-  const html = swaggerUi.generateHTML(swaggerSpec, swaggerUiOptions);
-  res.send(html);
-});
-
-// Swagger JSON endpoint - laadt ook dynamisch
-app.get('/api-docs.json', (req, res) => {
-  const swaggerSpec = getSwaggerSpec();
-  res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerSpec);
+  // Gebruik setup met spec
+  swaggerUi.setup(swaggerSpec, swaggerUiOptions)(req, res, next);
 });
 // Routes
 const generalRoutes = require('./routes/general');
