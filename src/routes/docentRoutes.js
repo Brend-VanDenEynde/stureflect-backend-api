@@ -1,12 +1,65 @@
 const express = require('express');
 const router = express.Router();
+const authenticateToken = require('../middleware/authMiddleware');
 const {
 	getEnrolledStudents,
 	getStudentStatusByCourse,
 	getStudentStatusForStudent,
 	addStudentToCourse,
-	removeStudentFromCourse
+	removeStudentFromCourse,
+	getDocentCourses
 } = require('../controllers/docentController');
+
+// Authenticatie middleware toepassen op alle docent routes
+router.use(authenticateToken);
+
+/**
+ * @swagger
+ * /api/docent/courses:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal vakken van docent op
+ *     description: Haalt alle vakken op waar de ingelogde docent les aan geeft, inclusief aantallen studenten en opdrachten
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lijst met vakken van de docent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 courses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       joinCode:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       studentCount:
+ *                         type: integer
+ *                       assignmentCount:
+ *                         type: integer
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/courses', getDocentCourses);
 
 /**
  * @swagger
