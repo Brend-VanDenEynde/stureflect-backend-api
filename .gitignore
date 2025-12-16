@@ -26,6 +26,7 @@ logs/
 dist/
 build/
 .out/
+coverage/
 .vercel_build_output/
 .instructions
 
