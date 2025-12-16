@@ -209,10 +209,15 @@
         },
         "post": {
             "summary": "Voeg student toe aan cursus",
-            "description": "Voegt een student toe aan een cursus op basis van e-mailadres.",
+            "description": "Voegt een student toe aan een cursus op basis van e-mailadres. Deze functie valideert eerst of de student bestaat in het systeem, controleert of de student al is ingeschreven, en voegt vervolgens de enrollment toe. De operatie wordt volledig gelogd met gedetailleerde stappen voor debugging doeleinden.",
             "operationId": "addStudentToCourse",
             "tags": [
                 "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
             ],
             "parameters": [
                 {
@@ -220,13 +225,15 @@
                     "in": "path",
                     "required": true,
                     "schema": {
-                        "type": "string"
+                        "type": "integer"
                     },
-                    "description": "ID van de cursus"
+                    "description": "ID van de cursus",
+                    "example": 1
                 }
             ],
             "requestBody": {
                 "required": true,
+                "description": "Student email die toegevoegd moet worden",
                 "content": {
                     "application/json": {
                         "schema": {
@@ -235,31 +242,180 @@
                                 "email": {
                                     "type": "string",
                                     "format": "email",
-                                    "description": "E-mailadres van de student"
+                                    "description": "E-mailadres van de student die toegevoegd moet worden",
+                                    "example": "charlie.dev@example.com"
                                 }
                             },
                             "required": [
                                 "email"
                             ]
+                        },
+                        "examples": {
+                            "validRequest": {
+                                "summary": "Geldige request",
+                                "value": {
+                                    "email": "charlie.dev@example.com"
+                                }
+                            }
                         }
                     }
                 }
             },
             "responses": {
                 "201": {
-                    "description": "Student succesvol toegevoegd"
+                    "description": "Student succesvol toegevoegd aan de cursus",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "message": {
+                                        "type": "string",
+                                        "example": "Student successfully added to the course"
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 "400": {
-                    "description": "Ongeldige input of missende velden"
+                    "description": "Ongeldige input of missende velden",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "email is required"
+                                    }
+                                }
+                            },
+                            "examples": {
+                                "missingBody": {
+                                    "summary": "Request body ontbreekt",
+                                    "value": {
+                                        "error": "Request body is missing",
+                                        "hint": "Ensure you are sending a JSON body and setting Content-Type: application/json"
+                                    }
+                                },
+                                "missingEmail": {
+                                    "summary": "Email ontbreekt",
+                                    "value": {
+                                        "error": "email is required"
+                                    }
+                                },
+                                "missingCourseId": {
+                                    "summary": "Course ID ontbreekt",
+                                    "value": {
+                                        "error": "courseId is required"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd - JWT token ontbreekt of is ongeldig",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Geen token verstrekt."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "403": {
+                    "description": "Forbidden - Alleen docenten en admins hebben toegang",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "FORBIDDEN"
+                                    },
+                                    "message": {
+                                        "type": "string",
+                                        "example": "Alleen docenten en admins hebben toegang tot deze functionaliteit"
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 "404": {
-                    "description": "Student niet gevonden"
+                    "description": "Student niet gevonden met opgegeven e-mailadres",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Student not found with this email"
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 "409": {
-                    "description": "Student is al ingeschreven"
+                    "description": "Student is al ingeschreven voor deze cursus",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Student is already enrolled in this course"
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 "500": {
-                    "description": "Interne serverfout"
+                    "description": "Interne serverfout",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Internal server error"
+                                    },
+                                    "message": {
+                                        "type": "string",
+                                        "example": "Database connection failed"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "x-logging": {
+                "description": "Deze endpoint logt uitgebreide informatie voor debugging",
+                "loggedInformation": [
+                    "Request user (ID, email, role)",
+                    "Course ID en student email",
+                    "Database query resultaten per stap",
+                    "Success/failure indicators",
+                    "Complete error stack traces"
+                ],
+                "logLevels": {
+                    "info": "Request details en success messages",
+                    "error": "Database errors en validation failures"
                 }
             }
         }
