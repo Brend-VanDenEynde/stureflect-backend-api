@@ -39,7 +39,14 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Middleware
-app.use(express.json());
+// Bewaar raw body voor webhook signature verificatie
+app.use(express.json({
+  verify: (req, res, buf) => {
+    if (req.originalUrl.startsWith('/api/webhooks')) {
+      req.rawBody = buf.toString('utf8');
+    }
+  }
+}));
 
 // Swagger UI opties
 const swaggerUiOptions = {

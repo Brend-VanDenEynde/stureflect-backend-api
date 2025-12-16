@@ -7,6 +7,7 @@ const userRoutes = require('./userRoutes');
 const docentRoutes = require('./docentRoutes');
 const studentRoutes = require('./studentRoutes');
 const adminRoutes = require('./adminRoutes');
+const webhookRoutes = require('./webhookRoutes');
 
 // Auth routes (public)
 router.use('/auth', authRoutes);
@@ -24,5 +25,8 @@ router.use('/docent', docentRoutes);
 
 // Admin routes
 router.use('/', adminRoutes);
+
+// Webhook routes (GitHub webhooks)
+router.use('/webhooks', webhookRoutes);
 
 module.exports = router;
