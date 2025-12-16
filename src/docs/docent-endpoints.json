@@ -1,5 +1,96 @@
 {
   "paths": {
+    "/api/docent/courses": {
+        "get": {
+            "summary": "Haal vakken van docent op",
+            "description": "Haalt alle vakken op waar de ingelogde docent les aan geeft, inclusief aantallen studenten en opdrachten.",
+            "operationId": "getDocentCourses",
+            "tags": [
+                "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Lijst met vakken van de docent",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "courses": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "description": "Unieke ID van het vak"
+                                                },
+                                                "title": {
+                                                    "type": "string",
+                                                    "description": "Titel van het vak"
+                                                },
+                                                "description": {
+                                                    "type": "string",
+                                                    "description": "Beschrijving van het vak"
+                                                },
+                                                "joinCode": {
+                                                    "type": "string",
+                                                    "description": "Join code voor het vak"
+                                                },
+                                                "createdAt": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "description": "Aanmaakdatum"
+                                                },
+                                                "updatedAt": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "description": "Laatste wijzigingsdatum"
+                                                },
+                                                "studentCount": {
+                                                    "type": "integer",
+                                                    "description": "Aantal ingeschreven studenten"
+                                                },
+                                                "assignmentCount": {
+                                                    "type": "integer",
+                                                    "description": "Aantal opdrachten"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "example": {
+                                "courses": [
+                                    {
+                                        "id": 1,
+                                        "title": "Web Development",
+                                        "description": "Leer moderne web development",
+                                        "joinCode": "ABC123",
+                                        "createdAt": "2024-01-01T00:00:00Z",
+                                        "updatedAt": "2024-01-15T00:00:00Z",
+                                        "studentCount": 25,
+                                        "assignmentCount": 10
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd"
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
+        }
+    },
     "/api/docent/courses/{courseId}/students": {
         "get": {
             "summary": "Haal ingeschreven studenten op",
