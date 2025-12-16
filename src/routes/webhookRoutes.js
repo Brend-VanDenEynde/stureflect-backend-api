@@ -5,7 +5,9 @@ const {
   findSubmissionByRepo,
   updateSubmissionStatus,
   getCourseSettings,
-  logWebhookEvent
+  logWebhookEvent,
+  saveFeedback,
+  updateSubmissionWithScore
 } = require('../controllers/webhookController');
 const {
   parseGitHubUrl,
@@ -151,20 +153,14 @@ router.post('/github', async (req, res) => {
     logAIEvent('complete', `${analysisResult.summary.total_feedback} feedback items, score: ${aiScore}`);
     logWebhookEvent(event, repoFullName, 'info', `AI analysis complete: ${analysisResult.summary.total_feedback} feedback items, score: ${aiScore}`);
 
-    // TODO: Checkpoint 4 - Feedback opslaan in database
-    // Voor nu: log de feedback en update status
-    console.log('[AI FEEDBACK]', JSON.stringify({
-      submission_id: submission.id,
-      commit_sha: latestCommitSha,
-      score: aiScore,
-      summary: analysisResult.summary,
-      feedback_count: analysisResult.feedback.length
-    }, null, 2));
+    // Checkpoint 4: Feedback opslaan in database
+    const savedFeedback = await saveFeedback(submission.id, analysisResult.feedback);
+    logWebhookEvent(event, repoFullName, 'info', `Feedback saved: ${savedFeedback.length} items`);
 
     // Update submission met AI score en status
-    await updateSubmissionStatus(submission.id, latestCommitSha, 'analyzed');
+    await updateSubmissionWithScore(submission.id, latestCommitSha, aiScore, 'analyzed');
 
-    logWebhookEvent(event, repoFullName, 'success', `Analysis complete - score: ${aiScore}, feedback items: ${analysisResult.feedback.length}`);
+    logWebhookEvent(event, repoFullName, 'success', `Analysis complete - score: ${aiScore}, feedback items: ${savedFeedback.length}`);
 
   } catch (error) {
     console.error('[WEBHOOK ERROR]', error);

@@ -168,11 +168,143 @@ function logWebhookEvent(event, repoFullName, status, message) {
   console.log(`[WEBHOOK ${timestamp}] ${event} | ${repoFullName} | ${status} | ${message}`);
 }
 
+/**
+ * Verwijder oude feedback voor een submission (bij re-analyse)
+ * @param {number} submissionId - Submission ID
+ * @returns {Promise<number>} - Aantal verwijderde records
+ */
+async function deletePreviousFeedback(submissionId) {
+  try {
+    const result = await db.query(
+      `DELETE FROM feedback WHERE submission_id = $1 AND reviewer = 'ai'`,
+      [submissionId]
+    );
+    return result.rowCount;
+  } catch (error) {
+    console.error('Fout bij verwijderen oude feedback:', error);
+    throw error;
+  }
+}
+
+/**
+ * Sla AI feedback op in de database
+ * @param {number} submissionId - Submission ID
+ * @param {Array} feedbackItems - Array van feedback objecten
+ * @returns {Promise<Array>} - Opgeslagen feedback records
+ */
+async function saveFeedback(submissionId, feedbackItems) {
+  if (!feedbackItems || feedbackItems.length === 0) {
+    return [];
+  }
+
+  try {
+    // Verwijder eerst oude AI feedback
+    await deletePreviousFeedback(submissionId);
+
+    // Insert alle nieuwe feedback items
+    const savedItems = [];
+
+    for (const item of feedbackItems) {
+      const result = await db.query(
+        `INSERT INTO feedback (submission_id, content, reviewer, severity, line_number, suggestion, type)
+         VALUES ($1, $2, 'ai', $3, $4, $5, $6)
+         RETURNING id, submission_id, content, reviewer, severity, line_number, suggestion, type, created_at`,
+        [
+          submissionId,
+          item.content,
+          item.severity || 'low',
+          item.line_number || null,
+          item.suggestion || null,
+          item.type || 'code_quality'
+        ]
+      );
+      savedItems.push(result.rows[0]);
+    }
+
+    return savedItems;
+  } catch (error) {
+    console.error('Fout bij opslaan feedback:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update submission met AI score en status
+ * @param {number} submissionId - Submission ID
+ * @param {string} commitSha - Commit SHA
+ * @param {number} aiScore - AI score (0-100)
+ * @param {string} status - Nieuwe status
+ * @returns {Promise<object>}
+ */
+async function updateSubmissionWithScore(submissionId, commitSha, aiScore, status) {
+  try {
+    const result = await db.query(
+      `UPDATE submission
+       SET commit_sha = $1, ai_score = $2, status = $3, updated_at = NOW()
+       WHERE id = $4
+       RETURNING id, commit_sha, ai_score, status, updated_at`,
+      [commitSha, aiScore, status, submissionId]
+    );
+
+    return result.rows[0];
+  } catch (error) {
+    console.error('Fout bij updaten submission met score:', error);
+    throw error;
+  }
+}
+
+/**
+ * Haal feedback op voor een submission
+ * @param {number} submissionId - Submission ID
+ * @param {object} filters - Filter opties
+ * @param {string} filters.reviewer - Filter op reviewer: 'ai', 'teacher', 'all'
+ * @param {string} filters.severity - Filter op severity
+ * @returns {Promise<Array>}
+ */
+async function getFeedbackBySubmission(submissionId, filters = {}) {
+  try {
+    const { reviewer = 'all', severity } = filters;
+    const params = [submissionId];
+    let paramIndex = 2;
+
+    let query = `
+      SELECT id, submission_id, content, reviewer, severity, line_number, suggestion, type, created_at
+      FROM feedback
+      WHERE submission_id = $1
+    `;
+
+    // Filter op reviewer
+    if (reviewer !== 'all') {
+      query += ` AND reviewer = $${paramIndex}`;
+      params.push(reviewer);
+      paramIndex++;
+    }
+
+    // Filter op severity
+    if (severity) {
+      query += ` AND severity = $${paramIndex}`;
+      params.push(severity);
+    }
+
+    query += ` ORDER BY severity DESC, line_number ASC NULLS LAST, created_at ASC`;
+
+    const result = await db.query(query, params);
+    return result.rows;
+  } catch (error) {
+    console.error('Fout bij ophalen feedback:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   verifyWebhookSignature,
   findSubmissionByRepo,
   updateSubmissionStatus,
   getCourseSettings,
   createOrUpdateSubmission,
-  logWebhookEvent
+  logWebhookEvent,
+  saveFeedback,
+  updateSubmissionWithScore,
+  getFeedbackBySubmission,
+  deletePreviousFeedback
 };
