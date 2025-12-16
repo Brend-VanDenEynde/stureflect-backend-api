@@ -1,6 +1,6 @@
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./docs/swagger.json');
+const swaggerSpec = require('./config/swagger');
 const session = require('express-session');
 const passport = require('./config/passport');
 const db = require('./config/db'); // Voeg databaseconfiguratie toe

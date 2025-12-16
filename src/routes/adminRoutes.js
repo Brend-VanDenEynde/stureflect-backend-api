@@ -4,8 +4,34 @@ const adminController = require('../controllers/adminController');
 const authenticateToken = require('../middleware/authMiddleware');
 
 /**
- * GET /api/admin/students
- * Haalt alle studenten op (alleen voor admins)
+ * @swagger
+ * /api/admin/students:
+ *   get:
+ *     tags:
+ *       - Admin
+ *     summary: Haal alle studenten op
+ *     description: Verkrijg een lijst van alle geregistreerde studenten (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lijst van studenten
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen admin rechten
  */
 router.get('/admin/students', authenticateToken, async (req, res) => {
   // Development: query param fallback, Productie: alleen req.user.id
@@ -67,8 +93,29 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
 });
 
 /**
- * PUT /api/admin/users/:userId/role/teacher
- * Zet een student account om naar een docent account (alleen voor admins)
+ * @swagger
+ * /api/admin/users/{userId}/role/teacher:
+ *   put:
+ *     tags:
+ *       - Admin
+ *     summary: Promoveer gebruiker naar docent
+ *     description: Wijzig de rol van een gebruiker naar 'teacher' (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de gebruiker
+ *     responses:
+ *       200:
+ *         description: Gebruiker succesvol gepromoveerd naar docent
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Gebruiker niet gevonden
  */
 router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, res) => {
   const adminId = req.user?.id;
@@ -141,8 +188,39 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
 });
 
 /**
- * PUT /api/admin/users/:userId/role/student
- * Zet een docent account om naar een student account (alleen voor admins)
+ * @swagger
+ * /api/admin/users/{userId}/role/student:
+ *   put:
+ *     tags:
+ *       - Admin
+ *     summary: Zet gebruiker terug naar student
+ *     description: Wijzig de rol van een gebruiker naar 'student' (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de gebruiker
+ *     responses:
+ *       200:
+ *         description: Gebruiker succesvol teruggezet naar student
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Gebruiker niet gevonden
  */
 router.put('/admin/users/:userId/role/student', authenticateToken, async (req, res) => {
   const adminId = req.user?.id;
@@ -215,8 +293,39 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
 });
 
 /**
- * PUT /api/admin/users/:userId/role/admin
- * Zet een gebruiker om naar een admin account (alleen voor admins)
+ * @swagger
+ * /api/admin/users/{userId}/role/admin:
+ *   put:
+ *     tags:
+ *       - Admin
+ *     summary: Promoveer gebruiker naar admin
+ *     description: Wijzig de rol van een gebruiker naar 'admin' (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de gebruiker
+ *     responses:
+ *       200:
+ *         description: Gebruiker succesvol gepromoveerd naar admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Gebruiker niet gevonden
  */
 router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res) => {
   const adminId = req.user?.id;
@@ -289,9 +398,53 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
 });
 
 /**
- * PUT /api/admin/users/:userId/demote
- * Zet een admin account om naar student of docent (alleen voor admins)
- * Body: { "newRole": "student" } of { "newRole": "teacher" }
+ * @swagger
+ * /api/admin/users/{userId}/demote:
+ *   put:
+ *     tags:
+ *       - Admin
+ *     summary: Degradeer gebruiker
+ *     description: Verwijder admin rechten van een gebruiker (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de gebruiker
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newRole
+ *             properties:
+ *               newRole:
+ *                 type: string
+ *                 enum: [student, teacher]
+ *                 example: student
+ *                 description: Nieuwe rol voor de gebruiker
+ *     responses:
+ *       200:
+ *         description: Gebruiker succesvol gedegradeerd
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Gebruiker niet gevonden
  */
 router.put('/admin/users/:userId/demote', authenticateToken, async (req, res) => {
   const adminId = req.user?.id;

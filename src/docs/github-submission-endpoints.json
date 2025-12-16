@@ -2,7 +2,7 @@
   "paths": {
     "/api/students/me/assignments/{assignmentId}/submissions": {
       "post": {
-        "tags": ["Student Submissions"],
+        "tags": ["Studenten"],
         "summary": "Submit GitHub repository for assignment",
         "description": "Dien een GitHub repository in voor een opdracht. De repository wordt gevalideerd en de bestanden worden opgehaald.",
         "operationId": "createGitHubSubmission",
