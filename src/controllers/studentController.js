@@ -94,7 +94,7 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
  */
 async function getStudentSubmissions(studentId, filters = {}) {
   try {
-    const { courseId, status, branch } = filters;
+    const { courseId, status } = filters;
     const params = [studentId];
     let paramIndex = 2;
 
@@ -106,7 +106,6 @@ async function getStudentSubmissions(studentId, filters = {}) {
         c.id as course_id,
         c.title as course_title,
         s.github_url,
-        s.branch,
         s.commit_sha,
         s.status,
         s.ai_score,
@@ -132,13 +131,6 @@ async function getStudentSubmissions(studentId, filters = {}) {
     if (status && validStatuses.includes(status)) {
       query += ` AND s.status = $${paramIndex}`;
       params.push(status);
-      paramIndex++;
-    }
-
-    // Filter op branch
-    if (branch) {
-      query += ` AND s.branch = $${paramIndex}`;
-      params.push(branch);
     }
 
     query += ` ORDER BY s.updated_at DESC`;
@@ -163,7 +155,6 @@ async function getSubmissionDetail(submissionId) {
       `SELECT
         s.id,
         s.github_url,
-        s.branch,
         s.commit_sha,
         s.status,
         s.ai_score,
@@ -188,7 +179,7 @@ async function getSubmissionDetail(submissionId) {
       return null;
     }
 
-    // Haal feedback op (volgorde schema: id, submission_id, content, reviewer, severity, line_number, suggestion, type, created_at)
+    // Haal feedback op
     const feedbackResult = await db.query(
       `SELECT
         id,
@@ -211,7 +202,6 @@ async function getSubmissionDetail(submissionId) {
       submission: {
         id: row.id,
         github_url: row.github_url,
-        branch: row.branch,
         commit_sha: row.commit_sha,
         status: row.status,
         ai_score: row.ai_score,
