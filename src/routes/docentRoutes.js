@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { getEnrolledStudents, addStudentToCourse, removeStudentFromCourse } = require('../controllers/docentController');
+const {
+	getEnrolledStudents,
+	getStudentStatusByCourse,
+	getStudentStatusForStudent,
+	addStudentToCourse,
+	removeStudentFromCourse
+} = require('../controllers/docentController');
 
 /**
  * @swagger
@@ -76,6 +82,8 @@ const { getEnrolledStudents, addStudentToCourse, removeStudentFromCourse } = req
  *         description: Student is al ingeschreven
  */
 router.get('/courses/:courseId/students', getEnrolledStudents);
+router.get('/courses/:courseId/student-status', getStudentStatusByCourse);
+router.get('/courses/:courseId/students/:studentId/status', getStudentStatusForStudent);
 router.post('/courses/:courseId/students', addStudentToCourse);
 
 /**
