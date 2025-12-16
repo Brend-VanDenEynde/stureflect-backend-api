@@ -132,6 +132,53 @@ header h1 {
   font-size: 0.875rem;
 }
 
+.btn-github {
+  background: #24292e;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.btn-github:hover {
+  background: #1a1e22;
+}
+
+.github-icon {
+  flex-shrink: 0;
+}
+
+/* User Info */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.user-badge {
+  background: #dcfce7;
+  color: #166534;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.user-id {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+#loggedIn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 /* Result Messages */
 .result-message {
   margin-top: 16px;
@@ -430,6 +477,15 @@ header h1 {
 
 .note a {
   color: #2563eb;
+}
+
+.note ul {
+  margin-left: 20px;
+  margin-top: 8px;
+}
+
+.note ul li {
+  margin-bottom: 4px;
 }
 
 /* Empty State */
