@@ -44,9 +44,11 @@ app.use(express.json());
 
 // Functie om swagger spec ALTIJD vers in te laden
 function getSwaggerSpec() {
+  // Delete from require cache to force fresh load
   const swaggerPath = path.join(__dirname, 'docs', 'swagger.json');
-  const swaggerFile = fs.readFileSync(swaggerPath, 'utf8');
-  const swaggerSpec = JSON.parse(swaggerFile);
+  delete require.cache[require.resolve('./docs/swagger.json')];
+  
+  const swaggerSpec = require('./docs/swagger.json');
   
   // Voeg unieke versie toe gebaseerd op tijdstip
   swaggerSpec.info.version = Date.now().toString();
@@ -61,7 +63,6 @@ app.use(/^\/api-docs/, (req, res, next) => {
   res.setHeader('Expires', '0');
   res.setHeader('Surrogate-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('ETag', Date.now().toString()); // Unieke ETag per request
   next();
 });
 
@@ -72,29 +73,19 @@ app.get('/api-docs.json', (req, res) => {
   res.send(swaggerSpec);
 });
 
-// Swagger UI - gebruik serve middleware voor assets en laad spec dynamisch
-app.use('/api-docs', swaggerUi.serve);
-app.get('/api-docs', (req, res, next) => {
+// Swagger UI setup - herlaadt spec bij elke request
+app.use('/api-docs', (req, res, next) => {
   const swaggerSpec = getSwaggerSpec();
-  const version = swaggerSpec.info.version;
   
   const swaggerUiOptions = {
-    customCssUrl: `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui.min.css?v=${version}`,
-    customJs: [
-      `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-bundle.js?v=${version}`,
-      `https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.0/swagger-ui-standalone-preset.js?v=${version}`,
-    ],
     swaggerOptions: {
       persistAuthorization: false,
-      displayRequestDuration: true,
-      filter: true,
-      tryItOutEnabled: true
     }
   };
   
-  // Gebruik setup met spec
-  swaggerUi.setup(swaggerSpec, swaggerUiOptions)(req, res, next);
-});
+  // Gebruik de standaard swagger-ui-express setup
+  return swaggerUi.setup(swaggerSpec, swaggerUiOptions)(req, res, next);
+}, swaggerUi.serve);
 // Routes
 const generalRoutes = require('./routes/general');
 const apiRoutes = require('./routes');
