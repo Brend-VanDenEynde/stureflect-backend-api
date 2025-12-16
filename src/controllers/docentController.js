@@ -540,7 +540,7 @@ const addStudentToCourse = async (req, res) => {
 
     // Debug logging
     console.log('📝 Add Student Request Headers:', req.headers['content-type']);
-    console.log('📝 Add Student Request Body:', req.body);
+    // Niet loggen van request body - bevat mogelijk gevoelige data zoals wachtwoorden
 
     if (!req.body) {
       return res.status(400).json({
