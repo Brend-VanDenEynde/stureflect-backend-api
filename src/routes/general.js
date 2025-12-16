@@ -21,9 +21,8 @@ const router = express.Router();
  */
 router.get('/', (req, res) => {
   // Serveer test UI voor development
+  console.log('[ROOT] Root endpoint aangeroepen - serving test UI');
   res.sendFile(path.join(__dirname, '../public/index.html'));
-  console.log('[ROOT] Root endpoint aangeroepen');
-  res.send('Hello from Express on Vercel!');
 });
 
 /**
