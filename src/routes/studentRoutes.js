@@ -40,15 +40,17 @@ router.get('/me/courses', async (req, res) => {
  * Query params:
  *   - courseId: Filter op cursus ID (optioneel)
  *   - status: 'pending' | 'completed' | 'graded' (optioneel)
+ *   - branch: Filter op branch naam (optioneel)
  */
 router.get('/me/submissions', async (req, res) => {
   try {
     const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
-    const { courseId, status } = req.query;
+    const { courseId, status, branch } = req.query;
 
     const filters = {};
     if (courseId) filters.courseId = parseInt(courseId);
     if (status) filters.status = status;
+    if (branch) filters.branch = branch;
 
     const submissions = await studentController.getStudentSubmissions(studentId, filters);
 

@@ -29,52 +29,70 @@ function verifyWebhookSignature(payload, signature, secret) {
 }
 
 /**
- * Zoek submission op basis van GitHub URL
+ * Zoek submission op basis van GitHub URL en optioneel branch
  * @param {string} repoFullName - Repository full name (owner/repo)
+ * @param {string} branch - Branch naam (optioneel)
  * @returns {Promise<object|null>}
  */
-async function findSubmissionByRepo(repoFullName) {
+async function findSubmissionByRepo(repoFullName, branch = null) {
   try {
     const githubUrl = `https://github.com/${repoFullName}`;
 
-    // Zoek eerst exact match, dan case-insensitive als fallback
-    let result = await db.query(
-      `SELECT
+    // Query met optionele branch filter
+    let query = `
+      SELECT
         s.id,
         s.assignment_id,
         s.user_id,
         s.github_url,
         s.commit_sha,
+        s.branch,
         s.status,
         s.webhook_secret,
         a.course_id
       FROM submission s
       JOIN assignment a ON s.assignment_id = a.id
       WHERE s.github_url = $1
-      ORDER BY s.created_at DESC
-      LIMIT 1`,
-      [githubUrl]
-    );
+    `;
+    const params = [githubUrl];
 
-    // Fallback: case-insensitive zoeken (voor oude data of variaties)
+    // Als branch opgegeven is, zoek specifiek voor die branch
+    if (branch) {
+      query += ` AND (s.branch = $2 OR s.branch IS NULL)`;
+      params.push(branch);
+    }
+
+    query += ` ORDER BY s.updated_at DESC LIMIT 1`;
+
+    let result = await db.query(query, params);
+
+    // Fallback: case-insensitive zoeken
     if (result.rows.length === 0) {
-      result = await db.query(
-        `SELECT
+      let fallbackQuery = `
+        SELECT
           s.id,
           s.assignment_id,
           s.user_id,
           s.github_url,
           s.commit_sha,
+          s.branch,
           s.status,
           s.webhook_secret,
           a.course_id
         FROM submission s
         JOIN assignment a ON s.assignment_id = a.id
         WHERE LOWER(s.github_url) = LOWER($1)
-        ORDER BY s.created_at DESC
-        LIMIT 1`,
-        [githubUrl]
-      );
+      `;
+      const fallbackParams = [githubUrl];
+
+      if (branch) {
+        fallbackQuery += ` AND (s.branch = $2 OR s.branch IS NULL)`;
+        fallbackParams.push(branch);
+      }
+
+      fallbackQuery += ` ORDER BY s.updated_at DESC LIMIT 1`;
+
+      result = await db.query(fallbackQuery, fallbackParams);
     }
 
     return result.rows.length > 0 ? result.rows[0] : null;
@@ -85,22 +103,70 @@ async function findSubmissionByRepo(repoFullName) {
 }
 
 /**
- * Update submission status en commit SHA
+ * Haal alle submissions op voor een repository (alle branches)
+ * @param {string} repoFullName - Repository full name (owner/repo)
+ * @returns {Promise<Array>}
+ */
+async function getSubmissionsByRepo(repoFullName) {
+  try {
+    const githubUrl = `https://github.com/${repoFullName}`;
+
+    const result = await db.query(
+      `SELECT
+        s.id,
+        s.assignment_id,
+        s.user_id,
+        s.github_url,
+        s.commit_sha,
+        s.branch,
+        s.status,
+        s.ai_score,
+        s.created_at,
+        s.updated_at,
+        a.course_id,
+        a.title as assignment_title
+      FROM submission s
+      JOIN assignment a ON s.assignment_id = a.id
+      WHERE LOWER(s.github_url) = LOWER($1)
+      ORDER BY s.branch, s.updated_at DESC`,
+      [githubUrl]
+    );
+
+    return result.rows;
+  } catch (error) {
+    console.error('Fout bij ophalen submissions voor repo:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update submission status, commit SHA en optioneel branch
  * @param {number} submissionId - Submission ID
  * @param {string} commitSha - Nieuwe commit SHA
  * @param {string} status - Nieuwe status
+ * @param {string} branch - Branch naam (optioneel)
  * @returns {Promise<object>}
  */
-async function updateSubmissionStatus(submissionId, commitSha, status) {
+async function updateSubmissionStatus(submissionId, commitSha, status, branch = null) {
   try {
-    const result = await db.query(
-      `UPDATE submission
-       SET commit_sha = $1, status = $2, updated_at = NOW()
-       WHERE id = $3
-       RETURNING id, commit_sha, status, updated_at`,
-      [commitSha, status, submissionId]
-    );
+    let query;
+    let params;
 
+    if (branch) {
+      query = `UPDATE submission
+               SET commit_sha = $1, status = $2, branch = $3, updated_at = NOW()
+               WHERE id = $4
+               RETURNING id, commit_sha, branch, status, updated_at`;
+      params = [commitSha, status, branch, submissionId];
+    } else {
+      query = `UPDATE submission
+               SET commit_sha = $1, status = $2, updated_at = NOW()
+               WHERE id = $3
+               RETURNING id, commit_sha, branch, status, updated_at`;
+      params = [commitSha, status, submissionId];
+    }
+
+    const result = await db.query(query, params);
     return result.rows[0];
   } catch (error) {
     console.error('Fout bij updaten submission:', error);
@@ -299,6 +365,7 @@ async function getFeedbackBySubmission(submissionId, filters = {}) {
 module.exports = {
   verifyWebhookSignature,
   findSubmissionByRepo,
+  getSubmissionsByRepo,
   updateSubmissionStatus,
   getCourseSettings,
   createOrUpdateSubmission,

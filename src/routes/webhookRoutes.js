@@ -62,11 +62,15 @@ router.post('/github', async (req, res) => {
       return;
     }
 
-    // Zoek bijbehorende submission
-    const submission = await findSubmissionByRepo(repoFullName);
+    // Extract branch info van de webhook payload
+    const branch = data.ref?.replace('refs/heads/', '') || 'main';
+    const latestCommitSha = data.after;
+
+    // Zoek bijbehorende submission (met branch support)
+    const submission = await findSubmissionByRepo(repoFullName, branch);
 
     if (!submission) {
-      logWebhookEvent(event, repoFullName, 'skipped', 'No matching submission found');
+      logWebhookEvent(event, repoFullName, 'skipped', `No matching submission found for branch: ${branch}`);
       return;
     }
 
@@ -76,14 +80,10 @@ router.post('/github', async (req, res) => {
       return;
     }
 
-    // Haal laatste commit SHA
-    const latestCommitSha = data.after;
-    const branch = data.ref?.replace('refs/heads/', '') || 'unknown';
-
     logWebhookEvent(event, repoFullName, 'processing', `Branch: ${branch}, Commit: ${latestCommitSha.substring(0, 7)}`);
 
-    // Update submission naar processing status
-    await updateSubmissionStatus(submission.id, latestCommitSha, 'processing');
+    // Update submission naar processing status met branch info
+    await updateSubmissionStatus(submission.id, latestCommitSha, 'processing', branch);
 
     // Haal course settings op voor AI context
     const courseSettings = await getCourseSettings(submission.course_id);
