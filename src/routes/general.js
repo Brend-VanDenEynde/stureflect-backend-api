@@ -1,8 +1,10 @@
 const express = require('express');
+const path = require('path');
 const router = express.Router();
 
 router.get('/', (req, res) => {
-  res.send('Hello from Express on Vercel!');
+  // Serveer test UI voor development
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 module.exports = router;

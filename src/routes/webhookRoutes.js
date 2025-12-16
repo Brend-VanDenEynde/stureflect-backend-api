@@ -353,4 +353,79 @@ router.get('/health', (req, res) => {
   });
 });
 
+/**
+ * Direct test - analyze GitHub repo without database
+ * POST /api/webhooks/test
+ */
+router.post('/test', async (req, res) => {
+  const { github_url } = req.body;
+
+  if (!github_url) {
+    return res.status(400).json({ success: false, error: 'github_url required' });
+  }
+
+  const repoInfo = parseGitHubUrl(github_url);
+  if (!repoInfo) {
+    return res.status(400).json({ success: false, error: 'Invalid GitHub URL' });
+  }
+
+  const repoFullName = `${repoInfo.owner}/${repoInfo.repo}`;
+  logWebhookEvent('test', repoFullName, 'start', 'Direct test');
+
+  try {
+    const { getLatestCommitSha, getRepositoryTree } = require('../services/githubService');
+
+    // Get latest commit
+    const commitResult = await getLatestCommitSha(repoInfo.owner, repoInfo.repo);
+    if (!commitResult.success) {
+      return res.status(400).json({ success: false, error: commitResult.error });
+    }
+
+    // Get files
+    const treeResult = await getRepositoryTree(repoInfo.owner, repoInfo.repo, commitResult.sha);
+    if (!treeResult.success) {
+      return res.status(400).json({ success: false, error: treeResult.error });
+    }
+
+    const codeFiles = filterCodeFiles(treeResult.files).slice(0, 10);
+    if (codeFiles.length === 0) {
+      return res.status(400).json({ success: false, error: 'No code files found' });
+    }
+
+    // Get contents
+    const fileContents = await getMultipleFileContents(repoInfo.owner, repoInfo.repo, codeFiles.map(f => f.path), commitResult.sha);
+    const validFiles = fileContents.filter(f => f.content);
+
+    if (validFiles.length === 0) {
+      return res.status(400).json({ success: false, error: 'Could not read files' });
+    }
+
+    // AI analysis
+    logAIEvent('start', `Test: ${validFiles.length} files`);
+    const analysisResult = await analyzeFiles(validFiles, null);
+
+    if (!analysisResult.success) {
+      return res.status(500).json({ success: false, error: 'AI analysis failed' });
+    }
+
+    const score = calculateScore(analysisResult.feedback);
+    logWebhookEvent('test', repoFullName, 'success', `Score: ${score}`);
+
+    res.json({
+      success: true,
+      data: {
+        repository: repoFullName,
+        commit: commitResult.sha.substring(0, 7),
+        files_analyzed: validFiles.length,
+        score,
+        feedback: analysisResult.feedback,
+        summary: analysisResult.summary
+      }
+    });
+  } catch (error) {
+    console.error('[TEST ERROR]', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

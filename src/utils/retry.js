@@ -21,7 +21,7 @@ async function withRetry(fn, options = {}) {
     maxDelay = 10000,
     backoffMultiplier = 2,
     shouldRetry = () => true,
-    onRetry = () => {}
+    onRetry = () => {},
   } = options;
 
   let lastError;
@@ -58,7 +58,7 @@ async function withRetry(fn, options = {}) {
  * @returns {Promise<void>}
  */
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -75,11 +75,13 @@ function isGitHubRetryable(error) {
   const status = error.response.status;
 
   // Retry bij rate limiting, server errors, of timeouts
-  return status === 429 || // Rate limited
-         status === 502 || // Bad gateway
-         status === 503 || // Service unavailable
-         status === 504 || // Gateway timeout
-         status >= 500;    // Server errors
+  return (
+    status === 429 || // Rate limited
+    status === 502 || // Bad gateway
+    status === 503 || // Service unavailable
+    status === 504 || // Gateway timeout
+    status >= 500
+  ); // Server errors
 }
 
 /**
@@ -96,11 +98,13 @@ function isOpenAIRetryable(error) {
   const status = error.response.status;
 
   // Retry bij rate limiting, server errors, of overload
-  return status === 429 || // Rate limited
-         status === 500 || // Server error
-         status === 502 || // Bad gateway
-         status === 503 || // Service unavailable (overloaded)
-         status === 504;   // Gateway timeout
+  return (
+    status === 429 || // Rate limited
+    status === 500 || // Server error
+    status === 502 || // Bad gateway
+    status === 503 || // Service unavailable (overloaded)
+    status === 504
+  ); // Gateway timeout
 }
 
 /**
@@ -111,7 +115,7 @@ function isOpenAIRetryable(error) {
 function getRetryAfter(error) {
   if (!error.response?.headers) return null;
 
-  const retryAfter = error.response.headers['retry-after'];
+  const retryAfter = error.response.headers["retry-after"];
   if (!retryAfter) return null;
 
   // Kan seconds of HTTP-date zijn
@@ -134,5 +138,5 @@ module.exports = {
   sleep,
   isGitHubRetryable,
   isOpenAIRetryable,
-  getRetryAfter
+  getRetryAfter,
 };

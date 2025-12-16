@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger.json');
 const session = require('express-session');
@@ -6,6 +7,9 @@ const passport = require('./config/passport');
 const db = require('./config/db'); // Voeg databaseconfiguratie toe
 
 const app = express();
+
+// Static files voor test UI
+app.use(express.static(path.join(__dirname, 'public')));
 
 // CORS Middleware
 const cors = require('cors');
