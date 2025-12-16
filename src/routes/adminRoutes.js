@@ -94,6 +94,95 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
 
 /**
  * @swagger
+ * /api/admin/teachers:
+ *   get:
+ *     tags:
+ *       - Admin
+ *     summary: Haal alle docenten op
+ *     description: Verkrijg een lijst van alle geregistreerde docenten (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lijst van docenten
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen admin rechten
+ */
+router.get('/admin/teachers', authenticateToken, async (req, res) => {
+  // Development: query param fallback, Productie: alleen req.user.id
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+
+  // Audit log: request ontvangen
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested all teachers at ${new Date().toISOString()}`);
+
+  try {
+    // Autorisatie: controleer of gebruiker admin is
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze data',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    const teachers = await adminController.getAllTeachers();
+
+    // Audit log: succesvolle request
+    console.log(`[AUDIT] Admin ${adminId} retrieved ${teachers.length} teachers`);
+
+    // Validatie: controleer of er docenten beschikbaar zijn
+    if (teachers.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: 'Geen docenten gevonden',
+        error: null
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: teachers,
+      message: `${teachers.length} docenten gevonden`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to retrieve teachers:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen docenten',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/admin/users/{userId}/role/teacher:
  *   put:
  *     tags:
