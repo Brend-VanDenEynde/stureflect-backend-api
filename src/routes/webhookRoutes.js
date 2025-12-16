@@ -277,7 +277,7 @@ router.post('/retry/:submissionId', async (req, res) => {
 
     logWebhookEvent('retry', repoFullName, 'start', `Retry submission ${submissionId}`);
 
-    // Start retry in background
+    // Start retry - response eerst, dan async processing
     res.status(202).json({
       success: true,
       message: 'Retry started',
@@ -287,21 +287,30 @@ router.post('/retry/:submissionId', async (req, res) => {
       }
     });
 
-    // Process async
-    const result = await processSubmission(submission, commitSha, branch, repoFullName);
+    // Process async (na response)
+    try {
+      const result = await processSubmission(submission, commitSha, branch, repoFullName);
 
-    if (result.success) {
-      logWebhookEvent('retry', repoFullName, 'success', `Retry complete - score: ${result.score}`);
-    } else {
-      logWebhookEvent('retry', repoFullName, 'failed', result.error);
+      if (result.success) {
+        logWebhookEvent('retry', repoFullName, 'success', `Retry complete - score: ${result.score}`);
+      } else {
+        logWebhookEvent('retry', repoFullName, 'failed', result.error);
+      }
+    } catch (processError) {
+      // Log error maar stuur geen response (al verzonden)
+      console.error('[RETRY PROCESS ERROR]', processError);
+      logWebhookEvent('retry', repoFullName, 'error', processError.message);
     }
 
   } catch (error) {
+    // Deze catch is voor errors VOOR de response
     console.error('[RETRY ERROR]', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
   }
 });
 

@@ -383,6 +383,9 @@ async function markSubmissionFailed(submissionId, commitSha, errorMessage, error
  */
 async function getFailedSubmissions(maxAge = 24) {
   try {
+    // Valideer maxAge is een nummer tussen 1 en 168 (1 week)
+    const safeMaxAge = Math.min(Math.max(parseInt(maxAge) || 24, 1), 168);
+
     const result = await db.query(
       `SELECT
         s.id,
@@ -397,9 +400,9 @@ async function getFailedSubmissions(maxAge = 24) {
       FROM submission s
       JOIN assignment a ON s.assignment_id = a.id
       WHERE s.status = 'failed'
-        AND s.updated_at > NOW() - INTERVAL '${maxAge} hours'
+        AND s.updated_at > NOW() - INTERVAL '1 hour' * $1
       ORDER BY s.updated_at DESC`,
-      []
+      [safeMaxAge]
     );
 
     return result.rows;
