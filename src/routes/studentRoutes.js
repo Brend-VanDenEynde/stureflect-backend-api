@@ -754,9 +754,21 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
  *   post:
  *     tags:
  *       - Studenten
- *     summary: Dien GitHub repository in
+ *     summary: Koppel GitHub repository aan opdracht
  *     description: |
- *       Dien een GitHub repository in voor een opdracht. De repository wordt gevalideerd.
+ *       Koppel een GitHub repository aan een opdracht. De repository wordt gevalideerd,
+ *       opgeslagen en een webhook wordt geregistreerd voor automatische AI analyse bij pushes.
+ *
+ *       **Flow:**
+ *       1. Valideer GitHub URL en repository toegang
+ *       2. Haal laatste commit SHA en file tree op
+ *       3. Maak submission aan in database
+ *       4. Registreer GitHub webhook voor push events
+ *
+ *       **Belangrijk:**
+ *       - Dit endpoint start GEEN AI analyse
+ *       - De analyse wordt automatisch getriggerd bij elke `git push` naar de repository
+ *       - Bij elke push worden ALLE code bestanden geanalyseerd (niet alleen de diff)
  *
  *       **Development mode:** Gebruik `studentId` query parameter.
  *       **Productie:** User ID wordt uit JWT token gehaald.
@@ -801,17 +813,91 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   $ref: '#/components/schemas/Submission'
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 42
+ *                       description: Submission ID
+ *                     assignment_id:
+ *                       type: integer
+ *                       example: 1
+ *                     user_id:
+ *                       type: integer
+ *                       example: 5
+ *                     github_url:
+ *                       type: string
+ *                       example: https://github.com/student/project
+ *                     commit_sha:
+ *                       type: string
+ *                       example: abc123def456
+ *                       description: Laatste commit SHA bij aanmaken
+ *                     status:
+ *                       type: string
+ *                       example: pending
+ *                       description: Status is 'pending' tot eerste push analyse
+ *                     repository:
+ *                       type: object
+ *                       properties:
+ *                         owner:
+ *                           type: string
+ *                           example: student
+ *                         repo:
+ *                           type: string
+ *                           example: project
+ *                         default_branch:
+ *                           type: string
+ *                           example: main
+ *                     files_count:
+ *                       type: integer
+ *                       example: 12
+ *                       description: Aantal code bestanden in repository
+ *                     files:
+ *                       type: array
+ *                       description: Lijst van code bestanden (max 100)
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           path:
+ *                             type: string
+ *                             example: src/index.js
+ *                           size:
+ *                             type: integer
+ *                             example: 1024
+ *                           language:
+ *                             type: string
+ *                             example: javascript
+ *                     webhook:
+ *                       type: object
+ *                       description: Webhook registratie status
+ *                       properties:
+ *                         registered:
+ *                           type: boolean
+ *                           example: true
+ *                         webhookId:
+ *                           type: integer
+ *                           example: 12345678
+ *                           description: GitHub webhook ID (alleen bij succes)
+ *                         error:
+ *                           type: string
+ *                           description: Foutmelding (alleen bij falen)
  *                 message:
  *                   type: string
+ *                   example: GitHub repository gekoppeld en webhook geregistreerd
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
  *       400:
- *         description: Ongeldige GitHub URL of assignment ID
+ *         description: Ongeldige GitHub URL, assignment ID, of lege repository
  *       403:
  *         description: Niet ingeschreven voor cursus
  *       404:
  *         description: Opdracht niet gevonden
  *       409:
  *         description: Al een submission voor deze opdracht
+ *       429:
+ *         description: GitHub API rate limit bereikt
  */
 router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
   try {
@@ -934,19 +1020,16 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
       commitSha: commitResult.sha
     });
 
-    // Registreer webhook automatisch voor push events
+    // Registreer webhook voor automatische analyse bij push events
     let webhookInfo = { registered: false };
     try {
-      // Haal student's GitHub token op
       const student = await getUserById(studentId);
       const githubToken = student?.github_access_token;
 
       if (githubToken) {
-        // Genereer webhook secret
         const webhookSecret = crypto.randomBytes(32).toString('hex');
         const webhookUrl = `${process.env.BACKEND_URL || 'https://backend.stureflect.com'}/api/webhooks/github`;
 
-        // Registreer webhook op GitHub
         const webhookResult = await githubService.registerWebhook(
           owner,
           repo,
@@ -956,7 +1039,6 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
         );
 
         if (webhookResult.success) {
-          // Sla webhook info op in submission
           await studentController.updateSubmissionWebhook(
             submission.id,
             String(webhookResult.webhookId),
@@ -971,22 +1053,21 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
           console.warn(`[API] Failed to register webhook: ${webhookResult.error}`);
           webhookInfo = {
             registered: false,
-            error: webhookResult.error,
-            errorCode: webhookResult.errorCode
+            error: webhookResult.error
           };
         }
       } else {
-        console.warn('[API] Student authentication not available, webhook not registered');
+        console.warn('[API] No GitHub token available for webhook registration');
         webhookInfo = {
           registered: false,
           error: 'Geen GitHub token beschikbaar'
         };
       }
     } catch (webhookError) {
-      console.error('[API] Error registering webhook:', webhookError.message);
+      console.error('[API] Webhook registration error:', webhookError.message);
       webhookInfo = {
         registered: false,
-        error: 'Interne fout bij webhook registratie'
+        error: 'Webhook registratie mislukt'
       };
     }
 
@@ -1012,8 +1093,8 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
         webhook: webhookInfo
       },
       message: webhookInfo.registered
-        ? 'Inzending succesvol aangemaakt met automatische webhook'
-        : 'Inzending aangemaakt (webhook registratie mislukt)',
+        ? 'GitHub repository gekoppeld en webhook geregistreerd'
+        : 'GitHub repository gekoppeld (webhook registratie mislukt)',
       error: null
     });
   } catch (error) {

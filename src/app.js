@@ -61,7 +61,6 @@ app.use(express.json({
     }
   }
 }));
-app.use(express.json());
 console.log('[SUCCESS] [APP] JSON middleware geladen');
 
 // Request logging middleware

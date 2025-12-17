@@ -157,6 +157,42 @@ async function updateSubmissionStatus(submissionId, commitSha, status, branch = 
 }
 
 /**
+ * Atomisch proberen om processing te starten (race condition preventie)
+ * Alleen succesvol als submission NIET al in 'processing' status is
+ * @param {number} submissionId - Submission ID
+ * @param {string} commitSha - Nieuwe commit SHA
+ * @param {string} branch - Branch naam (optioneel)
+ * @returns {Promise<{success: boolean, submission?: object, alreadyProcessing?: boolean}>}
+ */
+async function tryStartProcessing(submissionId, commitSha, branch = null) {
+  try {
+    // Atomic check-and-set: alleen updaten als status NIET 'processing' is
+    const result = await db.query(
+      `UPDATE submission
+       SET commit_sha = $1, status = 'processing', updated_at = NOW()
+       WHERE id = $2 AND status != 'processing'
+       RETURNING id, commit_sha, status, updated_at`,
+      [commitSha, submissionId]
+    );
+
+    if (result.rows.length === 0) {
+      // Geen rows geüpdatet = submission is al in processing
+      return { success: false, alreadyProcessing: true };
+    }
+
+    const submission = result.rows[0];
+    if (branch) {
+      submission.branch = branch;
+    }
+
+    return { success: true, submission };
+  } catch (error) {
+    console.error('[API] Error trying to start processing:', error.message);
+    throw error;
+  }
+}
+
+/**
  * Haal course settings op (rubric, guidelines)
  * @param {number} courseId - Course ID
  * @returns {Promise<object|null>}
@@ -447,6 +483,7 @@ module.exports = {
   findSubmissionByRepo,
   getSubmissionsByRepo,
   updateSubmissionStatus,
+  tryStartProcessing,
   getCourseSettings,
   createOrUpdateSubmission,
   logWebhookEvent,

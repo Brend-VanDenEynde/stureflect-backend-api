@@ -4,6 +4,7 @@ const {
   verifyWebhookSignature,
   findSubmissionByRepo,
   updateSubmissionStatus,
+  tryStartProcessing,
   getCourseSettings,
   logWebhookEvent,
   saveFeedback,
@@ -14,7 +15,7 @@ const {
 } = require('../controllers/webhookController');
 const {
   parseGitHubUrl,
-  getCommitFiles,
+  getRepositoryTree,
   getMultipleFileContents,
   filterCodeFiles
 } = require('../services/githubService');
@@ -39,8 +40,16 @@ const {
  */
 async function processSubmission(submission, commitSha, branch, repoFullName) {
   try {
-    // Update submission naar processing status
-    await updateSubmissionStatus(submission.id, commitSha, 'processing', branch);
+    // Atomic check: probeer processing te starten (voorkomt race condition)
+    const startResult = await tryStartProcessing(submission.id, commitSha, branch);
+
+    if (!startResult.success) {
+      if (startResult.alreadyProcessing) {
+        logWebhookEvent('push', repoFullName, 'skipped', 'Already processing');
+        return { success: false, error: 'Already processing', skipped: true };
+      }
+      return { success: false, error: 'Could not start processing' };
+    }
 
     // Haal course settings op voor AI context
     const courseSettings = await getCourseSettings(submission.course_id);
@@ -52,11 +61,11 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
       return { success: false, error: 'Invalid repository URL' };
     }
 
-    // Haal gewijzigde bestanden op via GitHub API (met retry)
-    let commitResult;
+    // Haal alle bestanden op uit repository (niet alleen commit diff)
+    let treeResult;
     try {
-      commitResult = await withRetry(
-        () => getCommitFiles(repoInfo.owner, repoInfo.repo, commitSha),
+      treeResult = await withRetry(
+        () => getRepositoryTree(repoInfo.owner, repoInfo.repo, commitSha),
         {
           maxRetries: 3,
           initialDelay: 2000,
@@ -71,28 +80,28 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
       return { success: false, error: 'GitHub API error' };
     }
 
-    if (!commitResult.success) {
-      await markSubmissionFailed(submission.id, commitSha, commitResult.error, commitResult.errorCode || 'GITHUB_ERROR');
-      return { success: false, error: commitResult.error };
+    if (!treeResult.success) {
+      await markSubmissionFailed(submission.id, commitSha, treeResult.error, treeResult.errorCode || 'GITHUB_ERROR');
+      return { success: false, error: treeResult.error };
     }
 
     // Filter alleen code bestanden
-    const codeFiles = filterCodeFiles(commitResult.files);
-    const filesToAnalyze = codeFiles.filter(f => f.status === 'added' || f.status === 'modified');
+    const codeFiles = filterCodeFiles(treeResult.files);
 
-    if (filesToAnalyze.length === 0) {
+    if (codeFiles.length === 0) {
       await updateSubmissionStatus(submission.id, commitSha, 'completed', branch);
       logWebhookEvent('push', repoFullName, 'info', 'No code files to analyze');
       return { success: true, message: 'No code files to analyze' };
     }
 
-    logWebhookEvent('push', repoFullName, 'info', `Code files to analyze: ${filesToAnalyze.length}`);
+    logWebhookEvent('push', repoFullName, 'info', `Code files to analyze: ${codeFiles.length}`);
 
-    // Haal file contents op (met retry)
+    // Haal file contents op (max 20 bestanden, met retry)
+    const filesToFetch = codeFiles.slice(0, 20).map(f => f.path);
     let fileContents;
     try {
       fileContents = await withRetry(
-        () => getMultipleFileContents(repoInfo.owner, repoInfo.repo, filesToAnalyze.map(f => f.path), commitSha),
+        () => getMultipleFileContents(repoInfo.owner, repoInfo.repo, filesToFetch, commitSha),
         {
           maxRetries: 2,
           initialDelay: 1000,
@@ -108,7 +117,7 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
     }
 
     const validFiles = fileContents.filter(f => f.content !== null);
-    logWebhookEvent('push', repoFullName, 'info', `Files retrieved: ${validFiles.length}/${filesToAnalyze.length}`);
+    logWebhookEvent('push', repoFullName, 'info', `Files retrieved: ${validFiles.length}/${filesToFetch.length}`);
 
     if (validFiles.length === 0) {
       await markSubmissionFailed(submission.id, commitSha, 'No file contents could be retrieved', 'NO_FILES');
@@ -177,19 +186,28 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *       Ontvangt push events van GitHub en start automatische AI code analyse.
  *       Dit endpoint wordt aangeroepen door GitHub wanneer er naar een repository wordt gepusht.
  *
+ *       **Belangrijk:** Dit endpoint wordt NIET direct door de frontend aangeroepen.
+ *       Het wordt automatisch getriggerd door GitHub na registratie via POST /submissions.
+ *
  *       **Flow:**
- *       1. Verifieer webhook signature
- *       2. Zoek bijbehorende submission
- *       3. Haal gewijzigde bestanden op
- *       4. Analyseer code met AI (GPT-5 mini)
- *       5. Sla feedback en score op
+ *       1. Valideer request (payload, signature header, event type, branch)
+ *       2. Stuur 202 Accepted response (async verwerking)
+ *       3. Zoek bijbehorende submission in database
+ *       4. Verifieer webhook signature met submission-specifieke secret
+ *       5. Haal ALLE code bestanden op uit repository (niet alleen commit diff)
+ *       6. Analyseer code met AI (GPT-5 mini)
+ *       7. Sla feedback en score op
+ *
+ *       **Race condition preventie:** Bij gelijktijdige pushes wordt slechts één
+ *       analyse tegelijk uitgevoerd per submission (atomic lock).
  *     parameters:
  *       - in: header
  *         name: X-GitHub-Event
  *         required: true
  *         schema:
  *           type: string
- *         description: Type GitHub event (push, ping, etc.)
+ *           enum: [push, ping]
+ *         description: Type GitHub event (alleen push events worden verwerkt)
  *       - in: header
  *         name: X-Hub-Signature-256
  *         required: true
@@ -200,7 +218,7 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *         name: X-GitHub-Delivery
  *         schema:
  *           type: string
- *         description: Unieke delivery ID
+ *         description: Unieke delivery ID van GitHub
  *     requestBody:
  *       required: true
  *       content:
@@ -211,8 +229,10 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *               ref:
  *                 type: string
  *                 example: refs/heads/main
+ *                 description: Git ref (branch) waar naar gepusht is
  *               after:
  *                 type: string
+ *                 example: abc123def456
  *                 description: Commit SHA na de push
  *               repository:
  *                 type: object
@@ -226,7 +246,20 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *                   type: object
  *     responses:
  *       200:
- *         description: Webhook ontvangen (verwerking gebeurt async)
+ *         description: Event ontvangen maar overgeslagen (geen push, geen branch, geen commits)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 received:
+ *                   type: boolean
+ *                   example: true
+ *                 skipped:
+ *                   type: string
+ *                   example: Not a push event
+ *       202:
+ *         description: Push event geaccepteerd, analyse gestart (async)
  *         content:
  *           application/json:
  *             schema:
@@ -237,40 +270,65 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *                   example: true
  *                 delivery_id:
  *                   type: string
+ *                   example: abc-123-def
+ *                 processing:
+ *                   type: boolean
+ *                   example: true
+ *       400:
+ *         description: Ongeldige request (geen payload)
+ *       401:
+ *         description: Ontbrekende signature header
  */
 router.post('/github', async (req, res) => {
   const event = req.headers['x-github-event'];
   const signature = req.headers['x-hub-signature-256'];
   const deliveryId = req.headers['x-github-delivery'];
+  const payload = req.rawBody;
+  const data = req.body;
 
-  // Altijd 200 teruggeven om retry storm te voorkomen
-  res.status(200).json({ received: true, delivery_id: deliveryId });
+  // === SYNC VALIDATIE (vóór response) ===
+
+  // Check of rawBody beschikbaar is (nodig voor signature verificatie)
+  if (!payload) {
+    console.error('[API] rawBody not available - webhook signature cannot be verified');
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+
+  // Check of signature header aanwezig is
+  if (!signature) {
+    console.warn('[API] Missing X-Hub-Signature-256 header');
+    return res.status(401).json({ error: 'Missing signature' });
+  }
+
+  const repoFullName = data.repository?.full_name || 'unknown';
+  logWebhookEvent(event, repoFullName, 'received', `Delivery: ${deliveryId}`);
+
+  // Alleen push events verwerken
+  if (event !== 'push') {
+    logWebhookEvent(event, repoFullName, 'skipped', 'Not a push event');
+    return res.status(200).json({ received: true, skipped: 'Not a push event' });
+  }
+
+  // Check of ref een branch is (niet een tag of PR)
+  if (!data.ref?.startsWith('refs/heads/')) {
+    logWebhookEvent(event, repoFullName, 'skipped', `Not a branch push: ${data.ref}`);
+    return res.status(200).json({ received: true, skipped: 'Not a branch push' });
+  }
+
+  // Check of er een commit SHA is (force push kan lege commits array hebben)
+  if (!data.after || data.after === '0000000000000000000000000000000000000000') {
+    logWebhookEvent(event, repoFullName, 'skipped', 'Branch deleted or no commits');
+    return res.status(200).json({ received: true, skipped: 'No commits' });
+  }
+
+  const branch = data.ref.replace('refs/heads/', '');
+  const latestCommitSha = data.after;
+
+  // === RESPONSE + ASYNC PROCESSING ===
+  // Nu pas 202 Accepted sturen - we weten dat het een geldige push event is
+  res.status(202).json({ received: true, delivery_id: deliveryId, processing: true });
 
   try {
-    const payload = req.rawBody;
-    const data = req.body;
-
-    if (!payload) {
-      console.warn('[API] rawBody not available');
-    }
-
-    const repoFullName = data.repository?.full_name || 'unknown';
-    logWebhookEvent(event, repoFullName, 'received', `Delivery: ${deliveryId}`);
-
-    // Alleen push events verwerken
-    if (event !== 'push') {
-      logWebhookEvent(event, repoFullName, 'skipped', 'Not a push event');
-      return;
-    }
-
-    if (!data.commits || data.commits.length === 0) {
-      logWebhookEvent(event, repoFullName, 'skipped', 'No commits in push');
-      return;
-    }
-
-    const branch = data.ref?.replace('refs/heads/', '') || 'main';
-    const latestCommitSha = data.after;
-
     // Zoek submission
     const submission = await findSubmissionByRepo(repoFullName, branch);
     if (!submission) {
@@ -278,7 +336,7 @@ router.post('/github', async (req, res) => {
       return;
     }
 
-    // Valideer signature
+    // Valideer signature met submission-specifieke secret
     if (!verifyWebhookSignature(payload, signature, submission.webhook_secret)) {
       logWebhookEvent(event, repoFullName, 'error', 'Invalid signature');
       return;
@@ -291,7 +349,7 @@ router.post('/github', async (req, res) => {
 
   } catch (error) {
     console.error('[API] Webhook error:', error.message);
-    logWebhookEvent('push', 'unknown', 'error', error.message);
+    logWebhookEvent('push', repoFullName, 'error', error.message);
   }
 });
 
