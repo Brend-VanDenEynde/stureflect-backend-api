@@ -583,6 +583,172 @@ async function getStudentSubmissions(studentId) {
   return result.rows;
 }
 
+/**
+ * Haalt de instellingen van een vak op
+ * @param {number} courseId - ID van het vak
+ * @returns {Promise<Object|null>} Object met instellingen of null als niet gevonden
+ */
+async function getCourseSettings(courseId) {
+  const result = await db.query(
+    `SELECT cs.id, cs.course_id, cs.rubric, cs.ai_guidelines, cs.created_at, cs.updated_at
+     FROM course_settings cs
+     WHERE cs.course_id = $1`,
+    [courseId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
+ * Werkt de instellingen van een vak bij
+ * @param {number} courseId - ID van het vak
+ * @param {Object} settingsData - Object met te updaten velden (rubric, ai_guidelines)
+ * @returns {Promise<Object>} Bijgewerkte instellingen
+ */
+async function updateCourseSettings(courseId, settingsData) {
+  const { rubric, ai_guidelines } = settingsData;
+
+  // Controleer eerst of het vak bestaat
+  const courseCheck = await db.query(
+    `SELECT id FROM course WHERE id = $1`,
+    [courseId]
+  );
+
+  if (courseCheck.rows.length === 0) {
+    throw new Error('COURSE_NOT_FOUND');
+  }
+
+  // Controleer of er al instellingen bestaan voor dit vak
+  const existingSettings = await getCourseSettings(courseId);
+
+  if (existingSettings) {
+    // Update bestaande instellingen
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (rubric !== undefined) {
+      updates.push(`rubric = $${paramCount}`);
+      values.push(rubric);
+      paramCount++;
+    }
+
+    if (ai_guidelines !== undefined) {
+      updates.push(`ai_guidelines = $${paramCount}`);
+      values.push(ai_guidelines);
+      paramCount++;
+    }
+
+    if (updates.length === 0) {
+      // Geen wijzigingen, return bestaande instellingen
+      return existingSettings;
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(courseId);
+
+    const query = `
+      UPDATE course_settings
+      SET ${updates.join(', ')}
+      WHERE course_id = $${paramCount}
+      RETURNING id, course_id, rubric, ai_guidelines, created_at, updated_at
+    `;
+
+    const result = await db.query(query, values);
+    return result.rows[0];
+  } else {
+    // Maak nieuwe instellingen aan
+    const result = await db.query(
+      `INSERT INTO course_settings (course_id, rubric, ai_guidelines)
+       VALUES ($1, $2, $3)
+       RETURNING id, course_id, rubric, ai_guidelines, created_at, updated_at`,
+      [courseId, rubric || null, ai_guidelines || null]
+    );
+    return result.rows[0];
+  }
+}
+
+/**
+ * Verwijdert de instellingen van een vak (reset naar defaults)
+ * @param {number} courseId - ID van het vak
+ * @returns {Promise<Object|null>} Verwijderde instellingen of null als niet gevonden
+ */
+async function deleteCourseSettings(courseId) {
+  // Controleer eerst of het vak bestaat
+  const courseCheck = await db.query(
+    `SELECT id FROM course WHERE id = $1`,
+    [courseId]
+  );
+
+  if (courseCheck.rows.length === 0) {
+    throw new Error('COURSE_NOT_FOUND');
+  }
+
+  // Verwijder de instellingen als ze bestaan
+  const result = await db.query(
+    `DELETE FROM course_settings
+     WHERE course_id = $1
+     RETURNING id, course_id, rubric, ai_guidelines, created_at, updated_at`,
+    [courseId]
+  );
+
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
+ * Kopieert instellingen van een vak naar een ander vak
+ * @param {number} targetCourseId - ID van het vak waar naartoe gekopieerd wordt
+ * @param {number} sourceCourseId - ID van het vak waarvan gekopieerd wordt
+ * @returns {Promise<Object>} Gekopieerde instellingen
+ */
+async function copyCourseSettings(targetCourseId, sourceCourseId) {
+  // Controleer of beide vakken bestaan
+  const coursesCheck = await db.query(
+    `SELECT id FROM course WHERE id IN ($1, $2)`,
+    [targetCourseId, sourceCourseId]
+  );
+
+  if (coursesCheck.rows.length !== 2) {
+    throw new Error('COURSE_NOT_FOUND');
+  }
+
+  // Haal bron instellingen op
+  const sourceSettings = await getCourseSettings(sourceCourseId);
+  
+  if (!sourceSettings) {
+    throw new Error('SOURCE_SETTINGS_NOT_FOUND');
+  }
+
+  // Kopieer naar target vak
+  const copiedSettings = await updateCourseSettings(targetCourseId, {
+    rubric: sourceSettings.rubric,
+    ai_guidelines: sourceSettings.ai_guidelines
+  });
+
+  return copiedSettings;
+}
+
+/**
+ * Haalt alle vakinstellingen op (bulk)
+ * @returns {Promise<Array>} Array met alle vakinstellingen
+ */
+async function getAllCourseSettings() {
+  const result = await db.query(
+    `SELECT 
+       c.id as course_id,
+       c.title as course_title,
+       cs.id as settings_id,
+       cs.rubric,
+       cs.ai_guidelines,
+       cs.created_at as settings_created_at,
+       cs.updated_at as settings_updated_at,
+       CASE WHEN cs.id IS NOT NULL THEN true ELSE false END as has_settings
+     FROM course c
+     LEFT JOIN course_settings cs ON c.id = cs.course_id
+     ORDER BY c.title ASC`
+  );
+  return result.rows;
+}
+
 module.exports = {
   getAllStudents,
   getAllTeachers,
@@ -606,5 +772,10 @@ module.exports = {
   updateStudent,
   deleteStudent,
   getStudentEnrollments,
-  getStudentSubmissions
+  getStudentSubmissions,
+  getCourseSettings,
+  updateCourseSettings,
+  deleteCourseSettings,
+  copyCourseSettings,
+  getAllCourseSettings
 };
