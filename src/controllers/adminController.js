@@ -429,6 +429,160 @@ async function deleteAssignment(assignmentId) {
   return result.rows.length > 0 ? result.rows[0] : null;
 }
 
+/**
+ * Haalt een specifieke student op uit de database
+ * @param {number} studentId - ID van de student
+ * @returns {Promise<Object|null>} Studentgegevens of null als niet gevonden
+ */
+async function getStudentById(studentId) {
+  const result = await db.query(
+    `SELECT u.id, u.email, u.name, u.github_id, u.role, u.created_at, u.updated_at,
+            COUNT(DISTINCT e.course_id) as enrolled_courses_count,
+            COUNT(DISTINCT s.id) as submissions_count
+     FROM "user" u
+     LEFT JOIN enrollment e ON u.id = e.user_id
+     LEFT JOIN submission s ON u.id = s.user_id
+     WHERE u.id = $1 AND u.role = 'student'
+     GROUP BY u.id, u.email, u.name, u.github_id, u.role, u.created_at, u.updated_at`,
+    [studentId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
+ * Werkt studentgegevens bij
+ * @param {number} studentId - ID van de student
+ * @param {Object} updateData - Object met te updaten velden (email, name, github_id)
+ * @returns {Promise<Object|null>} Bijgewerkte studentgegevens of null als niet gevonden
+ */
+async function updateStudent(studentId, updateData) {
+  const { email, name, github_id } = updateData;
+  
+  // Build dynamic query based on provided fields
+  const updates = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (email !== undefined && email !== null) {
+    updates.push(`email = $${paramCount}`);
+    values.push(email);
+    paramCount++;
+  }
+
+  if (name !== undefined && name !== null) {
+    updates.push(`name = $${paramCount}`);
+    values.push(name);
+    paramCount++;
+  }
+
+  if (github_id !== undefined) {
+    updates.push(`github_id = $${paramCount}`);
+    values.push(github_id);
+    paramCount++;
+  }
+
+  // Always update the updated_at timestamp
+  updates.push(`updated_at = NOW()`);
+
+  // If no fields to update, return null
+  if (updates.length === 1) {
+    return null;
+  }
+
+  values.push(studentId);
+
+  const query = `
+    UPDATE "user"
+    SET ${updates.join(', ')}
+    WHERE id = $${paramCount} AND role = 'student'
+    RETURNING id, email, name, github_id, role, created_at, updated_at
+  `;
+
+  const result = await db.query(query, values);
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
+ * Verwijdert een student uit de database
+ * @param {number} studentId - ID van de student
+ * @returns {Promise<Object|null>} Verwijderde studentgegevens of null als niet gevonden
+ */
+async function deleteStudent(studentId) {
+  const result = await db.query(
+    `DELETE FROM "user"
+     WHERE id = $1 AND role = 'student'
+     RETURNING id, email, name, github_id, role, created_at`,
+    [studentId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
+ * Haalt alle vakken op waarin een student is ingeschreven
+ * @param {number} studentId - ID van de student
+ * @returns {Promise<Array>} Array met vakinformatie
+ */
+async function getStudentEnrollments(studentId) {
+  const result = await db.query(
+    `SELECT 
+      c.id,
+      c.title,
+      c.description,
+      c.join_code,
+      e.created_at as enrolled_at,
+      COUNT(DISTINCT a.id) as assignment_count,
+      COUNT(DISTINCT s.id) as submission_count,
+      COALESCE(AVG(s.ai_score), 0) as avg_ai_score,
+      COALESCE(AVG(s.manual_score), 0) as avg_manual_score
+     FROM enrollment e
+     JOIN course c ON e.course_id = c.id
+     LEFT JOIN assignment a ON c.id = a.course_id
+     LEFT JOIN submission s ON a.id = s.assignment_id AND s.user_id = e.user_id
+     WHERE e.user_id = $1
+     GROUP BY c.id, c.title, c.description, c.join_code, e.created_at
+     ORDER BY e.created_at DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+/**
+ * Haalt alle submissions van een student op
+ * @param {number} studentId - ID van de student
+ * @returns {Promise<Array>} Array met submission informatie
+ */
+async function getStudentSubmissions(studentId) {
+  const result = await db.query(
+    `SELECT 
+      s.id,
+      s.github_url,
+      s.commit_sha,
+      s.status,
+      s.ai_score,
+      s.manual_score,
+      s.created_at,
+      s.updated_at,
+      a.id as assignment_id,
+      a.title as assignment_title,
+      a.description as assignment_description,
+      a.due_date as assignment_due_date,
+      c.id as course_id,
+      c.title as course_title,
+      COUNT(DISTINCT f.id) as feedback_count
+     FROM submission s
+     JOIN assignment a ON s.assignment_id = a.id
+     JOIN course c ON a.course_id = c.id
+     LEFT JOIN feedback f ON s.id = f.submission_id
+     WHERE s.user_id = $1
+     GROUP BY s.id, s.github_url, s.commit_sha, s.status, s.ai_score, s.manual_score, 
+              s.created_at, s.updated_at, a.id, a.title, a.description, a.due_date,
+              c.id, c.title
+     ORDER BY s.created_at DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
 module.exports = {
   getAllStudents,
   getAllTeachers,
@@ -447,5 +601,10 @@ module.exports = {
   enrollStudent,
   unenrollStudent,
   getCourseAssignments,
-  deleteAssignment
+  deleteAssignment,
+  getStudentById,
+  updateStudent,
+  deleteStudent,
+  getStudentEnrollments,
+  getStudentSubmissions
 };
