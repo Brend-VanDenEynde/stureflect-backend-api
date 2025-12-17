@@ -7,10 +7,49 @@ const {
 	getStudentStatusForStudent,
 	addStudentToCourse,
 	removeStudentFromCourse,
-	getDocentCourses
+	getDocentCourses,
+	streamCourseStatistics
 } = require('../controllers/docentController');
 
-// Authenticatie middleware toepassen op alle docent routes
+/**
+ * @swagger
+ * /api/docent/courses/{courseId}/statistics/stream:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Real-time statistieken stream (SSE)
+ *     description: Server-Sent Events stream voor live updates van cursusstatistieken. Authenticatie via query parameter token= voor EventSource compatibiliteit.
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de cursus
+ *       - in: query
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: JWT access token (omdat EventSource geen headers ondersteunt)
+ *     responses:
+ *       200:
+ *         description: SSE stream gestart
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ *       400:
+ *         description: Ontbrekende cursus ID
+ *       401:
+ *         description: Ongeldige of ontbrekende token
+ *       403:
+ *         description: Geen toegang tot deze cursus
+ */
+// ✅ SSE route VOOR authenticatie middleware (gebruikt query token in plaats van header)
+router.get('/courses/:courseId/statistics/stream', streamCourseStatistics);
+
+// Authenticatie middleware toepassen op alle overige docent routes
 router.use(authenticateToken);
 
 /**
