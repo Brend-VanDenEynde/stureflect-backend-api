@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const notificationService = require('../services/notificationService');
+const logger = require('../utils/logger');
 
 // In-memory cache for expensive statistics queries
 // Structure: { cacheKey: { data: any, timestamp: number } }
@@ -708,7 +709,23 @@ const addStudentToCourse = async (req, res) => {
       studentEmail: email,
       studentName: userResult.rows[0].name || null
     });
-    console.log('📡 [SSE] Enrollment event emitted for course', courseId);
+    
+    // Structured event log
+    logger.event('enrollment_added', {
+      courseId: parseInt(courseId),
+      assignmentId: null,
+      submissionId: null,
+      userId: studentId,
+      actorId: req.user.id,
+      oldStatus: null,
+      newStatus: 'enrolled',
+      metadata: {
+        studentEmail: email,
+        studentName: userResult.rows[0].name || null,
+        actorEmail: req.user.email,
+        actorRole: req.user.role
+      }
+    });
     
     // 5. Invalidate cache for this course
     invalidateCourseCache(courseId);
@@ -769,7 +786,23 @@ const removeStudentFromCourse = async (req, res) => {
       studentEmail: studentInfo.email,
       studentName: studentInfo.name
     });
-    console.log('📡 [SSE] Student removal event emitted for course', courseId);
+    
+    // Structured event log
+    logger.event('enrollment_removed', {
+      courseId: parseInt(courseId),
+      assignmentId: null,
+      submissionId: null,
+      userId: parseInt(studentId),
+      actorId: req.user.id,
+      oldStatus: 'enrolled',
+      newStatus: 'removed',
+      metadata: {
+        studentEmail: studentInfo.email,
+        studentName: studentInfo.name,
+        actorEmail: req.user.email,
+        actorRole: req.user.role
+      }
+    });
 
     // Invalidate cache for this course
     invalidateCourseCache(courseId);
