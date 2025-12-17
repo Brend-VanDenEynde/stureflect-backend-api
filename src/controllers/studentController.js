@@ -342,6 +342,49 @@ async function updateSubmissionWebhook(submissionId, webhookId, webhookSecret) {
   }
 }
 
+/**
+ * Schrijf een student in voor een cursus met join code
+ * @param {number} studentId - ID van de student
+ * @param {string} joinCode - Join code van de cursus
+ * @returns {Promise<object>} - Object met resultaat: { success, course, error }
+ */
+async function joinCourseByCode(studentId, joinCode) {
+  try {
+    // Zoek cursus op basis van join code
+    const courseResult = await db.query(
+      'SELECT id, title, description FROM course WHERE join_code = $1',
+      [joinCode]
+    );
+
+    if (courseResult.rows.length === 0) {
+      return { success: false, error: 'INVALID_JOIN_CODE' };
+    }
+
+    const course = courseResult.rows[0];
+
+    // Controleer of student al ingeschreven is
+    const enrollmentCheck = await db.query(
+      'SELECT id FROM enrollment WHERE user_id = $1 AND course_id = $2',
+      [studentId, course.id]
+    );
+
+    if (enrollmentCheck.rows.length > 0) {
+      return { success: false, error: 'ALREADY_ENROLLED', course };
+    }
+
+    // Schrijf student in
+    await db.query(
+      'INSERT INTO enrollment (course_id, user_id, created_at) VALUES ($1, $2, NOW())',
+      [course.id, studentId]
+    );
+
+    return { success: true, course };
+  } catch (error) {
+    console.error('Fout bij inschrijven met join code:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getStudentCourses,
   getCourseAssignments,
@@ -351,5 +394,6 @@ module.exports = {
   getAssignmentWithCourse,
   getExistingSubmission,
   createSubmission,
-  updateSubmissionWebhook
+  updateSubmissionWebhook,
+  joinCourseByCode
 };
