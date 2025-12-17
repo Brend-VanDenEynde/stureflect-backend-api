@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 const notificationService = require('../services/notificationService');
+const logger = require('../utils/logger');
 
 /**
  * Valideer GitHub webhook signature
@@ -136,6 +137,15 @@ async function getSubmissionsByRepo(repoFullName) {
  */
 async function updateSubmissionStatus(submissionId, commitSha, status, branch = null) {
   try {
+    // Get old status first for logging
+    const oldStatusResult = await db.query(
+      'SELECT status, assignment_id, user_id FROM submission WHERE id = $1',
+      [submissionId]
+    );
+    const oldStatus = oldStatusResult.rows[0]?.status;
+    const assignmentId = oldStatusResult.rows[0]?.assignment_id;
+    const userId = oldStatusResult.rows[0]?.user_id;
+    
     // Simpele update zonder branch kolom (backwards compatible)
     const result = await db.query(
       `UPDATE submission
@@ -149,6 +159,28 @@ async function updateSubmissionStatus(submissionId, commitSha, status, branch = 
     if (result.rows[0] && branch) {
       result.rows[0].branch = branch;
     }
+    
+    // Get course ID for logging
+    const courseResult = await db.query(
+      'SELECT course_id FROM assignment WHERE id = $1',
+      [assignmentId]
+    );
+    const courseId = courseResult.rows[0]?.course_id;
+    
+    // Structured event log
+    logger.event('submission_status_changed', {
+      courseId,
+      assignmentId,
+      submissionId,
+      userId,
+      actorId: null,
+      oldStatus,
+      newStatus: status,
+      metadata: {
+        commitSha,
+        branch: branch || null
+      }
+    });
 
     return result.rows[0];
   } catch (error) {
@@ -297,7 +329,22 @@ async function saveFeedback(submissionId, feedbackItems) {
           feedbackCount: savedItems.length,
           avgSeverity: Math.round(avgSeverity * 100) / 100
         });
-        console.log(`📡 [SSE] Feedback added event emitted for course ${sub.course_id}`);
+        
+        // Structured event log
+        logger.event('feedback_added', {
+          courseId: sub.course_id,
+          assignmentId: sub.assignment_id,
+          submissionId: sub.id,
+          userId: sub.user_id,
+          actorId: null,
+          oldStatus: null,
+          newStatus: null,
+          metadata: {
+            feedbackCount: savedItems.length,
+            avgSeverity: Math.round(avgSeverity * 100) / 100,
+            reviewer: 'ai'
+          }
+        });
       }
     }
 
@@ -344,7 +391,21 @@ async function updateSubmissionWithScore(submissionId, commitSha, aiScore, statu
         assignmentId: submission.assignment_id,
         aiScore: aiScore
       });
-      console.log(`📡 [SSE] Submission analyzed event emitted for course ${courseId}`);
+      
+      // Structured event log
+      logger.event('submission_analyzed', {
+        courseId,
+        assignmentId: submission.assignment_id,
+        submissionId: submission.id,
+        userId: submission.user_id,
+        actorId: null,
+        oldStatus: null,
+        newStatus: status,
+        metadata: {
+          aiScore,
+          commitSha
+        }
+      });
     }
 
     return submission;
