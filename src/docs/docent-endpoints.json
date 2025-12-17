@@ -702,6 +702,87 @@
                 }
             }
         }
+    },
+    "/api/docent/courses/{courseId}/statistics/stream": {
+        "get": {
+            "summary": "Real-time statistieken stream (SSE)",
+            "description": "Server-Sent Events stream voor live updates van cursusstatistieken. Docenten ontvangen realtime notificaties bij submission wijzigingen, enrollment changes, en feedback toevoegingen. Authenticatie via query parameter omdat EventSource geen headers ondersteunt.",
+            "operationId": "streamCourseStatistics",
+            "tags": [
+                "Docenten"
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "description": "Unieke ID van de cursus",
+                    "schema": {
+                        "type": "integer"
+                    }
+                },
+                {
+                    "name": "token",
+                    "in": "query",
+                    "required": true,
+                    "description": "JWT access token voor authenticatie (omdat EventSource geen custom headers ondersteunt)",
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "SSE stream gestart - ontvangt realtime events",
+                    "content": {
+                        "text/event-stream": {
+                            "schema": {
+                                "type": "string",
+                                "description": "Server-Sent Events stream met JSON payloads"
+                            },
+                            "examples": {
+                                "connection": {
+                                    "summary": "Connection established event",
+                                    "value": "data: {\"type\":\"connection:established\",\"courseId\":8,\"timestamp\":\"2025-12-17T14:30:00.000Z\"}\n\n"
+                                },
+                                "heartbeat": {
+                                    "summary": "Heartbeat (elke 30s)",
+                                    "value": ":heartbeat\n\n"
+                                },
+                                "submission_analyzed": {
+                                    "summary": "Submission geanalyseerd door AI",
+                                    "value": "data: {\"id\":12345,\"timestamp\":\"2025-12-17T14:30:15.000Z\",\"courseId\":8,\"type\":\"submission:analyzed\",\"data\":{\"submissionId\":123,\"studentId\":45,\"assignmentId\":5,\"aiScore\":85}}\n\n"
+                                },
+                                "feedback_added": {
+                                    "summary": "Feedback toegevoegd aan submission",
+                                    "value": "data: {\"id\":12346,\"timestamp\":\"2025-12-17T14:30:20.000Z\",\"courseId\":8,\"type\":\"feedback:added\",\"data\":{\"submissionId\":123,\"studentId\":45,\"assignmentId\":5,\"feedbackCount\":5,\"avgSeverity\":2.4}}\n\n"
+                                },
+                                "enrollment_added": {
+                                    "summary": "Student toegevoegd aan cursus",
+                                    "value": "data: {\"id\":12347,\"timestamp\":\"2025-12-17T14:31:00.000Z\",\"courseId\":8,\"type\":\"enrollment:added\",\"data\":{\"studentId\":78,\"studentName\":\"John Doe\",\"studentEmail\":\"john@example.com\"}}\n\n"
+                                },
+                                "enrollment_removed": {
+                                    "summary": "Student verwijderd uit cursus",
+                                    "value": "data: {\"id\":12348,\"timestamp\":\"2025-12-17T14:32:00.000Z\",\"courseId\":8,\"type\":\"enrollment:removed\",\"data\":{\"studentId\":78,\"studentName\":\"John Doe\",\"studentEmail\":\"john@example.com\"}}\n\n"
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ontbrekende cursus ID"
+                },
+                "401": {
+                    "description": "Ongeldige of ontbrekende token"
+                },
+                "403": {
+                    "description": "Geen toegang tot deze cursus - gebruiker is geen docent van deze cursus"
+                },
+                "500": {
+                    "description": "Interne serverfout bij opzetten SSE stream"
+                }
+            }
+        }
     }
   }
 }
