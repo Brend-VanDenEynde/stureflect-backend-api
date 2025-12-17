@@ -3,6 +3,7 @@ const router = express.Router();
 const passport = require('passport');
 const userController = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
+const { authLimiter } = require('../middleware/rateLimiter');
 
 /**
  * @swagger
@@ -52,8 +53,8 @@ const authMiddleware = require('../middleware/authMiddleware');
  *       401:
  *         description: Ongeldige inloggegevens
  */
-// Public auth routes
-router.post('/login', userController.loginUser);
+// Public auth routes - with rate limiting
+router.post('/login', authLimiter, userController.loginUser);
 
 /**
  * @swagger
@@ -97,7 +98,7 @@ router.post('/login', userController.loginUser);
  *       400:
  *         description: Validatiefout of email bestaat al
  */
-router.post('/register', userController.registerUser);
+router.post('/register', authLimiter, userController.registerUser);
 
 /**
  * @swagger

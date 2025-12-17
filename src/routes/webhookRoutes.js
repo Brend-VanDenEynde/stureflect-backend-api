@@ -28,6 +28,7 @@ const {
   isGitHubRetryable,
   isOpenAIRetryable
 } = require('../utils/retry');
+const { webhookLimiter } = require('../middleware/rateLimiter');
 
 /**
  * Process een submission (herbruikbaar voor webhook en retry)
@@ -238,7 +239,7 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *                 delivery_id:
  *                   type: string
  */
-router.post('/github', async (req, res) => {
+router.post('/github', webhookLimiter, async (req, res) => {
   const event = req.headers['x-github-event'];
   const signature = req.headers['x-hub-signature-256'];
   const deliveryId = req.headers['x-github-delivery'];

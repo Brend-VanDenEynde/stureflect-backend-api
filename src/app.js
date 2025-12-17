@@ -9,6 +9,7 @@ console.log(`[SUCCESS] [APP] Swagger geladen met ${Object.keys(swaggerSpec.paths
 const session = require('express-session');
 const passport = require('./config/passport');
 const db = require('./config/db'); // Voeg databaseconfiguratie toe
+const { generalLimiter } = require('./middleware/rateLimiter');
 
 console.log('[APP] Initialiseren van Express app...');
 const app = express();
@@ -63,6 +64,13 @@ app.use(express.json({
 }));
 app.use(express.json());
 console.log('[SUCCESS] [APP] JSON middleware geladen');
+
+// Rate limiting middleware
+console.log('[APP] Configureren van rate limiting...');
+app.use('/api/', generalLimiter);
+console.log('[SUCCESS] [APP] Rate limiting actief voor /api/* routes');
+console.log('[APP]    - Limiet: 100 requests per 15 minuten');
+console.log('[APP]    - Headers: RateLimit-* headers ingeschakeld');
 
 // Request logging middleware
 app.use((req, res, next) => {
