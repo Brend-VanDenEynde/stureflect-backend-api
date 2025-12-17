@@ -299,9 +299,9 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
       });
     }
 
-    const detail = await studentController.getSubmissionDetail(submissionId);
+    const result = await studentController.getSubmissionDetail(submissionId);
 
-    if (!detail) {
+    if (!result.success) {
       return res.status(404).json({
         success: false,
         message: 'Submission niet gevonden',
@@ -310,7 +310,7 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
     }
 
     // Autorisatie: check of submission van deze student is
-    if (detail.submission.user_id !== studentId) {
+    if (result.data.submission.user_id !== studentId) {
       return res.status(403).json({
         success: false,
         message: 'Je hebt geen toegang tot deze submission',
@@ -320,7 +320,7 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: detail,
+      data: result.data,
       message: 'Submission detail opgehaald',
       error: null
     });
@@ -432,9 +432,9 @@ router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
     }
 
     // Haal submission op om eigenaar te controleren
-    const detail = await studentController.getSubmissionDetail(submissionId);
+    const result = await studentController.getSubmissionDetail(submissionId);
 
-    if (!detail) {
+    if (!result.success) {
       return res.status(404).json({
         success: false,
         message: 'Submission niet gevonden',
@@ -443,7 +443,7 @@ router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
     }
 
     // Autorisatie: check of submission van deze student is
-    if (detail.submission.user_id !== studentId) {
+    if (result.data.submission.user_id !== studentId) {
       return res.status(403).json({
         success: false,
         message: 'Je hebt geen toegang tot deze feedback',
@@ -691,14 +691,16 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
     }
 
     // Haal assignment op en check of deze bestaat
-    const assignment = await studentController.getAssignmentWithCourse(assignmentId);
-    if (!assignment) {
+    const assignmentResult = await studentController.getAssignmentWithCourse(assignmentId);
+    if (!assignmentResult.success) {
       return res.status(404).json({
         success: false,
         message: 'Opdracht niet gevonden',
         error: 'NOT_FOUND'
       });
     }
+
+    const assignment = assignmentResult.data;
 
     // Check of student ingeschreven is voor de cursus
     const isEnrolled = await studentController.isStudentEnrolledInCourse(studentId, assignment.course_id);
@@ -711,13 +713,13 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
     }
 
     // Check of student al een submission heeft
-    const existingSubmission = await studentController.getExistingSubmission(studentId, assignmentId);
-    if (existingSubmission) {
+    const existingResult = await studentController.getExistingSubmission(studentId, assignmentId);
+    if (existingResult.success) {
       return res.status(409).json({
         success: false,
         message: 'Je hebt al een inzending voor deze opdracht',
         error: 'CONFLICT',
-        data: { existing_submission_id: existingSubmission.id }
+        data: { existing_submission_id: existingResult.data.id }
       });
     }
 

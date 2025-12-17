@@ -146,7 +146,7 @@ async function getStudentSubmissions(studentId, filters = {}) {
 /**
  * Haal detail van een specifieke submission op inclusief feedback
  * @param {number} submissionId - ID van de submission
- * @returns {Promise<object|null>}
+ * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
 async function getSubmissionDetail(submissionId) {
   try {
@@ -176,7 +176,7 @@ async function getSubmissionDetail(submissionId) {
     );
 
     if (submissionResult.rows.length === 0) {
-      return null;
+      return { success: false, error: 'NOT_FOUND' };
     }
 
     // Haal feedback op
@@ -199,28 +199,31 @@ async function getSubmissionDetail(submissionId) {
 
     const row = submissionResult.rows[0];
     return {
-      submission: {
-        id: row.id,
-        github_url: row.github_url,
-        commit_sha: row.commit_sha,
-        status: row.status,
-        ai_score: row.ai_score,
-        manual_score: row.manual_score,
-        user_id: row.user_id,
-        created_at: row.created_at,
-        updated_at: row.updated_at
-      },
-      assignment: {
-        id: row.assignment_id,
-        title: row.assignment_title,
-        description: row.assignment_description,
-        due_date: row.due_date
-      },
-      course: {
-        id: row.course_id,
-        title: row.course_title
-      },
-      feedback: feedbackResult.rows
+      success: true,
+      data: {
+        submission: {
+          id: row.id,
+          github_url: row.github_url,
+          commit_sha: row.commit_sha,
+          status: row.status,
+          ai_score: row.ai_score,
+          manual_score: row.manual_score,
+          user_id: row.user_id,
+          created_at: row.created_at,
+          updated_at: row.updated_at
+        },
+        assignment: {
+          id: row.assignment_id,
+          title: row.assignment_title,
+          description: row.assignment_description,
+          due_date: row.due_date
+        },
+        course: {
+          id: row.course_id,
+          title: row.course_title
+        },
+        feedback: feedbackResult.rows
+      }
     };
   } catch (error) {
     console.error('[API] Error fetching submission detail:', error.message);
@@ -250,7 +253,7 @@ async function isStudentEnrolledInCourse(studentId, courseId) {
 /**
  * Haal een assignment op met course info
  * @param {number} assignmentId - ID van de assignment
- * @returns {Promise<object|null>}
+ * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
 async function getAssignmentWithCourse(assignmentId) {
   try {
@@ -267,7 +270,10 @@ async function getAssignmentWithCourse(assignmentId) {
       WHERE a.id = $1`,
       [assignmentId]
     );
-    return result.rows.length > 0 ? result.rows[0] : null;
+    if (result.rows.length === 0) {
+      return { success: false, error: 'NOT_FOUND' };
+    }
+    return { success: true, data: result.rows[0] };
   } catch (error) {
     console.error('[API] Error fetching assignment:', error.message);
     throw error;
@@ -278,7 +284,7 @@ async function getAssignmentWithCourse(assignmentId) {
  * Check of een student al een submission heeft voor een assignment
  * @param {number} studentId - ID van de student
  * @param {number} assignmentId - ID van de assignment
- * @returns {Promise<object|null>} - Bestaande submission of null
+ * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
 async function getExistingSubmission(studentId, assignmentId) {
   try {
@@ -288,7 +294,10 @@ async function getExistingSubmission(studentId, assignmentId) {
        WHERE user_id = $1 AND assignment_id = $2`,
       [studentId, assignmentId]
     );
-    return result.rows.length > 0 ? result.rows[0] : null;
+    if (result.rows.length === 0) {
+      return { success: false, error: 'NOT_FOUND' };
+    }
+    return { success: true, data: result.rows[0] };
   } catch (error) {
     console.error('[API] Error checking existing submission:', error.message);
     throw error;
