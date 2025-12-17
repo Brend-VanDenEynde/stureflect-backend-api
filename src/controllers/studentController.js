@@ -394,6 +394,68 @@ async function joinCourseByCode(studentId, joinCode) {
   }
 }
 
+/**
+ * Update een submission met nieuwe GitHub repository URL
+ * @param {number} submissionId - ID van de submission
+ * @param {number} studentId - ID van de student (voor autorisatie)
+ * @param {string} githubUrl - Nieuwe GitHub repository URL
+ * @param {string} commitSha - Nieuwe commit SHA
+ * @returns {Promise<object>} - Object met resultaat: { success, submission, oldWebhookInfo, error }
+ */
+async function updateSubmission(submissionId, studentId, githubUrl, commitSha) {
+  try {
+    // Haal bestaande submission op
+    const existingResult = await db.query(
+      `SELECT id, user_id, assignment_id, github_url, webhook_id
+       FROM submission
+       WHERE id = $1`,
+      [submissionId]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return { success: false, error: 'NOT_FOUND' };
+    }
+
+    const existing = existingResult.rows[0];
+
+    // Autorisatie check
+    if (existing.user_id !== studentId) {
+      return { success: false, error: 'FORBIDDEN' };
+    }
+
+    // Parse oude URL voor webhook verwijdering
+    let oldWebhookInfo = null;
+    if (existing.webhook_id && existing.github_url) {
+      const oldUrlMatch = existing.github_url.match(/github\.com\/([^/]+)\/([^/]+)/);
+      if (oldUrlMatch) {
+        oldWebhookInfo = {
+          webhookId: existing.webhook_id,
+          owner: oldUrlMatch[1],
+          repo: oldUrlMatch[2].replace(/\.git$/, '')
+        };
+      }
+    }
+
+    // Update submission
+    const updateResult = await db.query(
+      `UPDATE submission
+       SET github_url = $1, commit_sha = $2, status = 'pending', updated_at = NOW()
+       WHERE id = $3
+       RETURNING id, assignment_id, user_id, github_url, commit_sha, status, created_at, updated_at`,
+      [githubUrl, commitSha, submissionId]
+    );
+
+    return {
+      success: true,
+      submission: updateResult.rows[0],
+      oldWebhookInfo
+    };
+  } catch (error) {
+    console.error('Fout bij updaten submission:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getStudentCourses,
   getCourseAssignments,
@@ -404,5 +466,6 @@ module.exports = {
   getExistingSubmission,
   createSubmission,
   updateSubmissionWebhook,
-  joinCourseByCode
+  joinCourseByCode,
+  updateSubmission
 };
