@@ -84,7 +84,7 @@ async function findSubmissionByRepo(repoFullName, branch = null) {
 
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('Fout bij zoeken submission:', error);
+    console.error('[API] Error searching submission:', error.message);
     throw error;
   }
 }
@@ -120,7 +120,7 @@ async function getSubmissionsByRepo(repoFullName) {
 
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen submissions voor repo:', error);
+    console.error('[API] Error fetching submissions for repo:', error.message);
     throw error;
   }
 }
@@ -151,7 +151,7 @@ async function updateSubmissionStatus(submissionId, commitSha, status, branch = 
 
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij updaten submission:', error);
+    console.error('[API] Error updating submission:', error.message);
     throw error;
   }
 }
@@ -172,7 +172,7 @@ async function getCourseSettings(courseId) {
 
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('Fout bij ophalen course settings:', error);
+    console.error('[API] Error fetching course settings:', error.message);
     throw error;
   }
 }
@@ -199,7 +199,7 @@ async function createOrUpdateSubmission(assignmentId, userId, githubUrl, commitS
 
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij aanmaken/updaten submission:', error);
+    console.error('[API] Error creating/updating submission:', error.message);
     throw error;
   }
 }
@@ -213,7 +213,7 @@ async function createOrUpdateSubmission(assignmentId, userId, githubUrl, commitS
  */
 function logWebhookEvent(event, repoFullName, status, message) {
   const timestamp = new Date().toISOString();
-  console.log(`[WEBHOOK ${timestamp}] ${event} | ${repoFullName} | ${status} | ${message}`);
+  console.log(`[API] WEBHOOK ${timestamp} | ${event} | ${repoFullName} | ${status} | ${message}`);
 }
 
 /**
@@ -229,7 +229,7 @@ async function deletePreviousFeedback(submissionId) {
     );
     return result.rowCount;
   } catch (error) {
-    console.error('Fout bij verwijderen oude feedback:', error);
+    console.error('[API] Error deleting old feedback:', error.message);
     throw error;
   }
 }
@@ -271,7 +271,7 @@ async function saveFeedback(submissionId, feedbackItems) {
 
     return savedItems;
   } catch (error) {
-    console.error('Fout bij opslaan feedback:', error);
+    console.error('[API] Error saving feedback:', error.message);
     throw error;
   }
 }
@@ -296,7 +296,7 @@ async function updateSubmissionWithScore(submissionId, commitSha, aiScore, statu
 
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij updaten submission met score:', error);
+    console.error('[API] Error updating submission with score:', error.message);
     throw error;
   }
 }
@@ -339,7 +339,7 @@ async function getFeedbackBySubmission(submissionId, filters = {}) {
     const result = await db.query(query, params);
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen feedback:', error);
+    console.error('[API] Error fetching feedback:', error.message);
     throw error;
   }
 }
@@ -367,11 +367,11 @@ async function markSubmissionFailed(submissionId, commitSha, errorMessage, error
     );
 
     // Log de error voor debugging
-    console.error(`[SUBMISSION ${submissionId}] Failed: ${errorCode} - ${errorMessage}`);
+    console.error(`[API] Submission ${submissionId} failed: ${errorCode} - ${errorMessage}`);
 
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij markeren submission als failed:', error);
+    console.error('[API] Error marking submission as failed:', error.message);
     throw error;
   }
 }
@@ -407,7 +407,7 @@ async function getFailedSubmissions(maxAge = 24) {
 
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen failed submissions:', error);
+    console.error('[API] Error fetching failed submissions:', error.message);
     throw error;
   }
 }
@@ -437,7 +437,7 @@ async function getSubmissionForRetry(submissionId) {
 
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('Fout bij ophalen submission voor retry:', error);
+    console.error('[API] Error fetching submission for retry:', error.message);
     throw error;
   }
 }

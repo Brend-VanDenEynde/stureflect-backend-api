@@ -68,7 +68,7 @@ router.get('/me/courses', async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error('Fout bij ophalen cursussen:', error);
+    console.error('[API] GET /api/students/me/courses failed:', error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen cursussen',
@@ -126,7 +126,7 @@ router.get('/me/submissions', async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error('Fout bij ophalen submissions:', error);
+    console.error('[API] GET /api/students/me/submissions failed:', error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen submissions',
@@ -213,7 +213,7 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error('Fout bij ophalen submission detail:', error);
+    console.error('[API] GET /api/students/me/submissions/:submissionId failed:', error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen submission detail',
@@ -376,7 +376,7 @@ router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error('Fout bij ophalen feedback:', error);
+    console.error('[API] GET /api/students/me/submissions/:submissionId/feedback failed:', error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen feedback',
@@ -489,7 +489,7 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error('Fout bij ophalen opdrachten:', error);
+    console.error('[API] GET /api/students/me/courses/:courseId/assignments failed:', error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen opdrachten',
@@ -691,9 +691,9 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
             registered: true,
             webhookId: webhookResult.webhookId
           };
-          console.log(`[WEBHOOK] Webhook geregistreerd voor ${owner}/${repo} (ID: ${webhookResult.webhookId})`);
+          console.log(`[API] Webhook registered for ${owner}/${repo} (ID: ${webhookResult.webhookId})`);
         } else {
-          console.warn(`[WEBHOOK] Kon webhook niet registreren: ${webhookResult.error}`);
+          console.warn(`[API] Failed to register webhook: ${webhookResult.error}`);
           webhookInfo = {
             registered: false,
             error: webhookResult.error,
@@ -701,14 +701,14 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
           };
         }
       } else {
-        console.warn('[WEBHOOK] Student heeft geen GitHub token, webhook niet geregistreerd');
+        console.warn('[API] Student authentication not available, webhook not registered');
         webhookInfo = {
           registered: false,
           error: 'Geen GitHub token beschikbaar'
         };
       }
     } catch (webhookError) {
-      console.error('[WEBHOOK] Fout bij registreren webhook:', webhookError);
+      console.error('[API] Error registering webhook:', webhookError.message);
       webhookInfo = {
         registered: false,
         error: 'Interne fout bij webhook registratie'
@@ -742,7 +742,7 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error('Fout bij aanmaken submission:', error);
+    console.error('[API] POST /api/students/me/assignments/:assignmentId/submissions failed:', error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij aanmaken inzending',

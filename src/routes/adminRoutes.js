@@ -38,12 +38,12 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
 
   // Audit log: request ontvangen
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested all students at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested all students at ${new Date().toISOString()}`);
 
   try {
     // Autorisatie: controleer of gebruiker admin is
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -53,7 +53,7 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze data',
@@ -64,7 +64,7 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
     const students = await adminController.getAllStudents();
 
     // Audit log: succesvolle request
-    console.log(`[AUDIT] Admin ${adminId} retrieved ${students.length} students`);
+    console.log(`[API] Admin ${adminId} retrieved ${students.length} students`);
 
     // Validatie: controleer of er studenten beschikbaar zijn
     if (students.length === 0) {
@@ -83,7 +83,7 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to retrieve students:`, error);
+    console.error(`[API] Admin ${adminId} failed to retrieve students`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen studenten',
@@ -125,11 +125,11 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
 router.get('/admin/admins', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested all admins at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested all admins at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -139,7 +139,7 @@ router.get('/admin/admins', authenticateToken, async (req, res) => {
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze data',
@@ -149,7 +149,7 @@ router.get('/admin/admins', authenticateToken, async (req, res) => {
 
     const admins = await adminController.getAllAdmins();
 
-    console.log(`[AUDIT] Admin ${adminId} retrieved ${admins.length} admins`);
+    console.log(`[API] Admin ${adminId} retrieved ${admins.length} admins`);
 
     if (admins.length === 0) {
       return res.status(200).json({
@@ -167,7 +167,7 @@ router.get('/admin/admins', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to retrieve admins:`, error);
+    console.error(`[API] Admin ${adminId} failed to retrieve admins`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen admins',
@@ -211,12 +211,12 @@ router.get('/admin/teachers', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
 
   // Audit log: request ontvangen
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested all teachers at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested all teachers at ${new Date().toISOString()}`);
 
   try {
     // Autorisatie: controleer of gebruiker admin is
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -226,7 +226,7 @@ router.get('/admin/teachers', authenticateToken, async (req, res) => {
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze data',
@@ -237,7 +237,7 @@ router.get('/admin/teachers', authenticateToken, async (req, res) => {
     const teachers = await adminController.getAllTeachers();
 
     // Audit log: succesvolle request
-    console.log(`[AUDIT] Admin ${adminId} retrieved ${teachers.length} teachers`);
+    console.log(`[API] Admin ${adminId} retrieved ${teachers.length} teachers`);
 
     // Validatie: controleer of er docenten beschikbaar zijn
     if (teachers.length === 0) {
@@ -256,7 +256,7 @@ router.get('/admin/teachers', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to retrieve teachers:`, error);
+    console.error(`[API] Admin ${adminId} failed to retrieve teachers`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen docenten',
@@ -294,12 +294,12 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
   const adminId = req.user?.id;
   const targetUserId = parseInt(req.params.userId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to teacher at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to teacher at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer admin ID
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID in token`);
+      console.log(`[API] Request denied: no admin ID`);
       return res.status(401).json({
         success: false,
         message: 'Authenticatie vereist',
@@ -310,7 +310,7 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
     // Autorisatie: controleer of gebruiker admin is
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins kunnen rollen wijzigen',
@@ -321,7 +321,7 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
     // Validatie: controleer of target user bestaat
     const targetUser = await adminController.getUserById(targetUserId);
     if (!targetUser) {
-      console.log(`[AUDIT] User ${targetUserId} not found`);
+      console.log(`[API] User ${targetUserId} not found`);
       return res.status(404).json({
         success: false,
         message: 'Gebruiker niet gevonden',
@@ -331,7 +331,7 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
 
     // Validatie: voorkom dat admin zichzelf demoveert
     if (targetUser.role === 'admin' && adminId === targetUserId) {
-      console.log(`[AUDIT] Admin ${adminId} attempted to demote themselves`);
+      console.log(`[API] Admin ${adminId} attempted to demote themselves`);
       return res.status(400).json({
         success: false,
         message: 'Je kunt je eigen admin rol niet wijzigen',
@@ -341,7 +341,7 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
 
     // Validatie: controleer of rol al correct is
     if (targetUser.role === 'teacher') {
-      console.log(`[AUDIT] User ${targetUserId} already has teacher role`);
+      console.log(`[API] User ${targetUserId} already has teacher role`);
       return res.status(400).json({
         success: false,
         message: 'Gebruiker is al een docent',
@@ -352,7 +352,7 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
     // Rol wijzigen
     const updatedUser = await adminController.changeUserRole(targetUserId, 'teacher');
 
-    console.log(`[AUDIT] Admin ${adminId} changed user ${targetUserId} role from ${targetUser.role} to teacher`);
+    console.log(`[API] Admin ${adminId} changed user ${targetUserId} role from ${targetUser.role} to teacher`);
 
     res.status(200).json({
       success: true,
@@ -361,7 +361,7 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to change user ${targetUserId} to teacher:`, error);
+    console.error(`[API] Admin ${adminId} failed to change user ${targetUserId} to teacher`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij wijzigen van gebruikersrol',
@@ -409,12 +409,12 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
   const adminId = req.user?.id;
   const targetUserId = parseInt(req.params.userId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to student at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to student at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer admin ID
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID in token`);
+      console.log(`[API] Request denied: no admin ID`);
       return res.status(401).json({
         success: false,
         message: 'Authenticatie vereist',
@@ -425,7 +425,7 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
     // Autorisatie: controleer of gebruiker admin is
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins kunnen rollen wijzigen',
@@ -436,7 +436,7 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
     // Validatie: controleer of target user bestaat
     const targetUser = await adminController.getUserById(targetUserId);
     if (!targetUser) {
-      console.log(`[AUDIT] User ${targetUserId} not found`);
+      console.log(`[API] User ${targetUserId} not found`);
       return res.status(404).json({
         success: false,
         message: 'Gebruiker niet gevonden',
@@ -446,7 +446,7 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
 
     // Validatie: voorkom dat admin zichzelf demoveert
     if (targetUser.role === 'admin' && adminId === targetUserId) {
-      console.log(`[AUDIT] Admin ${adminId} attempted to demote themselves`);
+      console.log(`[API] Admin ${adminId} attempted to demote themselves`);
       return res.status(400).json({
         success: false,
         message: 'Je kunt je eigen admin rol niet wijzigen',
@@ -456,7 +456,7 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
 
     // Validatie: controleer of rol al correct is
     if (targetUser.role === 'student') {
-      console.log(`[AUDIT] User ${targetUserId} already has student role`);
+      console.log(`[API] User ${targetUserId} already has student role`);
       return res.status(400).json({
         success: false,
         message: 'Gebruiker is al een student',
@@ -467,7 +467,7 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
     // Rol wijzigen
     const updatedUser = await adminController.changeUserRole(targetUserId, 'student');
 
-    console.log(`[AUDIT] Admin ${adminId} changed user ${targetUserId} role from ${targetUser.role} to student`);
+    console.log(`[API] Admin ${adminId} changed user ${targetUserId} role from ${targetUser.role} to student`);
 
     res.status(200).json({
       success: true,
@@ -476,7 +476,7 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to change user ${targetUserId} to student:`, error);
+    console.error(`[API] Admin ${adminId} failed to change user ${targetUserId} to student`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij wijzigen van gebruikersrol',
@@ -524,12 +524,12 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
   const adminId = req.user?.id;
   const targetUserId = parseInt(req.params.userId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to admin at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to admin at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer admin ID
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID in token`);
+      console.log(`[API] Request denied: no admin ID`);
       return res.status(401).json({
         success: false,
         message: 'Authenticatie vereist',
@@ -540,7 +540,7 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
     // Autorisatie: controleer of gebruiker admin is
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins kunnen rollen wijzigen',
@@ -551,7 +551,7 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
     // Validatie: controleer of target user bestaat
     const targetUser = await adminController.getUserById(targetUserId);
     if (!targetUser) {
-      console.log(`[AUDIT] User ${targetUserId} not found`);
+      console.log(`[API] User ${targetUserId} not found`);
       return res.status(404).json({
         success: false,
         message: 'Gebruiker niet gevonden',
@@ -561,7 +561,7 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
 
     // Validatie: controleer of gebruiker al admin is
     if (targetUser.role === 'admin') {
-      console.log(`[AUDIT] User ${targetUserId} is already an admin`);
+      console.log(`[API] User ${targetUserId} is already an admin`);
       return res.status(400).json({
         success: false,
         message: 'Gebruiker is al een admin',
@@ -572,7 +572,7 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
     // Rol wijzigen
     const updatedUser = await adminController.changeUserRole(targetUserId, 'admin');
 
-    console.log(`[AUDIT] Admin ${adminId} changed user ${targetUserId} role from ${targetUser.role} to admin`);
+    console.log(`[API] Admin ${adminId} changed user ${targetUserId} role from ${targetUser.role} to admin`);
 
     res.status(200).json({
       success: true,
@@ -581,7 +581,7 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to change user ${targetUserId} to admin:`, error);
+    console.error(`[API] Admin ${adminId} failed to change user ${targetUserId} to admin`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij wijzigen van gebruikersrol',
@@ -638,11 +638,11 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
 router.get('/admin/courses', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested all courses at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested all courses at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -652,7 +652,7 @@ router.get('/admin/courses', authenticateToken, async (req, res) => {
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze data',
@@ -662,7 +662,7 @@ router.get('/admin/courses', authenticateToken, async (req, res) => {
 
     const courses = await adminController.getAllCourses();
 
-    console.log(`[AUDIT] Admin ${adminId} retrieved ${courses.length} courses`);
+    console.log(`[API] Admin ${adminId} retrieved ${courses.length} courses`);
 
     if (courses.length === 0) {
       return res.status(200).json({
@@ -680,7 +680,7 @@ router.get('/admin/courses', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to retrieve courses:`, error);
+    console.error(`[API] Admin ${adminId} failed to retrieve courses`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen vakken',
@@ -773,11 +773,11 @@ router.post('/admin/courses', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
   const { title, description, join_code, teacher_id } = req.body;
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to create course at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to create course at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -787,7 +787,7 @@ router.post('/admin/courses', authenticateToken, async (req, res) => {
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -841,7 +841,7 @@ router.post('/admin/courses', authenticateToken, async (req, res) => {
     // Voeg docent toe aan het vak
     await adminController.addTeacherToCourse(newCourse.id, teacher_id);
 
-    console.log(`[AUDIT] Admin ${adminId} created course ${newCourse.id}: ${newCourse.title} with teacher ${teacher.name}`);
+    console.log(`[API] Admin ${adminId} created course ${newCourse.id}: ${newCourse.title} with teacher ${teacher.name}`);
 
     res.status(201).json({
       success: true,
@@ -857,7 +857,7 @@ router.post('/admin/courses', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to create course:`, error);
+    console.error(`[API] Admin ${adminId} failed to create course`, error.message);
     
     // Check voor unique constraint violation (duplicate join_code)
     if (error.code === '23505' && error.constraint === 'course_join_code_key') {
@@ -943,11 +943,11 @@ router.get('/admin/courses/:courseId', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested details for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested details for course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -965,7 +965,7 @@ router.get('/admin/courses/:courseId', authenticateToken, async (req, res) => {
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze data',
@@ -976,7 +976,7 @@ router.get('/admin/courses/:courseId', authenticateToken, async (req, res) => {
     const courseDetails = await adminController.getCourseDetails(courseId);
 
     if (!courseDetails) {
-      console.log(`[AUDIT] Course ${courseId} not found`);
+      console.log(`[API] Course ${courseId} not found`);
       return res.status(404).json({
         success: false,
         message: 'Vak niet gevonden',
@@ -984,7 +984,7 @@ router.get('/admin/courses/:courseId', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(`[AUDIT] Admin ${adminId} retrieved details for course ${courseId}`);
+    console.log(`[API] Admin ${adminId} retrieved details for course ${courseId}`);
 
     res.status(200).json({
       success: true,
@@ -993,7 +993,7 @@ router.get('/admin/courses/:courseId', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to retrieve course ${courseId} details:`, error);
+    console.error(`[API] Admin ${adminId} failed to retrieve course ${courseId} details`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen vak details',
@@ -1050,11 +1050,11 @@ router.delete('/admin/courses/:courseId', authenticateToken, async (req, res) =>
   const adminId = req.user?.id || parseInt(req.query.adminId);
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to delete course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to delete course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -1072,7 +1072,7 @@ router.delete('/admin/courses/:courseId', authenticateToken, async (req, res) =>
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -1083,7 +1083,7 @@ router.delete('/admin/courses/:courseId', authenticateToken, async (req, res) =>
     const deletedCourse = await adminController.deleteCourse(courseId);
 
     if (!deletedCourse) {
-      console.log(`[AUDIT] Course ${courseId} not found for deletion`);
+      console.log(`[API] Course ${courseId} not found for deletion`);
       return res.status(404).json({
         success: false,
         message: 'Vak niet gevonden',
@@ -1091,7 +1091,7 @@ router.delete('/admin/courses/:courseId', authenticateToken, async (req, res) =>
       });
     }
 
-    console.log(`[AUDIT] Admin ${adminId} deleted course ${courseId}: ${deletedCourse.title}`);
+    console.log(`[API] Admin ${adminId} deleted course ${courseId}: ${deletedCourse.title}`);
 
     res.status(200).json({
       success: true,
@@ -1100,7 +1100,7 @@ router.delete('/admin/courses/:courseId', authenticateToken, async (req, res) =>
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to delete course ${courseId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to delete course ${courseId}`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij verwijderen vak',
@@ -1185,11 +1185,11 @@ router.put('/admin/courses/:courseId', authenticateToken, async (req, res) => {
   const courseId = parseInt(req.params.courseId);
   const { title, description, join_code } = req.body;
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to update course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to update course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -1207,7 +1207,7 @@ router.put('/admin/courses/:courseId', authenticateToken, async (req, res) => {
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -1227,7 +1227,7 @@ router.put('/admin/courses/:courseId', authenticateToken, async (req, res) => {
     // Validatie: controleer of vak bestaat
     const existingCourse = await adminController.getCourseDetails(courseId);
     if (!existingCourse) {
-      console.log(`[AUDIT] Course ${courseId} not found for update`);
+      console.log(`[API] Course ${courseId} not found for update`);
       return res.status(404).json({
         success: false,
         message: 'Vak niet gevonden',
@@ -1250,7 +1250,7 @@ router.put('/admin/courses/:courseId', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(`[AUDIT] Admin ${adminId} updated course ${courseId}: ${updatedCourse.title}`);
+    console.log(`[API] Admin ${adminId} updated course ${courseId}: ${updatedCourse.title}`);
 
     res.status(200).json({
       success: true,
@@ -1259,7 +1259,7 @@ router.put('/admin/courses/:courseId', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to update course ${courseId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to update course ${courseId}`, error.message);
     
     // Check voor unique constraint violation (duplicate join_code)
     if (error.code === '23505' && error.constraint === 'course_join_code_key') {
@@ -1339,11 +1339,11 @@ router.post('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, a
   const courseId = parseInt(req.params.courseId);
   const teacherId = parseInt(req.params.teacherId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to add teacher ${teacherId} to course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to add teacher ${teacherId} to course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -1369,7 +1369,7 @@ router.post('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, a
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -1409,7 +1409,7 @@ router.post('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, a
     const result = await adminController.addTeacherToCourse(courseId, teacherId);
 
     if (result.exists) {
-      console.log(`[AUDIT] Teacher ${teacherId} already assigned to course ${courseId}`);
+      console.log(`[API] Teacher ${teacherId} already assigned to course ${courseId}`);
       return res.status(400).json({
         success: false,
         message: 'Deze docent is al gekoppeld aan dit vak',
@@ -1417,7 +1417,7 @@ router.post('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, a
       });
     }
 
-    console.log(`[AUDIT] Admin ${adminId} added teacher ${teacherId} (${result.name}) to course ${courseId} (${result.course_title})`);
+    console.log(`[API] Admin ${adminId} added teacher ${teacherId} (${result.name}) to course ${courseId} (${result.course_title})`);
 
     res.status(201).json({
       success: true,
@@ -1432,7 +1432,7 @@ router.post('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, a
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to add teacher ${teacherId} to course ${courseId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to add teacher ${teacherId} to course ${courseId}`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij toevoegen docent aan vak',
@@ -1496,11 +1496,11 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
   const courseId = parseInt(req.params.courseId);
   const teacherId = parseInt(req.params.teacherId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to remove teacher ${teacherId} from course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to remove teacher ${teacherId} from course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -1526,7 +1526,7 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -1538,7 +1538,7 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
     const removedRelation = await adminController.removeTeacherFromCourse(courseId, teacherId);
 
     if (!removedRelation) {
-      console.log(`[AUDIT] Teacher ${teacherId} is not assigned to course ${courseId}`);
+      console.log(`[API] Teacher ${teacherId} is not assigned to course ${courseId}`);
       return res.status(404).json({
         success: false,
         message: 'Deze docent is niet gekoppeld aan dit vak',
@@ -1546,7 +1546,7 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
       });
     }
 
-    console.log(`[AUDIT] Admin ${adminId} removed teacher ${teacherId} (${removedRelation.name}) from course ${courseId} (${removedRelation.course_title})`);
+    console.log(`[API] Admin ${adminId} removed teacher ${teacherId} (${removedRelation.name}) from course ${courseId} (${removedRelation.course_title})`);
 
     res.status(200).json({
       success: true,
@@ -1559,7 +1559,7 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to remove teacher ${teacherId} from course ${courseId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to remove teacher ${teacherId} from course ${courseId}`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij verwijderen docent van vak',
@@ -1618,11 +1618,11 @@ router.get('/admin/courses/:courseId/students', authenticateToken, async (req, r
   const adminId = req.user?.id || parseInt(req.query.adminId);
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested students for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested students for course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -1640,7 +1640,7 @@ router.get('/admin/courses/:courseId/students', authenticateToken, async (req, r
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -1660,7 +1660,7 @@ router.get('/admin/courses/:courseId/students', authenticateToken, async (req, r
 
     const students = await adminController.getCourseStudents(courseId);
 
-    console.log(`[AUDIT] Admin ${adminId} retrieved ${students.length} students for course ${courseId}`);
+    console.log(`[API] Admin ${adminId} retrieved ${students.length} students for course ${courseId}`);
 
     res.status(200).json({
       success: true,
@@ -1669,7 +1669,7 @@ router.get('/admin/courses/:courseId/students', authenticateToken, async (req, r
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to retrieve students for course ${courseId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to retrieve students for course ${courseId}`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen studenten',
@@ -1737,11 +1737,11 @@ router.post('/admin/courses/:courseId/students/:studentId', authenticateToken, a
   const courseId = parseInt(req.params.courseId);
   const studentId = parseInt(req.params.studentId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to enroll student ${studentId} in course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to enroll student ${studentId} in course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -1767,7 +1767,7 @@ router.post('/admin/courses/:courseId/students/:studentId', authenticateToken, a
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -1807,7 +1807,7 @@ router.post('/admin/courses/:courseId/students/:studentId', authenticateToken, a
     const result = await adminController.enrollStudent(courseId, studentId);
 
     if (result.exists) {
-      console.log(`[AUDIT] Student ${studentId} already enrolled in course ${courseId}`);
+      console.log(`[API] Student ${studentId} already enrolled in course ${courseId}`);
       return res.status(400).json({
         success: false,
         message: 'Deze student is al ingeschreven voor dit vak',
@@ -1815,7 +1815,7 @@ router.post('/admin/courses/:courseId/students/:studentId', authenticateToken, a
       });
     }
 
-    console.log(`[AUDIT] Admin ${adminId} enrolled student ${studentId} (${result.name}) in course ${courseId} (${result.course_title})`);
+    console.log(`[API] Admin ${adminId} enrolled student ${studentId} (${result.name}) in course ${courseId} (${result.course_title})`);
 
     res.status(201).json({
       success: true,
@@ -1830,7 +1830,7 @@ router.post('/admin/courses/:courseId/students/:studentId', authenticateToken, a
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to enroll student ${studentId} in course ${courseId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to enroll student ${studentId} in course ${courseId}`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij inschrijven student',
@@ -1894,11 +1894,11 @@ router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken,
   const courseId = parseInt(req.params.courseId);
   const studentId = parseInt(req.params.studentId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to unenroll student ${studentId} from course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to unenroll student ${studentId} from course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -1924,7 +1924,7 @@ router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken,
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -1936,7 +1936,7 @@ router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken,
     const result = await adminController.unenrollStudent(courseId, studentId);
 
     if (!result) {
-      console.log(`[AUDIT] Student ${studentId} not enrolled in course ${courseId}`);
+      console.log(`[API] Student ${studentId} not enrolled in course ${courseId}`);
       return res.status(404).json({
         success: false,
         message: 'Deze student is niet ingeschreven voor dit vak',
@@ -1944,7 +1944,7 @@ router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken,
       });
     }
 
-    console.log(`[AUDIT] Admin ${adminId} unenrolled student ${studentId} (${result.name}) from course ${courseId} (${result.course_title})`);
+    console.log(`[API] Admin ${adminId} unenrolled student ${studentId} (${result.name}) from course ${courseId} (${result.course_title})`);
 
     res.status(200).json({
       success: true,
@@ -1957,7 +1957,7 @@ router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken,
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to unenroll student ${studentId} from course ${courseId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to unenroll student ${studentId} from course ${courseId}`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij uitschrijven student',
@@ -2022,11 +2022,11 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
   const adminId = req.user?.id || parseInt(req.query.adminId);
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested assignments for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested assignments for course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -2044,7 +2044,7 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -2064,7 +2064,7 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
 
     const assignments = await adminController.getCourseAssignments(courseId);
 
-    console.log(`[AUDIT] Admin ${adminId} retrieved ${assignments.length} assignments for course ${courseId}`);
+    console.log(`[API] Admin ${adminId} retrieved ${assignments.length} assignments for course ${courseId}`);
 
     res.status(200).json({
       success: true,
@@ -2073,7 +2073,7 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to retrieve assignments for course ${courseId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to retrieve assignments for course ${courseId}`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen opdrachten',
@@ -2134,11 +2134,11 @@ router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req,
   const adminId = req.user?.id || parseInt(req.query.adminId);
   const assignmentId = parseInt(req.params.assignmentId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested to delete assignment ${assignmentId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested to delete assignment ${assignmentId} at ${new Date().toISOString()}`);
 
   try {
     if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
         success: false,
         message: 'Admin ID is verplicht',
@@ -2156,7 +2156,7 @@ router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req,
 
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
       return res.status(403).json({
         success: false,
         message: 'Alleen admins hebben toegang tot deze functie',
@@ -2168,7 +2168,7 @@ router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req,
     const deletedAssignment = await adminController.deleteAssignment(assignmentId);
 
     if (!deletedAssignment) {
-      console.log(`[AUDIT] Assignment ${assignmentId} not found`);
+      console.log(`[API] Assignment ${assignmentId} not found`);
       return res.status(404).json({
         success: false,
         message: 'Opdracht niet gevonden',
@@ -2176,7 +2176,7 @@ router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req,
       });
     }
 
-    console.log(`[AUDIT] Admin ${adminId} deleted assignment ${assignmentId}: ${deletedAssignment.title}`);
+    console.log(`[API] Admin ${adminId} deleted assignment ${assignmentId}: ${deletedAssignment.title}`);
 
     res.status(200).json({
       success: true,
@@ -2185,7 +2185,7 @@ router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req,
       error: null
     });
   } catch (error) {
-    console.error(`[AUDIT] Admin ${adminId} failed to delete assignment ${assignmentId}:`, error);
+    console.error(`[API] Admin ${adminId} failed to delete assignment ${assignmentId}`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij verwijderen opdracht',
@@ -2195,3 +2195,7 @@ router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req,
 });
 
 module.exports = router;
+
+
+
+

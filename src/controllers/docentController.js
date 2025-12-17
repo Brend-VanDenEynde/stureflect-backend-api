@@ -110,9 +110,9 @@ const getEnrolledStudents = async (req, res) => {
             LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
         `;
 
-    console.log('🔍 Executing query with params:', queryParams);
+    console.log('[API] Executing query for enrolled students with params:', queryParams);
     const result = await pool.query(query, queryParams);
-    console.log('✅ Query successful. Rows:', result.rows.length);
+    console.log('[API] Query successful. Rows:', result.rows.length);
 
     const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
     const totalPages = Math.ceil(totalCount / limit);
@@ -141,8 +141,7 @@ const getEnrolledStudents = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching enrolled students:', error.message);
-    console.error('❌ Stack:', error.stack);
+    console.error('[API] Error fetching enrolled students:', error.message);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message
@@ -369,8 +368,7 @@ const getStudentStatusByCourse = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching student status by course:', error.message);
-    console.error('❌ Stack:', error.stack);
+    console.error('[API] Error fetching student status by course:', error.message);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message
@@ -526,7 +524,7 @@ const getStudentStatusForStudent = async (req, res) => {
 
     res.json({ student });
   } catch (error) {
-    console.error('❌ Error fetching student status by course/student:', error.message);
+    console.error('[API] Error fetching student status:', error.message);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message
@@ -538,16 +536,12 @@ const addStudentToCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('📝 [ADD STUDENT] Starting addStudentToCourse request');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('🔑 Request user:', req.user ? `ID: ${req.user.id}, Email: ${req.user.email}, Role: ${req.user.role}` : 'No user');
-    console.log('📦 Course ID (from params):', courseId);
-    console.log('📋 Content-Type:', req.headers['content-type']);
-    console.log('📥 Request body received:', req.body ? 'YES' : 'NO');
+    console.log('[API] POST /api/docent/courses/:courseId/students - Add student request');
+    console.log('[API] Request user:', req.user ? `ID: ${req.user.id}, Role: ${req.user.role}` : 'No user');
+    console.log('[API] Course ID:', courseId);
 
     if (!req.body) {
-      console.log('❌ [ADD STUDENT] Request body is missing');
+      console.log('[API] Request body is missing');
       return res.status(400).json({
         error: 'Request body is missing',
         hint: 'Ensure you are sending a JSON body and setting Content-Type: application/json'
@@ -555,80 +549,69 @@ const addStudentToCourse = async (req, res) => {
     }
 
     const { email } = req.body;
-    console.log('📧 Student email (from body):', email ? email : 'NOT PROVIDED');
+    console.log('[API] Adding student to course');
 
     if (!courseId) {
-      console.log('❌ [ADD STUDENT] courseId is missing');
+      console.log('[API] courseId is missing');
       return res.status(400).json({ error: 'courseId is required' });
     }
     if (!email) {
-      console.log('❌ [ADD STUDENT] email is missing');
+      console.log('[API] email is missing');
       return res.status(400).json({ error: 'email is required' });
     }
 
     // 1. Find the user by email
-    console.log('🔍 [STEP 1] Looking up user by email:', email);
+    console.log('[API] Looking up user by email');
     const userResult = await pool.query(
       'SELECT id FROM "user" WHERE email = $1',
       [email]
     );
 
-    console.log('📊 [STEP 1] Query result:', {
+    console.log('[API] User lookup result:', {
       rowCount: userResult.rows.length,
       found: userResult.rows.length > 0
     });
 
     if (userResult.rows.length === 0) {
-      console.log('❌ [STEP 1] Student not found with email:', email);
+      console.log('[API] Student not found');
       return res.status(404).json({ error: 'Student not found with this email' });
     }
 
     const studentId = userResult.rows[0].id;
-    console.log('✅ [STEP 1] Student found - ID:', studentId);
+    console.log('[API] Student found - ID:', studentId);
 
     // 2. Check if already enrolled
-    console.log('🔍 [STEP 2] Checking if student is already enrolled');
-    console.log('   - Course ID:', courseId);
-    console.log('   - Student ID:', studentId);
+    console.log('[API] Checking enrollment status for course:', courseId, 'student:', studentId);
     
     const enrollmentCheck = await pool.query(
       'SELECT id FROM enrollment WHERE course_id = $1 AND user_id = $2',
       [courseId, studentId]
     );
 
-    console.log('📊 [STEP 2] Enrollment check result:', {
+    console.log('[API] Enrollment check result:', {
       rowCount: enrollmentCheck.rows.length,
       alreadyEnrolled: enrollmentCheck.rows.length > 0
     });
 
     if (enrollmentCheck.rows.length > 0) {
-      console.log('⚠️ [STEP 2] Student already enrolled in this course');
+      console.log('[API] Student already enrolled in course');
       return res.status(409).json({ error: 'Student is already enrolled in this course' });
     }
 
     // 3. Enroll the student
-    console.log('➕ [STEP 3] Enrolling student in course');
-    console.log('   - Course ID:', courseId);
-    console.log('   - Student ID:', studentId);
+    console.log('[API] Enrolling student in course');
     
     await pool.query(
       'INSERT INTO enrollment (course_id, user_id) VALUES ($1, $2)',
       [courseId, studentId]
     );
 
-    console.log('✅ [STEP 3] Student successfully enrolled!');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('🎉 [ADD STUDENT] Successfully completed');
-    console.log('═══════════════════════════════════════════════════════');
+    console.log('[API] Student successfully enrolled');
 
     res.status(201).json({ message: 'Student successfully added to the course' });
 
   } catch (error) {
-    console.log('═══════════════════════════════════════════════════════');
-    console.error('❌ [ADD STUDENT ERROR] An error occurred');
-    console.error('❌ Error message:', error.message);
-    console.error('❌ Error stack:', error.stack);
-    console.log('═══════════════════════════════════════════════════════');
+    console.error('[API] Error adding student to course:', error.message);
     
     res.status(500).json({
       error: 'Internal server error',
@@ -667,7 +650,7 @@ const removeStudentFromCourse = async (req, res) => {
     res.json({ message: 'Student successfully removed from the course' });
 
   } catch (error) {
-    console.error('❌ Error removing student from course:', error.message);
+    console.error('[API] Error removing student from course:', error.message);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message
@@ -706,7 +689,7 @@ const getDocentCourses = async (req, res) => {
 
     res.status(200).json({ courses });
   } catch (error) {
-    console.error('❌ Error fetching docent courses:', error.message);
+    console.error('[API] Error fetching docent courses:', error.message);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message

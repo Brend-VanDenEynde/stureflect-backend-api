@@ -23,7 +23,7 @@ async function getStudentCourses(studentId) {
     );
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen cursussen:', error);
+    console.error('[API] Error fetching student courses:', error.message);
     throw error;
   }
 }
@@ -78,7 +78,7 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
     const result = await db.query(query, [studentId, courseId]);
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen opdrachten:', error);
+    console.error('[API] Error fetching course assignments:', error.message);
     throw error;
   }
 }
@@ -138,7 +138,7 @@ async function getStudentSubmissions(studentId, filters = {}) {
     const result = await db.query(query, params);
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen submissions:', error);
+    console.error('[API] Error fetching student submissions:', error.message);
     throw error;
   }
 }
@@ -223,7 +223,7 @@ async function getSubmissionDetail(submissionId) {
       feedback: feedbackResult.rows
     };
   } catch (error) {
-    console.error('Fout bij ophalen submission detail:', error);
+    console.error('[API] Error fetching submission detail:', error.message);
     throw error;
   }
 }
@@ -242,7 +242,7 @@ async function isStudentEnrolledInCourse(studentId, courseId) {
     );
     return result.rows.length > 0;
   } catch (error) {
-    console.error('Fout bij controleren inschrijving:', error);
+    console.error('[API] Error checking enrollment:', error.message);
     throw error;
   }
 }
@@ -269,7 +269,7 @@ async function getAssignmentWithCourse(assignmentId) {
     );
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('Fout bij ophalen assignment:', error);
+    console.error('[API] Error fetching assignment:', error.message);
     throw error;
   }
 }
@@ -290,7 +290,7 @@ async function getExistingSubmission(studentId, assignmentId) {
     );
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('Fout bij controleren bestaande submission:', error);
+    console.error('[API] Error checking existing submission:', error.message);
     throw error;
   }
 }
@@ -314,7 +314,7 @@ async function createSubmission({ assignmentId, userId, githubUrl, commitSha }) 
     );
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij aanmaken submission:', error);
+    console.error('[API] Error creating submission:', error.message);
     throw error;
   }
 }
@@ -337,7 +337,7 @@ async function updateSubmissionWebhook(submissionId, webhookId, webhookSecret) {
     );
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij updaten submission webhook:', error);
+    console.error('[API] Error updating submission webhook:', error.message);
     throw error;
   }
 }

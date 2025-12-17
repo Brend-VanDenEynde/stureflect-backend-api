@@ -156,11 +156,11 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
     return { success: true, score: aiScore, feedbackCount: savedFeedback.length };
 
   } catch (error) {
-    console.error('[PROCESS ERROR]', error);
+    console.error('[API] Process error:', error.message);
     try {
       await markSubmissionFailed(submission.id, commitSha, error.message, 'PROCESS_ERROR');
     } catch (updateError) {
-      console.error('[PROCESS ERROR] Could not update submission status:', updateError);
+      console.error('[API] Could not update submission status:', updateError.message);
     }
     return { success: false, error: error.message };
   }
@@ -251,7 +251,7 @@ router.post('/github', async (req, res) => {
     const data = req.body;
 
     if (!payload) {
-      console.warn('[WEBHOOK] rawBody not available');
+      console.warn('[API] rawBody not available');
     }
 
     const repoFullName = data.repository?.full_name || 'unknown';
@@ -290,7 +290,7 @@ router.post('/github', async (req, res) => {
     await processSubmission(submission, latestCommitSha, branch, repoFullName);
 
   } catch (error) {
-    console.error('[WEBHOOK ERROR]', error);
+    console.error('[API] Webhook error:', error.message);
     logWebhookEvent('push', 'unknown', 'error', error.message);
   }
 });
@@ -406,13 +406,13 @@ router.post('/retry/:submissionId', async (req, res) => {
       }
     } catch (processError) {
       // Log error maar stuur geen response (al verzonden)
-      console.error('[RETRY PROCESS ERROR]', processError);
+      console.error('[API] Retry process error:', processError.message);
       logWebhookEvent('retry', repoFullName, 'error', processError.message);
     }
 
   } catch (error) {
     // Deze catch is voor errors VOOR de response
-    console.error('[RETRY ERROR]', error);
+    console.error('[API] Retry error:', error.message);
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
@@ -474,7 +474,7 @@ router.get('/failed', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[FAILED LIST ERROR]', error);
+    console.error('[API] Failed list error:', error.message);
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve submissions'
@@ -657,7 +657,7 @@ router.post('/test', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[TEST ERROR]', error);
+    console.error('[API] Test error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
