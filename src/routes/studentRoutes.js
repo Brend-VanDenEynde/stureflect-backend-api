@@ -863,4 +863,249 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/students/me/submissions/{submissionId}:
+ *   put:
+ *     tags:
+ *       - Studenten
+ *     summary: Wijzig GitHub repository van een submission
+ *     description: |
+ *       Wijzig de GitHub repository URL van een bestaande submission.
+ *       De oude webhook wordt verwijderd en een nieuwe wordt geregistreerd.
+ *       De status wordt gereset naar 'pending'.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: submissionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de submission
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - github_url
+ *             properties:
+ *               github_url:
+ *                 type: string
+ *                 format: uri
+ *                 example: https://github.com/username/new-repository
+ *                 description: Nieuwe GitHub repository URL
+ *     responses:
+ *       200:
+ *         description: Submission succesvol bijgewerkt
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Submission'
+ *                 message:
+ *                   type: string
+ *                   example: Repository succesvol gewijzigd
+ *       400:
+ *         description: Ongeldige input (submission ID of GitHub URL)
+ *       403:
+ *         description: Geen eigenaar van deze submission
+ *       404:
+ *         description: Submission of repository niet gevonden
+ *       500:
+ *         description: Server error
+ */
+router.put('/me/submissions/:submissionId', async (req, res) => {
+  try {
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
+    const submissionId = parseInt(req.params.submissionId);
+    const { github_url } = req.body;
+
+    // Valideer submissionId
+    if (isNaN(submissionId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig submission ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Valideer github_url
+    if (!github_url || typeof github_url !== 'string' || github_url.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'GitHub URL is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Valideer GitHub URL formaat
+    const urlValidation = githubService.validateGitHubUrl(github_url);
+    if (!urlValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: urlValidation.error,
+        error: 'INVALID_URL'
+      });
+    }
+
+    // Check repository access
+    const { owner, repo } = urlValidation;
+    const repoAccess = await githubService.checkRepositoryAccess(owner, repo);
+    if (!repoAccess.accessible) {
+      const statusCode = repoAccess.errorCode === 'RATE_LIMITED' ? 429 : 404;
+      return res.status(statusCode).json({
+        success: false,
+        message: repoAccess.error,
+        error: repoAccess.errorCode || 'REPO_NOT_FOUND'
+      });
+    }
+
+    // Haal laatste commit SHA op
+    const commitResult = await githubService.getLatestCommitSha(owner, repo);
+    if (!commitResult.success) {
+      const statusCode = commitResult.errorCode === 'RATE_LIMITED' ? 429 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        message: commitResult.error,
+        error: commitResult.errorCode
+      });
+    }
+
+    // Haal file tree op en filter
+    const treeResult = await githubService.getRepositoryTree(owner, repo, commitResult.sha);
+    if (!treeResult.success) {
+      return res.status(502).json({
+        success: false,
+        message: treeResult.error,
+        error: treeResult.errorCode
+      });
+    }
+
+    const codeFiles = githubService.filterCodeFiles(treeResult.files);
+    if (codeFiles.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Repository bevat geen code bestanden',
+        error: 'EMPTY_REPO'
+      });
+    }
+
+    // Update submission in database
+    const updateResult = await studentController.updateSubmission(
+      submissionId,
+      studentId,
+      github_url,
+      commitResult.sha
+    );
+
+    if (!updateResult.success) {
+      if (updateResult.error === 'NOT_FOUND') {
+        return res.status(404).json({
+          success: false,
+          message: 'Submission niet gevonden',
+          error: 'NOT_FOUND'
+        });
+      }
+      if (updateResult.error === 'FORBIDDEN') {
+        return res.status(403).json({
+          success: false,
+          message: 'Je hebt geen toegang tot deze submission',
+          error: 'FORBIDDEN'
+        });
+      }
+    }
+
+    // Delete oude webhook indien aanwezig
+    if (updateResult.oldWebhookInfo) {
+      try {
+        await githubService.deleteWebhook(
+          updateResult.oldWebhookInfo.owner,
+          updateResult.oldWebhookInfo.repo,
+          updateResult.oldWebhookInfo.webhookId
+        );
+        console.log(`[WEBHOOK] Oude webhook verwijderd voor ${updateResult.oldWebhookInfo.owner}/${updateResult.oldWebhookInfo.repo}`);
+      } catch (webhookError) {
+        console.warn('[WEBHOOK] Kon oude webhook niet verwijderen:', webhookError.message);
+      }
+    }
+
+    // Registreer nieuwe webhook
+    let webhookInfo = { registered: false };
+    try {
+      const student = await getUserById(studentId);
+      const githubToken = student?.github_access_token;
+
+      if (githubToken) {
+        const webhookSecret = crypto.randomBytes(32).toString('hex');
+        const webhookUrl = `${process.env.BACKEND_URL || 'https://backend.stureflect.com'}/api/webhooks/github`;
+
+        const webhookResult = await githubService.registerWebhook(
+          owner,
+          repo,
+          webhookUrl,
+          webhookSecret,
+          githubToken
+        );
+
+        if (webhookResult.success) {
+          await studentController.updateSubmissionWebhook(
+            submissionId,
+            String(webhookResult.webhookId),
+            webhookSecret
+          );
+          webhookInfo = {
+            registered: true,
+            webhookId: webhookResult.webhookId
+          };
+          console.log(`[WEBHOOK] Nieuwe webhook geregistreerd voor ${owner}/${repo} (ID: ${webhookResult.webhookId})`);
+        } else {
+          webhookInfo = {
+            registered: false,
+            error: webhookResult.error
+          };
+        }
+      }
+    } catch (webhookError) {
+      console.error('[WEBHOOK] Fout bij registreren nieuwe webhook:', webhookError);
+      webhookInfo = {
+        registered: false,
+        error: 'Interne fout bij webhook registratie'
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...updateResult.submission,
+        github_url: github_url,
+        repository: {
+          owner,
+          repo,
+          default_branch: repoAccess.repoData?.default_branch
+        },
+        webhook: webhookInfo
+      },
+      message: webhookInfo.registered
+        ? 'Repository succesvol gewijzigd met nieuwe webhook'
+        : 'Repository gewijzigd (webhook registratie mislukt)',
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij updaten submission:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij wijzigen repository',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
 module.exports = router;
