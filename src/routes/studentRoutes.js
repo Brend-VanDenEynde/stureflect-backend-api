@@ -947,7 +947,7 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
  */
 router.get('/me/assignments/:assignmentId', async (req, res) => {
   try {
-    const studentId = req.user?.id || parseInt(req.query.userId) || 1;
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
     const assignmentId = parseInt(req.params.assignmentId);
 
     // Valideer assignmentId

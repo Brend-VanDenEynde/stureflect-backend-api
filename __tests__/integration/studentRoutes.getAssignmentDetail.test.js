@@ -41,7 +41,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
 
       const response = await request(app)
         .get('/api/students/me/assignments/1')
-        .query({ userId: 5 })
+        .query({ studentId: 5 })
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -83,7 +83,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
 
       const response = await request(app)
         .get('/api/students/me/assignments/1')
-        .query({ userId: 5 })
+        .query({ studentId: 5 })
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -99,7 +99,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
     it('should return 400 when assignmentId is not a number', async () => {
       const response = await request(app)
         .get('/api/students/me/assignments/abc')
-        .query({ userId: 5 })
+        .query({ studentId: 5 })
         .expect(400);
 
       expect(response.body.success).toBe(false);
@@ -109,7 +109,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
     it('should return 400 when assignmentId is zero', async () => {
       const response = await request(app)
         .get('/api/students/me/assignments/0')
-        .query({ userId: 5 })
+        .query({ studentId: 5 })
         .expect(400);
 
       expect(response.body.success).toBe(false);
@@ -119,7 +119,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
     it('should return 400 when assignmentId is negative', async () => {
       const response = await request(app)
         .get('/api/students/me/assignments/-1')
-        .query({ userId: 5 })
+        .query({ studentId: 5 })
         .expect(400);
 
       expect(response.body.success).toBe(false);
@@ -144,7 +144,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
 
       const response = await request(app)
         .get('/api/students/me/assignments/1')
-        .query({ userId: 999 })
+        .query({ studentId: 999 })
         .expect(403);
 
       expect(response.body.success).toBe(false);
@@ -161,7 +161,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
 
       const response = await request(app)
         .get('/api/students/me/assignments/999')
-        .query({ userId: 5 })
+        .query({ studentId: 5 })
         .expect(404);
 
       expect(response.body.success).toBe(false);
@@ -178,7 +178,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
 
       const response = await request(app)
         .get('/api/students/me/assignments/1')
-        .query({ userId: 5 })
+        .query({ studentId: 5 })
         .expect(500);
 
       expect(response.body.success).toBe(false);
@@ -209,7 +209,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
 
       const response = await request(app)
         .get('/api/students/me/assignments/1')
-        .query({ userId: 5 });
+        .query({ studentId: 5 });
 
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('data');
@@ -222,7 +222,7 @@ describe('GET /api/students/me/assignments/:assignmentId', () => {
 
       const response = await request(app)
         .get('/api/students/me/assignments/999')
-        .query({ userId: 5 });
+        .query({ studentId: 5 });
 
       expect(response.body).toHaveProperty('success', false);
       expect(response.body).toHaveProperty('message');
