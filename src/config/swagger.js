@@ -245,8 +245,20 @@ const options = {
         description: 'Endpoints voor docenten om cursussen en studenten te beheren'
       },
       {
-        name: 'Admin',
-        description: 'Endpoints voor administratieve taken (alleen voor admins)'
+        name: 'Admin - Students',
+        description: 'Admin endpoints voor studentenbeheer: accounts aanpassen, verwijderen en statistieken bekijken'
+      },
+      {
+        name: 'Admin - Teachers',
+        description: 'Admin endpoints voor docentenbeheer: accounts beheren en rollen wijzigen'
+      },
+      {
+        name: 'Admin - Courses',
+        description: 'Admin endpoints voor vakbeheer: vakken aanmaken, wijzigen en verwijderen'
+      },
+      {
+        name: 'Admin - System',
+        description: 'Admin endpoints voor systeembeheer: admin accounts en algemene instellingen'
       },
       {
         name: 'Webhooks',

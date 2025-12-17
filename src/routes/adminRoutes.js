@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const authenticateToken = require('../middleware/authMiddleware');
+const db = require('../config/db');
 
 /**
  * @swagger
  * /api/admin/students:
  *   get:
  *     tags:
- *       - Admin - Users
+ *       - Admin - Students
  *     summary: Haal alle studenten op
  *     description: Verkrijg een lijst van alle geregistreerde studenten (alleen voor admins)
  *     security:
@@ -94,10 +95,724 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
 
 /**
  * @swagger
+ * /api/admin/students/{studentId}:
+ *   get:
+ *     tags:
+ *       - Admin - Students
+ *     summary: Haal een specifieke student op
+ *     description: Verkrijg gedetailleerde informatie van een specifieke student (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de student
+ *     responses:
+ *       200:
+ *         description: Student gevonden
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     github_id:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     enrolled_courses_count:
+ *                       type: integer
+ *                     submissions_count:
+ *                       type: integer
+ *                     created_at:
+ *                       type: string
+ *                     updated_at:
+ *                       type: string
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldige student ID
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Student niet gevonden
+ */
+router.get('/admin/students/:studentId', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const studentId = parseInt(req.params.studentId);
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested student ${studentId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer student ID
+    if (!studentId || isNaN(studentId)) {
+      console.log(`[AUDIT] Invalid student ID: ${req.params.studentId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig student ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze data',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    const student = await adminController.getStudentById(studentId);
+
+    if (!student) {
+      console.log(`[AUDIT] Student ${studentId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Student niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    console.log(`[AUDIT] Admin ${adminId} retrieved student ${studentId}`);
+
+    res.status(200).json({
+      success: true,
+      data: student,
+      message: 'Student succesvol opgehaald',
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to retrieve student ${studentId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen student',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/students/{studentId}:
+ *   put:
+ *     tags:
+ *       - Admin - Students
+ *     summary: Werk een studentaccount bij
+ *     description: Wijzig gegevens van een studentaccount (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de student
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Nieuwe email van de student
+ *               name:
+ *                 type: string
+ *                 description: Nieuwe naam van de student
+ *               github_id:
+ *                 type: string
+ *                 description: Nieuwe GitHub ID van de student
+ *     responses:
+ *       200:
+ *         description: Student succesvol bijgewerkt
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     github_id:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     created_at:
+ *                       type: string
+ *                     updated_at:
+ *                       type: string
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldige input of geen velden om bij te werken
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Student niet gevonden
+ *       409:
+ *         description: Email al in gebruik door een andere gebruiker
+ */
+router.put('/admin/students/:studentId', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const studentId = parseInt(req.params.studentId);
+  const { email, name, github_id } = req.body;
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} attempting to update student ${studentId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer student ID
+    if (!studentId || isNaN(studentId)) {
+      console.log(`[AUDIT] Invalid student ID: ${req.params.studentId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig student ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze functie',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Validatie: controleer of er tenminste één veld is om bij te werken
+    if (email === undefined && name === undefined && github_id === undefined) {
+      console.log(`[AUDIT] No fields provided for update`);
+      return res.status(400).json({
+        success: false,
+        message: 'Geen velden om bij te werken',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Validatie: controleer of student bestaat
+    const existingStudent = await adminController.getStudentById(studentId);
+    if (!existingStudent) {
+      console.log(`[AUDIT] Student ${studentId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Student niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Validatie: controleer email format indien opgegeven
+    if (email !== undefined && email !== null) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        console.log(`[AUDIT] Invalid email format: ${email}`);
+        return res.status(400).json({
+          success: false,
+          message: 'Ongeldig email formaat',
+          error: 'BAD_REQUEST'
+        });
+      }
+
+      // Controleer of email al in gebruik is door een andere gebruiker
+      const existingUser = await db.query(
+        `SELECT id FROM "user" WHERE email = $1 AND id != $2`,
+        [email, studentId]
+      );
+
+      if (existingUser.rows.length > 0) {
+        console.log(`[AUDIT] Email ${email} already in use by another user`);
+        return res.status(409).json({
+          success: false,
+          message: 'Email is al in gebruik door een andere gebruiker',
+          error: 'CONFLICT'
+        });
+      }
+    }
+
+    // Validatie: controleer name indien opgegeven
+    if (name !== undefined && name !== null && name.trim() === '') {
+      console.log(`[AUDIT] Invalid name: empty string`);
+      return res.status(400).json({
+        success: false,
+        message: 'Naam mag niet leeg zijn',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const updatedStudent = await adminController.updateStudent(studentId, {
+      email,
+      name,
+      github_id
+    });
+
+    if (!updatedStudent) {
+      console.log(`[AUDIT] Failed to update student ${studentId}`);
+      return res.status(500).json({
+        success: false,
+        message: 'Fout bij bijwerken student',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+
+    console.log(`[AUDIT] Admin ${adminId} successfully updated student ${studentId}`);
+
+    res.status(200).json({
+      success: true,
+      data: updatedStudent,
+      message: 'Student succesvol bijgewerkt',
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to update student ${studentId}:`, error);
+    
+    // Handle unique constraint violation
+    if (error.code === '23505' && error.constraint === 'user_email_key') {
+      return res.status(409).json({
+        success: false,
+        message: 'Email is al in gebruik',
+        error: 'CONFLICT'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij bijwerken student',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/students/{studentId}:
+ *   delete:
+ *     tags:
+ *       - Admin - Students
+ *     summary: Verwijder een studentaccount
+ *     description: Verwijder een studentaccount permanent uit het systeem (alleen voor admins). Let op - cascade delete voor enrollments en submissions.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de student
+ *     responses:
+ *       200:
+ *         description: Student succesvol verwijderd
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldige student ID
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Student niet gevonden
+ */
+router.delete('/admin/students/:studentId', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const studentId = parseInt(req.params.studentId);
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} attempting to delete student ${studentId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer student ID
+    if (!studentId || isNaN(studentId)) {
+      console.log(`[AUDIT] Invalid student ID: ${req.params.studentId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig student ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze functie',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Controleer of student bestaat voordat we verwijderen
+    const existingStudent = await adminController.getStudentById(studentId);
+    if (!existingStudent) {
+      console.log(`[AUDIT] Student ${studentId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Student niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    const deletedStudent = await adminController.deleteStudent(studentId);
+
+    if (!deletedStudent) {
+      console.log(`[AUDIT] Failed to delete student ${studentId}`);
+      return res.status(500).json({
+        success: false,
+        message: 'Fout bij verwijderen student',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+
+    console.log(`[AUDIT] Admin ${adminId} successfully deleted student ${studentId} (${deletedStudent.email})`);
+
+    res.status(200).json({
+      success: true,
+      data: deletedStudent,
+      message: 'Student succesvol verwijderd',
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to delete student ${studentId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij verwijderen student',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/students/{studentId}/courses:
+ *   get:
+ *     tags:
+ *       - Admin - Students
+ *     summary: Haal alle vakken op waarin een student is ingeschreven
+ *     description: Verkrijg een lijst van alle vakken met enrollment informatie en statistieken voor een specifieke student (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de student
+ *     responses:
+ *       200:
+ *         description: Lijst van vakken
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       enrolled_at:
+ *                         type: string
+ *                       assignment_count:
+ *                         type: integer
+ *                       submission_count:
+ *                         type: integer
+ *                       avg_ai_score:
+ *                         type: number
+ *                       avg_manual_score:
+ *                         type: number
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldige student ID
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Student niet gevonden
+ */
+router.get('/admin/students/:studentId/courses', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const studentId = parseInt(req.params.studentId);
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested enrollments for student ${studentId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer student ID
+    if (!studentId || isNaN(studentId)) {
+      console.log(`[AUDIT] Invalid student ID: ${req.params.studentId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig student ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze data',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Controleer of student bestaat
+    const student = await adminController.getStudentById(studentId);
+    if (!student) {
+      console.log(`[AUDIT] Student ${studentId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Student niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    const enrollments = await adminController.getStudentEnrollments(studentId);
+
+    console.log(`[AUDIT] Admin ${adminId} retrieved ${enrollments.length} enrollments for student ${studentId}`);
+
+    res.status(200).json({
+      success: true,
+      data: enrollments,
+      message: `${enrollments.length} vak(ken) gevonden`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to retrieve enrollments for student ${studentId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen vakken',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/students/{studentId}/submissions:
+ *   get:
+ *     tags:
+ *       - Admin - Students
+ *     summary: Haal alle submissions van een student op
+ *     description: Verkrijg een lijst van alle submissions met scores en feedback informatie voor een specifieke student (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de student
+ *     responses:
+ *       200:
+ *         description: Lijst van submissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       github_url:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       ai_score:
+ *                         type: integer
+ *                       manual_score:
+ *                         type: integer
+ *                       assignment_title:
+ *                         type: string
+ *                       course_title:
+ *                         type: string
+ *                       feedback_count:
+ *                         type: integer
+ *                       created_at:
+ *                         type: string
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldige student ID
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Student niet gevonden
+ */
+router.get('/admin/students/:studentId/submissions', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const studentId = parseInt(req.params.studentId);
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested submissions for student ${studentId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer student ID
+    if (!studentId || isNaN(studentId)) {
+      console.log(`[AUDIT] Invalid student ID: ${req.params.studentId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig student ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze data',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Controleer of student bestaat
+    const student = await adminController.getStudentById(studentId);
+    if (!student) {
+      console.log(`[AUDIT] Student ${studentId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Student niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    const submissions = await adminController.getStudentSubmissions(studentId);
+
+    console.log(`[AUDIT] Admin ${adminId} retrieved ${submissions.length} submissions for student ${studentId}`);
+
+    res.status(200).json({
+      success: true,
+      data: submissions,
+      message: `${submissions.length} submission(s) gevonden`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to retrieve submissions for student ${studentId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen submissions',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/admin/admins:
  *   get:
  *     tags:
- *       - Admin - Users
+ *       - Admin - System
  *     summary: Haal alle admins op
  *     description: Verkrijg een lijst van alle geregistreerde admins (alleen voor admins)
  *     security:
@@ -181,7 +896,7 @@ router.get('/admin/admins', authenticateToken, async (req, res) => {
  * /api/admin/teachers:
  *   get:
  *     tags:
- *       - Admin - Users
+ *       - Admin - Teachers
  *     summary: Haal alle docenten op
  *     description: Verkrijg een lijst van alle geregistreerde docenten (alleen voor admins)
  *     security:
@@ -270,7 +985,7 @@ router.get('/admin/teachers', authenticateToken, async (req, res) => {
  * /api/admin/users/{userId}/role/teacher:
  *   put:
  *     tags:
- *       - Admin - Users
+ *       - Admin - Teachers
  *     summary: Wijzig gebruiker naar docent
  *     description: Wijzig de rol van een gebruiker naar 'teacher' vanuit elke andere rol (alleen voor admins)
  *     security:
@@ -375,7 +1090,7 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
  * /api/admin/users/{userId}/role/student:
  *   put:
  *     tags:
- *       - Admin - Users
+ *       - Admin - Students
  *     summary: Wijzig gebruiker naar student
  *     description: Wijzig de rol van een gebruiker naar 'student' vanuit elke andere rol (alleen voor admins). Admins kunnen zichzelf niet degraderen.
  *     security:
@@ -490,7 +1205,7 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
  * /api/admin/users/{userId}/role/admin:
  *   put:
  *     tags:
- *       - Admin - Users
+ *       - Admin - System
  *     summary: Wijzig gebruiker naar admin
  *     description: Wijzig de rol van een gebruiker naar 'admin' vanuit elke andere rol (alleen voor admins)
  *     security:
