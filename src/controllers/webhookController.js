@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const db = require('../config/db');
+const notificationService = require('../services/notificationService');
 
 /**
  * Valideer GitHub webhook signature
@@ -269,6 +270,37 @@ async function saveFeedback(submissionId, feedbackItems) {
       savedItems.push(result.rows[0]);
     }
 
+    // Get submission and course info for event
+    if (savedItems.length > 0) {
+      const submissionResult = await db.query(
+        `SELECT s.id, s.user_id, s.assignment_id, a.course_id
+         FROM submission s
+         JOIN assignment a ON s.assignment_id = a.id
+         WHERE s.id = $1`,
+        [submissionId]
+      );
+      
+      if (submissionResult.rows.length > 0) {
+        const sub = submissionResult.rows[0];
+        
+        // Calculate average severity
+        const severityMap = { low: 1, medium: 2, high: 3, critical: 4 };
+        const avgSeverity = savedItems.reduce((sum, item) => 
+          sum + (severityMap[item.severity] || 0), 0
+        ) / savedItems.length;
+        
+        // Emit real-time event for SSE clients
+        notificationService.emitFeedbackAdded(sub.course_id, {
+          submissionId: sub.id,
+          studentId: sub.user_id,
+          assignmentId: sub.assignment_id,
+          feedbackCount: savedItems.length,
+          avgSeverity: Math.round(avgSeverity * 100) / 100
+        });
+        console.log(`📡 [SSE] Feedback added event emitted for course ${sub.course_id}`);
+      }
+    }
+
     return savedItems;
   } catch (error) {
     console.error('Fout bij opslaan feedback:', error);
@@ -290,11 +322,32 @@ async function updateSubmissionWithScore(submissionId, commitSha, aiScore, statu
       `UPDATE submission
        SET commit_sha = $1, ai_score = $2, status = $3, updated_at = NOW()
        WHERE id = $4
-       RETURNING id, commit_sha, ai_score, status, updated_at`,
+       RETURNING id, commit_sha, ai_score, status, updated_at, assignment_id, user_id`,
       [commitSha, aiScore, status, submissionId]
     );
 
-    return result.rows[0];
+    const submission = result.rows[0];
+    
+    // Get course ID for the event
+    const courseResult = await db.query(
+      'SELECT course_id FROM assignment WHERE id = $1',
+      [submission.assignment_id]
+    );
+    
+    if (courseResult.rows.length > 0) {
+      const courseId = courseResult.rows[0].course_id;
+      
+      // Emit real-time event for SSE clients
+      notificationService.emitSubmissionAnalyzed(courseId, {
+        submissionId: submission.id,
+        studentId: submission.user_id,
+        assignmentId: submission.assignment_id,
+        aiScore: aiScore
+      });
+      console.log(`📡 [SSE] Submission analyzed event emitted for course ${courseId}`);
+    }
+
+    return submission;
   } catch (error) {
     console.error('Fout bij updaten submission met score:', error);
     throw error;
