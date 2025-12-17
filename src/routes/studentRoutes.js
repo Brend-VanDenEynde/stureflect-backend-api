@@ -754,9 +754,18 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
  *   post:
  *     tags:
  *       - Studenten
- *     summary: Dien GitHub repository in
+ *     summary: Koppel GitHub repository aan opdracht
  *     description: |
- *       Dien een GitHub repository in voor een opdracht. De repository wordt gevalideerd.
+ *       Koppel een GitHub repository aan een opdracht. De repository wordt gevalideerd,
+ *       opgeslagen en een webhook wordt geregistreerd voor automatische AI analyse bij pushes.
+ *
+ *       **Flow:**
+ *       1. Valideer GitHub URL en repository toegang
+ *       2. Maak submission aan
+ *       3. Registreer GitHub webhook voor push events
+ *
+ *       **Let op:** Dit endpoint start GEEN AI analyse. De analyse wordt automatisch
+ *       getriggerd wanneer je pusht naar de repository.
  *
  *       **Development mode:** Gebruik `studentId` query parameter.
  *       **Productie:** User ID wordt uit JWT token gehaald.
@@ -934,19 +943,16 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
       commitSha: commitResult.sha
     });
 
-    // Registreer webhook automatisch voor push events
+    // Registreer webhook voor automatische analyse bij push events
     let webhookInfo = { registered: false };
     try {
-      // Haal student's GitHub token op
       const student = await getUserById(studentId);
       const githubToken = student?.github_access_token;
 
       if (githubToken) {
-        // Genereer webhook secret
         const webhookSecret = crypto.randomBytes(32).toString('hex');
         const webhookUrl = `${process.env.BACKEND_URL || 'https://backend.stureflect.com'}/api/webhooks/github`;
 
-        // Registreer webhook op GitHub
         const webhookResult = await githubService.registerWebhook(
           owner,
           repo,
@@ -956,7 +962,6 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
         );
 
         if (webhookResult.success) {
-          // Sla webhook info op in submission
           await studentController.updateSubmissionWebhook(
             submission.id,
             String(webhookResult.webhookId),
@@ -971,22 +976,21 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
           console.warn(`[API] Failed to register webhook: ${webhookResult.error}`);
           webhookInfo = {
             registered: false,
-            error: webhookResult.error,
-            errorCode: webhookResult.errorCode
+            error: webhookResult.error
           };
         }
       } else {
-        console.warn('[API] Student authentication not available, webhook not registered');
+        console.warn('[API] No GitHub token available for webhook registration');
         webhookInfo = {
           registered: false,
           error: 'Geen GitHub token beschikbaar'
         };
       }
     } catch (webhookError) {
-      console.error('[API] Error registering webhook:', webhookError.message);
+      console.error('[API] Webhook registration error:', webhookError.message);
       webhookInfo = {
         registered: false,
-        error: 'Interne fout bij webhook registratie'
+        error: 'Webhook registratie mislukt'
       };
     }
 
@@ -1012,8 +1016,8 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
         webhook: webhookInfo
       },
       message: webhookInfo.registered
-        ? 'Inzending succesvol aangemaakt met automatische webhook'
-        : 'Inzending aangemaakt (webhook registratie mislukt)',
+        ? 'GitHub repository gekoppeld en webhook geregistreerd'
+        : 'GitHub repository gekoppeld (webhook registratie mislukt)',
       error: null
     });
   } catch (error) {
