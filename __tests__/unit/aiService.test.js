@@ -594,8 +594,8 @@ describe('aiService', () => {
       expect(SEVERITY_MAP.suggestion).toBe('low');
     });
 
-    it('should use GPT-4o-mini model', () => {
-      expect(OPENAI_MODEL).toBe('gpt-4o-mini');
+    it('should use GPT-5 mini model', () => {
+      expect(OPENAI_MODEL).toBe('gpt-5-mini');
     });
   });
 });
