@@ -4,7 +4,7 @@ const axios = require('axios');
  * OpenAI API configuratie
  */
 const OPENAI_API_BASE = 'https://api.openai.com/v1';
-const OPENAI_MODEL = 'gpt-4o-mini'; // GPT-4o-mini model
+const OPENAI_MODEL = 'gpt-5-mini'; // GPT-5 mini model
 const OPENAI_TIMEOUT = 120000; // 120s timeout voor Dokploy
 
 /**

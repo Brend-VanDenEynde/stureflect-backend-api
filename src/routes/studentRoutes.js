@@ -79,6 +79,118 @@ router.get('/me/courses', async (req, res) => {
 
 /**
  * @swagger
+ * /api/students/me/courses/join:
+ *   post:
+ *     tags:
+ *       - Studenten
+ *     summary: Schrijf in voor een cursus met join code
+ *     description: |
+ *       Student kan zichzelf inschrijven voor een cursus door de join code in te voeren.
+ *       De join code wordt verstrekt door de docent of admin.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - join_code
+ *             properties:
+ *               join_code:
+ *                 type: string
+ *                 example: ABC123
+ *                 description: De join code van de cursus
+ *     responses:
+ *       201:
+ *         description: Succesvol ingeschreven voor de cursus
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     course:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 1
+ *                         title:
+ *                           type: string
+ *                           example: Web Development 101
+ *                         description:
+ *                           type: string
+ *                 message:
+ *                   type: string
+ *                   example: Succesvol ingeschreven voor Web Development 101
+ *       400:
+ *         description: Join code niet opgegeven
+ *       404:
+ *         description: Ongeldige join code
+ *       409:
+ *         description: Al ingeschreven voor deze cursus
+ *       500:
+ *         description: Server error
+ */
+router.post('/me/courses/join', async (req, res) => {
+  try {
+    const studentId = req.user?.id || parseInt(req.query.studentId) || 1;
+    const { join_code } = req.body;
+
+    // Valideer input
+    if (!join_code || typeof join_code !== 'string' || join_code.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Join code is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const result = await studentController.joinCourseByCode(studentId, join_code.trim());
+
+    if (!result.success) {
+      if (result.error === 'INVALID_JOIN_CODE') {
+        return res.status(404).json({
+          success: false,
+          message: 'Ongeldige join code',
+          error: 'NOT_FOUND'
+        });
+      }
+      if (result.error === 'ALREADY_ENROLLED') {
+        return res.status(409).json({
+          success: false,
+          message: `Je bent al ingeschreven voor ${result.course.title}`,
+          error: 'CONFLICT',
+          data: { course: result.course }
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: { course: result.course },
+      message: `Succesvol ingeschreven voor ${result.course.title}`,
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij inschrijven met join code:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij inschrijven',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/students/me/submissions:
  *   get:
  *     tags:

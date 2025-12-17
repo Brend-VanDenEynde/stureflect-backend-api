@@ -181,7 +181,7 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *       1. Verifieer webhook signature
  *       2. Zoek bijbehorende submission
  *       3. Haal gewijzigde bestanden op
- *       4. Analyseer code met AI (GPT-4o-mini)
+ *       4. Analyseer code met AI (GPT-5 mini)
  *       5. Sla feedback en score op
  *     parameters:
  *       - in: header
