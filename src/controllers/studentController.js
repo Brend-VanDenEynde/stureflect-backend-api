@@ -380,6 +380,15 @@ async function joinCourseByCode(studentId, joinCode) {
 
     return { success: true, course };
   } catch (error) {
+    // Vang duplicate key violation op (race condition)
+    if (error.code === '23505' && error.constraint === 'enrollment_course_id_user_id_key') {
+      // Haal course opnieuw op voor response
+      const courseResult = await db.query(
+        'SELECT id, title, description FROM course WHERE join_code = $1',
+        [joinCode]
+      );
+      return { success: false, error: 'ALREADY_ENROLLED', course: courseResult.rows[0] };
+    }
     console.error('Fout bij inschrijven met join code:', error);
     throw error;
   }
