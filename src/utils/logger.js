@@ -41,7 +41,10 @@ const logger = {
     console.error(`${colors.red}[ERROR] [${getTimestamp()}] [${category}]${colors.reset} ${message}`);
     if (error) {
       console.error('[ERROR]    Error:', error.message);
-      if (error.stack) console.error('[ERROR]    Stack:', error.stack);
+      // Stack traces removed for security - only in development mode
+      if (process.env.NODE_ENV === 'development' && error.stack) {
+        console.error('[ERROR]    Stack:', error.stack);
+      }
       if (error.code) console.error('[ERROR]    Code:', error.code);
     }
   },

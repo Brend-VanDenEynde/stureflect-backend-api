@@ -69,11 +69,8 @@ app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
   console.log(`\n[REQUEST] [${timestamp}] ${req.method} ${req.url}`);
   
-  // Niet loggen van request body - bevat mogelijk gevoelige data zoals wachtwoorden
-  
-  if (req.headers.authorization) {
-    console.log(`[REQUEST]    Auth: Bearer token aanwezig`);
-  }
+  // Security: Do not log request body, headers, or auth tokens
+  // These may contain passwords, tokens, or other sensitive data
   
   // Log response
   const originalSend = res.send;
@@ -144,7 +141,10 @@ app.use((err, req, res, next) => {
   console.error('[ERROR]    Pad:', req.url);
   console.error('[ERROR]    Method:', req.method);
   console.error('[ERROR]    Error:', err.message);
-  console.error('[ERROR]    Stack:', err.stack);
+  // Stack traces removed for security - only in development mode
+  if (process.env.NODE_ENV === 'development') {
+    console.error('[ERROR]    Stack:', err.stack);
+  }
   
   res.status(err.status || 500).json({
     success: false,
