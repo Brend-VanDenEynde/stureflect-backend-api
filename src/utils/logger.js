@@ -79,6 +79,18 @@ const logger = {
     console.log('\n' + '='.repeat(50));
     if (title) console.log(`${colors.bright}${title}${colors.reset}`);
     console.log('='.repeat(50) + '\n');
+  },
+
+  // Structured event logging voor audit trails
+  event: (eventType, data) => {
+    const logEntry = {
+      timestamp: getTimestamp(),
+      level: 'EVENT',
+      event: eventType,
+      ...data
+    };
+    
+    console.log(JSON.stringify(logEntry));
   }
 };
 
