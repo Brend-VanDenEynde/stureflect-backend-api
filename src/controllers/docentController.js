@@ -1,4 +1,59 @@
 const pool = require('../config/db');
+const notificationService = require('../services/notificationService');
+
+// In-memory cache for expensive statistics queries
+// Structure: { cacheKey: { data: any, timestamp: number } }
+const statsCache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+
+/**
+ * Get data from cache if still valid
+ * @param {string} key - Cache key
+ * @returns {any|null} Cached data or null if expired/missing
+ */
+function getCachedData(key) {
+  const cached = statsCache.get(key);
+  if (!cached) return null;
+  
+  const age = Date.now() - cached.timestamp;
+  if (age > CACHE_TTL) {
+    statsCache.delete(key);
+    return null;
+  }
+  
+  console.log(`✅ Cache HIT for ${key} (age: ${Math.round(age/1000)}s)`);
+  return cached.data;
+}
+
+/**
+ * Store data in cache
+ * @param {string} key - Cache key
+ * @param {any} data - Data to cache
+ */
+function setCachedData(key, data) {
+  statsCache.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+  console.log(`💾 Cache SET for ${key}`);
+}
+
+/**
+ * Invalidate all cache entries for a specific course
+ * @param {number} courseId - Course ID
+ */
+function invalidateCourseCache(courseId) {
+  let deletedCount = 0;
+  for (const key of statsCache.keys()) {
+    if (key.startsWith(`course:${courseId}:`)) {
+      statsCache.delete(key);
+      deletedCount++;
+    }
+  }
+  if (deletedCount > 0) {
+    console.log(`🗑️  Invalidated ${deletedCount} cache entries for course ${courseId}`);
+  }
+}
 
 const getEnrolledStudents = async (req, res) => {
   try {
@@ -16,6 +71,15 @@ const getEnrolledStudents = async (req, res) => {
 
     if (!courseId) {
       return res.status(400).json({ error: 'courseId is required' });
+    }
+
+    // Generate cache key based on query parameters
+    const cacheKey = `course:${courseId}:enrolled:${assignmentId || 'all'}:${status || 'all'}:${search || 'none'}:${sortBy}:${sortOrder}:${page}:${limit}`;
+    
+    // Try to get from cache
+    const cachedResult = getCachedData(cacheKey);
+    if (cachedResult) {
+      return res.json(cachedResult);
     }
 
     // Build WHERE conditions for INSIDE the CTE
@@ -117,7 +181,7 @@ const getEnrolledStudents = async (req, res) => {
     const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
     const totalPages = Math.ceil(totalCount / limit);
 
-    res.json({
+    const responseData = {
       students: result.rows.map(row => ({
         id: row.student_id,
         name: row.name,
@@ -138,7 +202,12 @@ const getEnrolledStudents = async (req, res) => {
         totalItems: totalCount,
         itemsPerPage: parseInt(limit)
       }
-    });
+    };
+
+    // Store in cache
+    setCachedData(cacheKey, responseData);
+
+    res.json(responseData);
 
   } catch (error) {
     console.error('❌ Error fetching enrolled students:', error.message);
@@ -164,6 +233,15 @@ const getStudentStatusByCourse = async (req, res) => {
 
     if (!courseId) {
       return res.status(400).json({ error: 'courseId is required' });
+    }
+
+    // Generate cache key based on query parameters
+    const cacheKey = `course:${courseId}:status:${search || 'none'}:${sortBy}:${sortOrder}:${page}:${limit}`;
+    
+    // Try to get from cache
+    const cachedResult = getCachedData(cacheKey);
+    if (cachedResult) {
+      return res.json(cachedResult);
     }
 
     const order = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
@@ -359,7 +437,7 @@ const getStudentStatusByCourse = async (req, res) => {
       });
     });
 
-    res.json({
+    const responseData = {
       students,
       pagination: {
         currentPage: parseInt(page),
@@ -367,7 +445,12 @@ const getStudentStatusByCourse = async (req, res) => {
         totalItems: totalCount,
         itemsPerPage: parseInt(limit)
       }
-    });
+    };
+
+    // Store in cache
+    setCachedData(cacheKey, responseData);
+
+    res.json(responseData);
   } catch (error) {
     console.error('❌ Error fetching student status by course:', error.message);
     console.error('❌ Stack:', error.stack);
@@ -617,6 +700,19 @@ const addStudentToCourse = async (req, res) => {
     );
 
     console.log('✅ [STEP 3] Student successfully enrolled!');
+    
+    // 4. Emit real-time event for SSE clients
+    notificationService.emitEnrollmentChange(courseId, {
+      action: 'added',
+      studentId,
+      studentEmail: email,
+      studentName: userResult.rows[0].name || null
+    });
+    console.log('📡 [SSE] Enrollment event emitted for course', courseId);
+    
+    // 5. Invalidate cache for this course
+    invalidateCourseCache(courseId);
+    
     console.log('═══════════════════════════════════════════════════════');
     console.log('🎉 [ADD STUDENT] Successfully completed');
     console.log('═══════════════════════════════════════════════════════');
@@ -648,9 +744,9 @@ const removeStudentFromCourse = async (req, res) => {
       return res.status(400).json({ error: 'studentId is required' });
     }
 
-    // Check if the enrollment exists
+    // Check if the enrollment exists and get student info
     const checkResult = await pool.query(
-      'SELECT id FROM enrollment WHERE course_id = $1 AND user_id = $2',
+      'SELECT e.id, u.name, u.email FROM enrollment e JOIN "user" u ON e.user_id = u.id WHERE e.course_id = $1 AND e.user_id = $2',
       [courseId, studentId]
     );
 
@@ -658,11 +754,25 @@ const removeStudentFromCourse = async (req, res) => {
       return res.status(404).json({ error: 'Student is not enrolled in this course' });
     }
 
+    const studentInfo = checkResult.rows[0];
+
     // Remove the student
     await pool.query(
       'DELETE FROM enrollment WHERE course_id = $1 AND user_id = $2',
       [courseId, studentId]
     );
+
+    // Emit real-time event for SSE clients
+    notificationService.emitEnrollmentChange(courseId, {
+      action: 'removed',
+      studentId: parseInt(studentId),
+      studentEmail: studentInfo.email,
+      studentName: studentInfo.name
+    });
+    console.log('📡 [SSE] Student removal event emitted for course', courseId);
+
+    // Invalidate cache for this course
+    invalidateCourseCache(courseId);
 
     res.json({ message: 'Student successfully removed from the course' });
 
@@ -714,12 +824,97 @@ const getDocentCourses = async (req, res) => {
   }
 };
 
+const streamCourseStatistics = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    
+    // ✅ Support token via query parameter for EventSource (doesn't support headers)
+    let userId;
+    
+    if (req.user && req.user.id) {
+      // Normal authentication via middleware
+      userId = req.user.id;
+    } else if (req.query.token) {
+      // Authentication via query parameter for EventSource
+      const jwt = require('jsonwebtoken');
+      try {
+        const decoded = jwt.verify(req.query.token, process.env.JWT_SECRET);
+        userId = decoded.id;
+        console.log(`🔑 [SSE] Authenticated via query token for user ${userId}`);
+      } catch (error) {
+        console.log(`❌ [SSE] Invalid token in query parameter`);
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    } else {
+      console.log(`❌ [SSE] No authentication provided`);
+      return res.status(401).json({ error: 'No authentication provided' });
+    }
+
+    console.log(`📡 [SSE] Connection request for course ${courseId} by user ${userId}`);
+
+    if (!courseId) {
+      return res.status(400).json({ error: 'courseId is required' });
+    }
+
+    // Verify user has access to this course
+    const accessCheck = await pool.query(
+      'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+      [courseId, userId]
+    );
+
+    if (accessCheck.rows.length === 0) {
+      console.log(`❌ [SSE] User ${userId} has no access to course ${courseId}`);
+      return res.status(403).json({ error: 'No access to this course' });
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({
+      type: 'connection:established',
+      courseId: parseInt(courseId),
+      timestamp: new Date().toISOString()
+    })}\n\n`);
+
+    console.log(`✅ [SSE] Connection established for course ${courseId}`);
+
+    // Register connection with notification service
+    const notificationService = require('../services/notificationService');
+    const cleanup = notificationService.registerConnection(courseId, res);
+
+    // Handle client disconnect
+    req.on('close', () => {
+      console.log(`🔌 [SSE] Client disconnected from course ${courseId}`);
+      cleanup();
+    });
+
+    req.on('error', (error) => {
+      console.error(`❌ [SSE] Connection error for course ${courseId}:`, error.message);
+      cleanup();
+    });
+
+  } catch (error) {
+    console.error('❌ [SSE] Error setting up statistics stream:', error.message);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Internal server error',
+        message: error.message
+      });
+    }
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
   getStudentStatusForStudent,
   addStudentToCourse,
   removeStudentFromCourse,
-  getDocentCourses
+  getDocentCourses,
+  streamCourseStatistics
 };
 
