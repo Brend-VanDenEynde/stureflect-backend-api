@@ -186,19 +186,28 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *       Ontvangt push events van GitHub en start automatische AI code analyse.
  *       Dit endpoint wordt aangeroepen door GitHub wanneer er naar een repository wordt gepusht.
  *
+ *       **Belangrijk:** Dit endpoint wordt NIET direct door de frontend aangeroepen.
+ *       Het wordt automatisch getriggerd door GitHub na registratie via POST /submissions.
+ *
  *       **Flow:**
- *       1. Verifieer webhook signature
- *       2. Zoek bijbehorende submission
- *       3. Haal gewijzigde bestanden op
- *       4. Analyseer code met AI (GPT-5 mini)
- *       5. Sla feedback en score op
+ *       1. Valideer request (payload, signature header, event type, branch)
+ *       2. Stuur 202 Accepted response (async verwerking)
+ *       3. Zoek bijbehorende submission in database
+ *       4. Verifieer webhook signature met submission-specifieke secret
+ *       5. Haal ALLE code bestanden op uit repository (niet alleen commit diff)
+ *       6. Analyseer code met AI (GPT-5 mini)
+ *       7. Sla feedback en score op
+ *
+ *       **Race condition preventie:** Bij gelijktijdige pushes wordt slechts één
+ *       analyse tegelijk uitgevoerd per submission (atomic lock).
  *     parameters:
  *       - in: header
  *         name: X-GitHub-Event
  *         required: true
  *         schema:
  *           type: string
- *         description: Type GitHub event (push, ping, etc.)
+ *           enum: [push, ping]
+ *         description: Type GitHub event (alleen push events worden verwerkt)
  *       - in: header
  *         name: X-Hub-Signature-256
  *         required: true
@@ -209,7 +218,7 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *         name: X-GitHub-Delivery
  *         schema:
  *           type: string
- *         description: Unieke delivery ID
+ *         description: Unieke delivery ID van GitHub
  *     requestBody:
  *       required: true
  *       content:
@@ -220,8 +229,10 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *               ref:
  *                 type: string
  *                 example: refs/heads/main
+ *                 description: Git ref (branch) waar naar gepusht is
  *               after:
  *                 type: string
+ *                 example: abc123def456
  *                 description: Commit SHA na de push
  *               repository:
  *                 type: object
@@ -235,7 +246,20 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *                   type: object
  *     responses:
  *       200:
- *         description: Webhook ontvangen (verwerking gebeurt async)
+ *         description: Event ontvangen maar overgeslagen (geen push, geen branch, geen commits)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 received:
+ *                   type: boolean
+ *                   example: true
+ *                 skipped:
+ *                   type: string
+ *                   example: Not a push event
+ *       202:
+ *         description: Push event geaccepteerd, analyse gestart (async)
  *         content:
  *           application/json:
  *             schema:
@@ -246,6 +270,14 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
  *                   example: true
  *                 delivery_id:
  *                   type: string
+ *                   example: abc-123-def
+ *                 processing:
+ *                   type: boolean
+ *                   example: true
+ *       400:
+ *         description: Ongeldige request (geen payload)
+ *       401:
+ *         description: Ontbrekende signature header
  */
 router.post('/github', async (req, res) => {
   const event = req.headers['x-github-event'];

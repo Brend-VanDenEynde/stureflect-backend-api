@@ -761,11 +761,14 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
  *
  *       **Flow:**
  *       1. Valideer GitHub URL en repository toegang
- *       2. Maak submission aan
- *       3. Registreer GitHub webhook voor push events
+ *       2. Haal laatste commit SHA en file tree op
+ *       3. Maak submission aan in database
+ *       4. Registreer GitHub webhook voor push events
  *
- *       **Let op:** Dit endpoint start GEEN AI analyse. De analyse wordt automatisch
- *       getriggerd wanneer je pusht naar de repository.
+ *       **Belangrijk:**
+ *       - Dit endpoint start GEEN AI analyse
+ *       - De analyse wordt automatisch getriggerd bij elke `git push` naar de repository
+ *       - Bij elke push worden ALLE code bestanden geanalyseerd (niet alleen de diff)
  *
  *       **Development mode:** Gebruik `studentId` query parameter.
  *       **Productie:** User ID wordt uit JWT token gehaald.
@@ -810,17 +813,91 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   $ref: '#/components/schemas/Submission'
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 42
+ *                       description: Submission ID
+ *                     assignment_id:
+ *                       type: integer
+ *                       example: 1
+ *                     user_id:
+ *                       type: integer
+ *                       example: 5
+ *                     github_url:
+ *                       type: string
+ *                       example: https://github.com/student/project
+ *                     commit_sha:
+ *                       type: string
+ *                       example: abc123def456
+ *                       description: Laatste commit SHA bij aanmaken
+ *                     status:
+ *                       type: string
+ *                       example: pending
+ *                       description: Status is 'pending' tot eerste push analyse
+ *                     repository:
+ *                       type: object
+ *                       properties:
+ *                         owner:
+ *                           type: string
+ *                           example: student
+ *                         repo:
+ *                           type: string
+ *                           example: project
+ *                         default_branch:
+ *                           type: string
+ *                           example: main
+ *                     files_count:
+ *                       type: integer
+ *                       example: 12
+ *                       description: Aantal code bestanden in repository
+ *                     files:
+ *                       type: array
+ *                       description: Lijst van code bestanden (max 100)
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           path:
+ *                             type: string
+ *                             example: src/index.js
+ *                           size:
+ *                             type: integer
+ *                             example: 1024
+ *                           language:
+ *                             type: string
+ *                             example: javascript
+ *                     webhook:
+ *                       type: object
+ *                       description: Webhook registratie status
+ *                       properties:
+ *                         registered:
+ *                           type: boolean
+ *                           example: true
+ *                         webhookId:
+ *                           type: integer
+ *                           example: 12345678
+ *                           description: GitHub webhook ID (alleen bij succes)
+ *                         error:
+ *                           type: string
+ *                           description: Foutmelding (alleen bij falen)
  *                 message:
  *                   type: string
+ *                   example: GitHub repository gekoppeld en webhook geregistreerd
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
  *       400:
- *         description: Ongeldige GitHub URL of assignment ID
+ *         description: Ongeldige GitHub URL, assignment ID, of lege repository
  *       403:
  *         description: Niet ingeschreven voor cursus
  *       404:
  *         description: Opdracht niet gevonden
  *       409:
  *         description: Al een submission voor deze opdracht
+ *       429:
+ *         description: GitHub API rate limit bereikt
  */
 router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
   try {
