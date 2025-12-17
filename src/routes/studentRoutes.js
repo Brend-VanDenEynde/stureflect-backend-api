@@ -865,6 +865,143 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
 
 /**
  * @swagger
+ * /api/students/me/assignments/{assignmentId}:
+ *   get:
+ *     tags:
+ *       - Studenten
+ *     summary: Haal assignment details op
+ *     description: |
+ *       Haalt gedetailleerde informatie op over een specifieke opdracht,
+ *       inclusief cursus informatie (met rubric en AI guidelines) en submission status.
+ *       Alleen toegankelijk voor studenten die ingeschreven zijn voor de cursus.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: Assignment details succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignment:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         description:
+ *                           type: string
+ *                         due_date:
+ *                           type: string
+ *                           format: date-time
+ *                         created_at:
+ *                           type: string
+ *                           format: date-time
+ *                     course:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         rubric:
+ *                           type: string
+ *                           nullable: true
+ *                         ai_guidelines:
+ *                           type: string
+ *                           nullable: true
+ *                     submission_status:
+ *                       type: object
+ *                       properties:
+ *                         has_submitted:
+ *                           type: boolean
+ *                         submission_id:
+ *                           type: integer
+ *                           nullable: true
+ *                 message:
+ *                   type: string
+ *                   example: Assignment opgehaald
+ *       400:
+ *         description: Ongeldig assignment ID
+ *       403:
+ *         description: Niet ingeschreven voor deze cursus
+ *       404:
+ *         description: Assignment niet gevonden
+ *       500:
+ *         description: Server error
+ */
+router.get('/me/assignments/:assignmentId', async (req, res) => {
+  try {
+    const studentId = req.user?.id || parseInt(req.query.userId) || 1;
+    const assignmentId = parseInt(req.params.assignmentId);
+
+    // Valideer assignmentId
+    if (isNaN(assignmentId) || assignmentId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig assignment ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const result = await studentController.getAssignmentDetail(assignmentId, studentId);
+
+    if (!result.success) {
+      if (result.error === 'NOT_FOUND') {
+        return res.status(404).json({
+          success: false,
+          message: 'Assignment niet gevonden',
+          error: 'NOT_FOUND'
+        });
+      }
+      if (result.error === 'FORBIDDEN') {
+        return res.status(403).json({
+          success: false,
+          message: 'Je bent niet ingeschreven voor deze cursus',
+          error: 'FORBIDDEN'
+        });
+      }
+      // Fallback voor onverwachte errors
+      return res.status(500).json({
+        success: false,
+        message: 'Onverwachte fout bij ophalen assignment',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result.data,
+      message: 'Assignment opgehaald',
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij ophalen assignment detail:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen assignment',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/students/me/submissions/{submissionId}:
  *   put:
  *     tags:

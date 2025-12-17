@@ -456,6 +456,71 @@ async function updateSubmission(submissionId, studentId, githubUrl, commitSha) {
   }
 }
 
+/**
+ * Haal assignment details op met course context en submission status
+ * @param {number} assignmentId - ID van de assignment
+ * @param {number} studentId - ID van de student
+ * @returns {Promise<object>} - Object met resultaat: { success, data, error }
+ */
+async function getAssignmentDetail(assignmentId, studentId) {
+  try {
+    // Haal assignment op met enrollment check in dezelfde query
+    // Dit voorkomt information leakage (niet onthullen of assignment bestaat)
+    const assignmentResult = await db.query(
+      `SELECT
+        a.id, a.title, a.description, a.due_date, a.created_at,
+        c.id as course_id, c.title as course_title,
+        cs.rubric, cs.ai_guidelines,
+        s.id as submission_id,
+        e.id as enrollment_id
+      FROM assignment a
+      JOIN course c ON a.course_id = c.id
+      LEFT JOIN course_settings cs ON c.id = cs.course_id
+      LEFT JOIN submission s ON a.id = s.assignment_id AND s.user_id = $2
+      LEFT JOIN enrollment e ON c.id = e.course_id AND e.user_id = $2
+      WHERE a.id = $1`,
+      [assignmentId, studentId]
+    );
+
+    if (assignmentResult.rows.length === 0) {
+      return { success: false, error: 'NOT_FOUND' };
+    }
+
+    const row = assignmentResult.rows[0];
+
+    // Check enrollment (nu zonder apart info te lekken)
+    if (row.enrollment_id === null) {
+      return { success: false, error: 'FORBIDDEN' };
+    }
+
+    return {
+      success: true,
+      data: {
+        assignment: {
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          due_date: row.due_date,
+          created_at: row.created_at
+        },
+        course: {
+          id: row.course_id,
+          title: row.course_title,
+          rubric: row.rubric,
+          ai_guidelines: row.ai_guidelines
+        },
+        submission_status: {
+          has_submitted: row.submission_id !== null,
+          submission_id: row.submission_id
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Fout bij ophalen assignment detail:', { assignmentId, studentId, error: error.message });
+    throw error;
+  }
+}
+
 module.exports = {
   getStudentCourses,
   getCourseAssignments,
@@ -467,5 +532,6 @@ module.exports = {
   createSubmission,
   updateSubmissionWebhook,
   joinCourseByCode,
-  updateSubmission
+  updateSubmission,
+  getAssignmentDetail
 };
