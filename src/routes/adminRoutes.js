@@ -982,6 +982,171 @@ router.get('/admin/teachers', authenticateToken, async (req, res) => {
 
 /**
  * @swagger
+ * /api/admin/teachers/{teacherId}/courses:
+ *   get:
+ *     tags:
+ *       - Admin - Teachers
+ *     summary: Haal alle vakken van een docent op
+ *     description: Verkrijg een lijst van alle vakken waar een specifieke docent les aan geeft, inclusief student- en opdracht-aantallen (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: teacherId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de docent
+ *     responses:
+ *       200:
+ *         description: Lijst van vakken gekoppeld aan de docent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     teacher:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         name:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                     courses:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           title:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           join_code:
+ *                             type: string
+ *                           student_count:
+ *                             type: integer
+ *                           assignment_count:
+ *                             type: integer
+ *                           teacher_assigned_at:
+ *                             type: string
+ *                           created_at:
+ *                             type: string
+ *                           updated_at:
+ *                             type: string
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Docent niet gevonden
+ */
+router.get('/admin/teachers/:teacherId/courses', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const teacherId = parseInt(req.params.teacherId);
+
+  // Audit log: request ontvangen
+  console.log(`[API] Admin ${adminId || 'unknown'} requested courses for teacher ${teacherId} at ${new Date().toISOString()}`);
+
+  try {
+    // Autorisatie: controleer of gebruiker admin is
+    if (!adminId) {
+      console.log(`[API] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze data',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Validatie: controleer of de docent bestaat
+    const teacher = await adminController.getUserById(teacherId);
+    if (!teacher) {
+      console.log(`[API] Teacher ${teacherId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Docent niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Validatie: controleer of de gebruiker daadwerkelijk een docent is
+    if (teacher.role !== 'teacher') {
+      console.log(`[API] User ${teacherId} is not a teacher (role: ${teacher.role})`);
+      return res.status(400).json({
+        success: false,
+        message: `Gebruiker is geen docent (rol: ${teacher.role})`,
+        error: 'INVALID_ROLE'
+      });
+    }
+
+    // Haal vakken van de docent op
+    const courses = await adminController.getTeacherCourses(teacherId);
+
+    // Audit log: succesvolle request
+    console.log(`[API] Admin ${adminId} retrieved ${courses.length} courses for teacher ${teacherId}`);
+
+    // Validatie: controleer of er vakken beschikbaar zijn
+    if (courses.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          teacher: {
+            id: teacher.id,
+            name: teacher.name,
+            email: teacher.email
+          },
+          courses: []
+        },
+        message: 'Geen vakken gevonden voor deze docent',
+        error: null
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        teacher: {
+          id: teacher.id,
+          name: teacher.name,
+          email: teacher.email
+        },
+        courses: courses
+      },
+      message: `${courses.length} vakken gevonden voor docent ${teacher.name}`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[API] Admin ${adminId} failed to retrieve courses for teacher ${teacherId}:`, error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen vakken voor docent',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/admin/users/{userId}/role/teacher:
  *   put:
  *     tags:

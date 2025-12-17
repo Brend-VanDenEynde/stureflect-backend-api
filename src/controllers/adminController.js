@@ -43,6 +43,35 @@ async function getAllAdmins() {
 }
 
 /**
+ * Haalt alle vakken op van een specifieke docent
+ * @param {number} teacherId - ID van de docent
+ * @returns {Promise<Array>} Array met vakgegevens gekoppeld aan de docent
+ */
+async function getTeacherCourses(teacherId) {
+  const result = await db.query(
+    `SELECT 
+       c.id,
+       c.title,
+       c.description,
+       c.join_code,
+       c.created_at,
+       c.updated_at,
+       ct.created_at as teacher_assigned_at,
+       CAST(COUNT(DISTINCT e.user_id) AS INTEGER) as student_count,
+       CAST(COUNT(DISTINCT a.id) AS INTEGER) as assignment_count
+     FROM course_teacher ct
+     JOIN course c ON ct.course_id = c.id
+     LEFT JOIN enrollment e ON c.id = e.course_id
+     LEFT JOIN assignment a ON c.id = a.course_id
+     WHERE ct.user_id = $1
+     GROUP BY c.id, c.title, c.description, c.join_code, c.created_at, c.updated_at, ct.created_at
+     ORDER BY ct.created_at DESC`,
+    [teacherId]
+  );
+  return result.rows;
+}
+
+/**
  * Controleert of een gebruiker admin is
  * @param {number} userId - ID van de gebruiker
  * @returns {Promise<boolean>} True als gebruiker admin is
@@ -753,6 +782,7 @@ module.exports = {
   getAllStudents,
   getAllTeachers,
   getAllAdmins,
+  getTeacherCourses,
   isUserAdmin,
   getUserById,
   changeUserRole,
