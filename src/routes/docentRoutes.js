@@ -12,7 +12,8 @@ const {
 	updateCourse,
 	deleteCourse,
 	streamCourseStatistics,
-	getDocentAssignments
+	getDocentAssignments,
+	getDocentCourseAssignments
 } = require('../controllers/docentController');
 
 /**
@@ -199,6 +200,51 @@ router.get('/courses', getDocentCourses);
  *         description: Interne serverfout
  */
 router.get('/assignments', getDocentAssignments);
+
+/**
+ * @swagger
+ * /api/docent/courses/{courseId}/assignments:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal opdrachten van een specifiek vak op
+ *     description: Haalt alle opdrachten op van een specifiek vak waar de docent les aan geeft, inclusief het aantal inzendingen per opdracht
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van het vak
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [dueDate, title, createdAt, submissionCount]
+ *           default: dueDate
+ *         description: Sorteer opdrachten op dit veld
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: asc
+ *         description: Sorteervolgorde (oplopend of aflopend)
+ *     responses:
+ *       200:
+ *         description: Lijst met opdrachten
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toegang tot dit vak
+ *       404:
+ *         description: Vak niet gevonden
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/courses/:courseId/assignments', getDocentCourseAssignments);
 
 /**
  * @swagger
