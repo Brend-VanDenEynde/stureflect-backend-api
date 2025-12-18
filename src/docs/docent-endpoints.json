@@ -1638,6 +1638,230 @@
             }
         }
     },
+    "/api/docent/assignments/{assignmentId}": {
+        "put": {
+            "summary": "Update een bestaande opdracht",
+            "description": "Werk de details van een opdracht bij. Alleen docenten van de cursus en admins kunnen opdrachten wijzigen. Alle velden zijn optioneel - alleen opgegeven velden worden bijgewerkt.",
+            "operationId": "updateAssignment",
+            "tags": [
+                "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "assignmentId",
+                    "in": "path",
+                    "required": true,
+                    "description": "Unieke ID van de opdracht die moet worden bijgewerkt",
+                    "schema": {
+                        "type": "integer"
+                    }
+                }
+            ],
+            "requestBody": {
+                "required": true,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                    "maxLength": 255,
+                                    "description": "Titel van de opdracht (mag niet leeg zijn indien opgegeven)"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Beschrijving van de opdracht"
+                                },
+                                "dueDate": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "nullable": true,
+                                    "description": "Deadline voor de opdracht (ISO8601 format)"
+                                },
+                                "rubric": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "Beoordelingsrubriek voor de opdracht"
+                                },
+                                "aiGuidelines": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "AI feedback richtlijnen"
+                                }
+                            }
+                        },
+                        "examples": {
+                            "fullUpdate": {
+                                "summary": "Volledige update van alle velden",
+                                "value": {
+                                    "title": "Updated REST API Implementation",
+                                    "description": "Build a comprehensive RESTful API with Node.js, Express, and PostgreSQL",
+                                    "dueDate": "2025-12-31T23:59:59Z",
+                                    "rubric": "Functionality (40%), Code quality (30%), Documentation (20%), Testing (10%)",
+                                    "aiGuidelines": "Check for RESTful best practices, proper error handling, and security measures"
+                                }
+                            },
+                            "partialUpdate": {
+                                "summary": "Gedeeltelijke update (alleen titel en deadline)",
+                                "value": {
+                                    "title": "REST API Project - Extended Deadline",
+                                    "dueDate": "2026-01-15T23:59:59Z"
+                                }
+                            },
+                            "clearField": {
+                                "summary": "Veld leegmaken (rubric verwijderen)",
+                                "value": {
+                                    "rubric": null
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "Opdracht succesvol bijgewerkt",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "assignment": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "integer"},
+                                            "title": {"type": "string"},
+                                            "description": {"type": "string", "nullable": true},
+                                            "courseId": {"type": "integer"},
+                                            "dueDate": {"type": "string", "format": "date-time", "nullable": true},
+                                            "rubric": {"type": "string", "nullable": true},
+                                            "aiGuidelines": {"type": "string", "nullable": true},
+                                            "createdAt": {"type": "string", "format": "date-time"},
+                                            "updatedAt": {"type": "string", "format": "date-time"}
+                                        }
+                                    }
+                                }
+                            },
+                            "example": {
+                                "assignment": {
+                                    "id": 1,
+                                    "title": "Updated REST API Implementation",
+                                    "description": "Build a comprehensive RESTful API with Node.js, Express, and PostgreSQL",
+                                    "courseId": 1,
+                                    "dueDate": "2025-12-31T23:59:59.000Z",
+                                    "rubric": "Functionality (40%), Code quality (30%), Documentation (20%), Testing (10%)",
+                                    "aiGuidelines": "Check for RESTful best practices, proper error handling, and security measures",
+                                    "createdAt": "2024-12-01T10:00:00.000Z",
+                                    "updatedAt": "2024-12-18T14:30:00.000Z"
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Validatiefout - ongeldige invoer, lege titel, of geen velden opgegeven",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {"type": "string"}
+                                }
+                            },
+                            "examples": {
+                                "noFields": {
+                                    "summary": "Geen velden opgegeven",
+                                    "value": {"error": "No fields provided to update"}
+                                },
+                                "emptyTitle": {
+                                    "summary": "Lege titel",
+                                    "value": {"error": "Title cannot be empty"}
+                                },
+                                "titleTooLong": {
+                                    "summary": "Titel te lang",
+                                    "value": {"error": "Title cannot exceed 255 characters"}
+                                },
+                                "invalidDate": {
+                                    "summary": "Ongeldige datum",
+                                    "value": {"error": "Invalid dueDate format: must be a valid ISO8601 date"}
+                                },
+                                "invalidId": {
+                                    "summary": "Ongeldige assignment ID",
+                                    "value": {"error": "Invalid assignment ID: must be an integer"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd - token ontbreekt of is verlopen"
+                },
+                "403": {
+                    "description": "Geen toestemming - gebruiker is geen docent van deze cursus",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {"type": "string"}
+                                }
+                            },
+                            "examples": {
+                                "notTeacher": {
+                                    "summary": "Niet docent van cursus",
+                                    "value": {"error": "Forbidden: You are not a teacher of this course"}
+                                },
+                                "notAuthorized": {
+                                    "summary": "Geen docent of admin rol",
+                                    "value": {"error": "Forbidden: Only teachers and admins can update assignments"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "404": {
+                    "description": "Opdracht niet gevonden",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {"type": "string"}
+                                }
+                            },
+                            "example": {
+                                "error": "Assignment not found"
+                            }
+                        }
+                    }
+                },
+                "500": {
+                    "description": "Interne serverfout",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {"type": "string"},
+                                    "message": {"type": "string"}
+                                }
+                            },
+                            "example": {
+                                "error": "Internal server error",
+                                "message": "Database connection failed"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
     "/api/docent/courses/{courseId}/statistics/stream": {
         "get": {
             "summary": "Real-time statistieken stream (SSE)",
