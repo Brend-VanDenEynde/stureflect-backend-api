@@ -5,7 +5,7 @@ const {
   findSubmissionByRepo,
   updateSubmissionStatus,
   tryStartProcessing,
-  getCourseSettings,
+  getAssignmentSettings,
   logWebhookEvent,
   saveFeedback,
   updateSubmissionWithScore,
@@ -51,8 +51,16 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
       return { success: false, error: 'Could not start processing' };
     }
 
-    // Haal course settings op voor AI context
-    const courseSettings = await getCourseSettings(submission.course_id);
+    if (!startResult.success) {
+      if (startResult.alreadyProcessing) {
+        logWebhookEvent('push', repoFullName, 'skipped', 'Already processing');
+        return { success: false, error: 'Already processing', skipped: true };
+      }
+      return { success: false, error: 'Could not start processing' };
+    }
+
+    // Haal assignment settings op voor AI context
+    const assignmentSettings = await getAssignmentSettings(submission.assignment_id);
 
     // Parse repository info
     const repoInfo = parseGitHubUrl(`https://github.com/${repoFullName}`);
@@ -130,7 +138,7 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
     let analysisResult;
     try {
       analysisResult = await withRetry(
-        () => analyzeFiles(validFiles, courseSettings),
+        () => analyzeFiles(validFiles, assignmentSettings),
         {
           maxRetries: 2,
           initialDelay: 3000,

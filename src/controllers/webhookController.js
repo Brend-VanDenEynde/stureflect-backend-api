@@ -193,22 +193,22 @@ async function tryStartProcessing(submissionId, commitSha, branch = null) {
 }
 
 /**
- * Haal course settings op (rubric, guidelines)
- * @param {number} courseId - Course ID
+ * Haal assignment settings op (rubric, guidelines)
+ * @param {number} assignmentId - Assignment ID
  * @returns {Promise<object|null>}
  */
-async function getCourseSettings(courseId) {
+async function getAssignmentSettings(assignmentId) {
   try {
     const result = await db.query(
       `SELECT rubric, ai_guidelines
-       FROM course_settings
-       WHERE course_id = $1`,
-      [courseId]
+       FROM assignment
+       WHERE id = $1`,
+      [assignmentId]
     );
 
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('[API] Error fetching course settings:', error.message);
+    console.error('[API] Error fetching assignment settings:', error.message);
     throw error;
   }
 }
@@ -484,7 +484,7 @@ module.exports = {
   getSubmissionsByRepo,
   updateSubmissionStatus,
   tryStartProcessing,
-  getCourseSettings,
+  getAssignmentSettings,
   createOrUpdateSubmission,
   logWebhookEvent,
   saveFeedback,
