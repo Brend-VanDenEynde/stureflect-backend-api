@@ -11,7 +11,8 @@ const {
 	createCourse,
 	updateCourse,
 	deleteCourse,
-	streamCourseStatistics
+	streamCourseStatistics,
+	getDocentAssignments
 } = require('../controllers/docentController');
 
 /**
@@ -102,6 +103,102 @@ router.use(authenticateToken);
  *         description: Interne serverfout
  */
 router.get('/courses', getDocentCourses);
+
+/**
+ * @swagger
+ * /api/docent/assignments:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal alle opdrachten van de docent op
+ *     description: Haalt alle opdrachten op van alle vakken waar de docent les aan geeft, met optionele filtering en sortering
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: courseId
+ *         schema:
+ *           type: integer
+ *         description: Filter op specifiek vak (optioneel)
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [dueDate, title, createdAt, courseTitle]
+ *           default: dueDate
+ *         description: Sorteer veld
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: asc
+ *         description: Sorteer richting
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Paginanummer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: Aantal items per pagina
+ *     responses:
+ *       200:
+ *         description: Lijst met opdrachten en paginering metadata
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignments:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       courseId:
+ *                         type: integer
+ *                       courseTitle:
+ *                         type: string
+ *                       dueDate:
+ *                         type: string
+ *                         format: date-time
+ *                       rubric:
+ *                         type: string
+ *                       aiGuidelines:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     currentPage:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     itemsPerPage:
+ *                       type: integer
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments', getDocentAssignments);
 
 /**
  * @swagger
