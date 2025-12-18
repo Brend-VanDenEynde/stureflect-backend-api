@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const sseManager = require('../services/sseManager');
 const {
   verifyWebhookSignature,
   findSubmissionByRepo,
@@ -168,6 +169,13 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
 
     // Update submission met score
     await updateSubmissionWithScore(submission.id, commitSha, aiScore, 'analyzed');
+
+    // Broadcast SSE event naar verbonden clients
+    sseManager.broadcast(submission.id, 'feedback_updated', {
+      score: aiScore,
+      feedbackCount: savedFeedback.length
+    });
+    console.log(`[SSE] Broadcast feedback_updated voor submission ${submission.id}`);
 
     logWebhookEvent('push', repoFullName, 'success', `Analysis complete - score: ${aiScore}`);
     return { success: true, score: aiScore, feedbackCount: savedFeedback.length };
