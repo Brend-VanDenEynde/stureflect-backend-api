@@ -89,6 +89,148 @@
                     "description": "Interne serverfout"
                 }
             }
+        },
+        "post": {
+            "summary": "Vak aanmaken",
+            "description": "Maakt een nieuw vak aan en voegt de ingelogde docent automatisch toe als docent van het vak.",
+            "operationId": "createCourse",
+            "tags": [
+                "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
+            ],
+            "requestBody": {
+                "required": true,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["title"],
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                    "description": "Titel van het vak (verplicht)",
+                                    "example": "Algoritmen en Datastructuren"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Beschrijving van het vak (optioneel)",
+                                    "example": "Een inleiding tot algoritmen en datastructuren"
+                                },
+                                "join_code": {
+                                    "type": "string",
+                                    "description": "Unieke inschrijfcode voor het vak (optioneel)",
+                                    "example": "ALG2024"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "201": {
+                    "description": "Vak succesvol aangemaakt",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "course": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer",
+                                                "example": 42
+                                            },
+                                            "title": {
+                                                "type": "string",
+                                                "example": "Algoritmen en Datastructuren"
+                                            },
+                                            "description": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "Een inleiding tot algoritmen en datastructuren"
+                                            },
+                                            "join_code": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "ALG2024"
+                                            },
+                                            "createdAt": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "example": "2024-01-15T10:30:00Z"
+                                            },
+                                            "updatedAt": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "example": "2024-01-15T10:30:00Z"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ongeldige invoer (titel ontbreekt of is leeg)",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Title is required and cannot be empty"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd"
+                },
+                "403": {
+                    "description": "Geen toestemming (alleen docenten en admins kunnen vakken aanmaken)",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Forbidden: Only teachers and admins can create courses"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "409": {
+                    "description": "Inschrijfcode bestaat al",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Join code already exists"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
         }
     },
     "/api/docent/courses/{courseId}/students": {
