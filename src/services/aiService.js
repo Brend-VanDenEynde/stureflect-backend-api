@@ -157,6 +157,13 @@ function getOpenAIHeaders() {
  */
 async function analyzeFile(filePath, content, language, courseSettings) {
   try {
+    console.log(`[API] AI: analyzeFile called with courseSettings:`, {
+      hasRubric: !!courseSettings?.rubric,
+      rubricLength: courseSettings?.rubric?.length || 0,
+      hasGuidelines: !!courseSettings?.ai_guidelines,
+      guidelinesLength: courseSettings?.ai_guidelines?.length || 0
+    });
+
     const systemPrompt = buildSystemPrompt(courseSettings);
     const userPrompt = buildUserPrompt(filePath, content, language);
 
@@ -193,8 +200,13 @@ async function analyzeFile(filePath, content, language, courseSettings) {
       return [];
     }
 
+    // Log de ruwe AI response voor debugging
+    console.log(`[API] AI raw response for ${filePath}:`, aiResponse.substring(0, 500));
+
     // Parse JSON response
     const feedbackItems = parseAIResponse(aiResponse, filePath);
+
+    console.log(`[API] AI parsed feedback items: ${feedbackItems.length}`);
 
     return feedbackItems;
   } catch (error) {
@@ -221,13 +233,20 @@ function parseAIResponse(response, filePath) {
     // Probeer JSON te extracten uit de response
     let jsonStr = response.trim();
 
+    console.log(`[API] AI parseAIResponse input length: ${jsonStr.length}`);
+
     // Als response in markdown code block zit, extract de JSON
     const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
+      console.log(`[API] AI: Found markdown code block, extracting JSON`);
       jsonStr = jsonMatch[1].trim();
     }
 
+    console.log(`[API] AI: Attempting to parse JSON: ${jsonStr.substring(0, 200)}...`);
+
     const parsed = JSON.parse(jsonStr);
+
+    console.log(`[API] AI: Parsed successfully, isArray: ${Array.isArray(parsed)}, length: ${parsed?.length}`);
 
     if (!Array.isArray(parsed)) {
       console.warn(`[API] AI: Response is not an array for ${filePath}`);

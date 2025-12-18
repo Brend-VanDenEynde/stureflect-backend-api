@@ -310,18 +310,33 @@ async function deletePreviousFeedback(submissionId) {
  * @returns {Promise<Array>} - Opgeslagen feedback records
  */
 async function saveFeedback(submissionId, feedbackItems) {
+  console.log(`[API] saveFeedback called with submissionId: ${submissionId}, feedbackItems:`, {
+    isArray: Array.isArray(feedbackItems),
+    length: feedbackItems?.length,
+    firstItem: feedbackItems?.[0]
+  });
+
   if (!feedbackItems || feedbackItems.length === 0) {
+    console.log(`[API] saveFeedback: No feedback items to save (empty or null)`);
     return [];
   }
 
   try {
     // Verwijder eerst oude AI feedback
-    await deletePreviousFeedback(submissionId);
+    const deletedCount = await deletePreviousFeedback(submissionId);
+    console.log(`[API] saveFeedback: Deleted ${deletedCount} old feedback items`);
 
     // Insert alle nieuwe feedback items
     const savedItems = [];
 
     for (const item of feedbackItems) {
+      console.log(`[API] saveFeedback: Inserting item:`, {
+        content: item.content?.substring(0, 50),
+        severity: item.severity,
+        type: item.type,
+        line_number: item.line_number
+      });
+
       const result = await db.query(
         `INSERT INTO feedback (submission_id, content, reviewer, severity, line_number, suggestion, type)
          VALUES ($1, $2, 'ai', $3, $4, $5, $6)
@@ -335,6 +350,7 @@ async function saveFeedback(submissionId, feedbackItems) {
           item.type || 'code_quality'
         ]
       );
+      console.log(`[API] saveFeedback: Inserted feedback id: ${result.rows[0]?.id}`);
       savedItems.push(result.rows[0]);
     }
 
@@ -387,6 +403,7 @@ async function saveFeedback(submissionId, feedbackItems) {
     return savedItems;
   } catch (error) {
     console.error('[API] Error saving feedback:', error.message);
+    console.error('[API] Error saving feedback - full error:', error);
     throw error;
   }
 }
