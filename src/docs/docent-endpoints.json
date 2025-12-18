@@ -209,7 +209,7 @@
         },
         "post": {
             "summary": "Voeg student toe aan cursus",
-            "description": "Voegt een student toe aan een cursus op basis van e-mailadres. Deze functie valideert eerst of de student bestaat in het systeem, controleert of de student al is ingeschreven, en voegt vervolgens de enrollment toe. De operatie wordt volledig gelogd met gedetailleerde stappen voor debugging doeleinden.",
+            "description": "Voegt een student toe aan een cursus op basis van e-mailadres. Deze functie valideert eerst of de gebruiker bestaat in het systeem, controleert of de gebruiker de rol 'student' heeft, controleert of de student al is ingeschreven, en voegt vervolgens de enrollment toe. Alleen gebruikers met de rol 'student' kunnen worden toegevoegd; docenten en admins worden geweigerd. De operatie wordt volledig gelogd met gedetailleerde stappen voor debugging doeleinden.",
             "operationId": "addStudentToCourse",
             "tags": [
                 "Docenten"
@@ -288,6 +288,11 @@
                                     "error": {
                                         "type": "string",
                                         "example": "email is required"
+                                    },
+                                    "userRole": {
+                                        "type": "string",
+                                        "description": "De rol van de gebruiker (alleen aanwezig bij role validatie fout)",
+                                        "example": "teacher"
                                     }
                                 }
                             },
@@ -309,6 +314,13 @@
                                     "summary": "Course ID ontbreekt",
                                     "value": {
                                         "error": "courseId is required"
+                                    }
+                                },
+                                "invalidRole": {
+                                    "summary": "Gebruiker is geen student",
+                                    "value": {
+                                        "error": "Only users with student role can be enrolled in courses",
+                                        "userRole": "teacher"
                                     }
                                 }
                             }
