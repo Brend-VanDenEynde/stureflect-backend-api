@@ -51,6 +51,14 @@ async function processSubmission(submission, commitSha, branch, repoFullName) {
       return { success: false, error: 'Could not start processing' };
     }
 
+    if (!startResult.success) {
+      if (startResult.alreadyProcessing) {
+        logWebhookEvent('push', repoFullName, 'skipped', 'Already processing');
+        return { success: false, error: 'Already processing', skipped: true };
+      }
+      return { success: false, error: 'Could not start processing' };
+    }
+
     // Haal assignment settings op voor AI context
     const assignmentSettings = await getAssignmentSettings(submission.assignment_id);
 
