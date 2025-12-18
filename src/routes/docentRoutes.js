@@ -9,6 +9,7 @@ const {
 	removeStudentFromCourse,
 	getDocentCourses,
 	createCourse,
+	updateCourse,
 	streamCourseStatistics
 } = require('../controllers/docentController');
 
@@ -259,6 +260,8 @@ router.get('/courses/:courseId/student-status', getStudentStatusByCourse);
 router.get('/courses/:courseId/students/:studentId/status', getStudentStatusForStudent);
 
 router.post('/courses', createCourse);
+
+router.put('/courses/:courseId', updateCourse);
 
 router.post('/courses/:courseId/students', addStudentToCourse);
 
