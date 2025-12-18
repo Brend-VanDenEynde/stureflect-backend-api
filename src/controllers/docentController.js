@@ -988,6 +988,87 @@ const getDocentCourses = async (req, res) => {
   }
 };
 
+const deleteCourse = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const userId = req.user.id;
+
+    // Validation: courseId required
+    if (!courseId) {
+      return res.status(400).json({ error: 'courseId is required' });
+    }
+
+    // Check if course exists
+    const courseCheck = await pool.query(
+      'SELECT id, title, description, join_code FROM course WHERE id = $1',
+      [courseId]
+    );
+
+    if (courseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Authorization check: verify user is a teacher of this course
+    const accessCheck = await pool.query(
+      'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+      [courseId, userId]
+    );
+
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to delete this course' });
+    }
+
+    const courseData = courseCheck.rows[0];
+
+    // Delete course (CASCADE will handle related data)
+    const deleteResult = await pool.query(
+      `DELETE FROM course
+       WHERE id = $1
+       RETURNING id, title, description, join_code`,
+      [courseId]
+    );
+
+    const deletedCourse = deleteResult.rows[0];
+
+    // Structured event log
+    logger.event('course_deleted', {
+      courseId: parseInt(courseId),
+      assignmentId: null,
+      submissionId: null,
+      userId: null,
+      actorId: req.user.id,
+      oldStatus: 'active',
+      newStatus: 'deleted',
+      metadata: {
+        courseTitle: courseData.title,
+        actorEmail: req.user.email,
+        actorRole: req.user.role
+      }
+    });
+
+    // Invalidate cache for this course
+    invalidateCourseCache(courseId);
+
+    console.log(`✅ Course deleted: ${courseId} by user ${userId}`);
+    res.json({
+      message: 'Course successfully deleted',
+      course: {
+        id: deletedCourse.id,
+        title: deletedCourse.title,
+        description: deletedCourse.description,
+        join_code: deletedCourse.join_code
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error deleting course:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 const streamCourseStatistics = async (req, res) => {
   try {
     const { courseId } = req.params;
@@ -1081,6 +1162,7 @@ module.exports = {
   getDocentCourses,
   createCourse,
   updateCourse,
+  deleteCourse,
   streamCourseStatistics
 };
 
