@@ -1611,4 +1611,161 @@ router.put('/me/submissions/:submissionId', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/students/me/submissions/{submissionId}:
+ *   delete:
+ *     tags:
+ *       - Studenten
+ *     summary: Ontkoppel GitHub repository van een submission
+ *     description: |
+ *       Verwijdert de gekoppelde GitHub repository van een submission.
+ *       De webhook wordt verwijderd van GitHub en de submission krijgt status 'unlinked'.
+ *       Bestaande feedback blijft behouden voor history.
+ *       Student kan later een nieuwe repository koppelen via PUT.
+ *
+ *       **Development mode:** Gebruik `studentId` query parameter.
+ *       **Productie:** User ID wordt uit JWT token gehaald.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: studentId
+ *         schema:
+ *           type: integer
+ *         description: Student ID (verplicht in development mode)
+ *         example: 1
+ *       - in: path
+ *         name: submissionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de submission
+ *     responses:
+ *       200:
+ *         description: Repository succesvol ontkoppeld
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     status:
+ *                       type: string
+ *                       example: unlinked
+ *                     github_url:
+ *                       type: string
+ *                       nullable: true
+ *                       example: null
+ *                 message:
+ *                   type: string
+ *                   example: Repository succesvol ontkoppeld
+ *       400:
+ *         description: Ongeldig submission ID of repository al ontkoppeld
+ *       403:
+ *         description: Geen eigenaar van deze submission
+ *       404:
+ *         description: Submission niet gevonden
+ *       500:
+ *         description: Server error
+ */
+router.delete('/me/submissions/:submissionId', async (req, res) => {
+  try {
+    const studentId = req.user?.id ||
+      (process.env.NODE_ENV !== 'production' && req.query.studentId
+        ? parseInt(req.query.studentId, 10)
+        : null);
+
+    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
+      const isProduction = process.env.NODE_ENV === 'production';
+      return res.status(isProduction ? 401 : 400).json({
+        success: false,
+        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
+        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+      });
+    }
+
+    const submissionId = parseInt(req.params.submissionId);
+
+    // Valideer submissionId
+    if (isNaN(submissionId) || submissionId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig submission ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Unlink submission
+    const unlinkResult = await studentController.unlinkSubmission(submissionId, studentId);
+
+    if (!unlinkResult.success) {
+      if (unlinkResult.error === 'NOT_FOUND') {
+        return res.status(404).json({
+          success: false,
+          message: 'Submission niet gevonden',
+          error: 'NOT_FOUND'
+        });
+      }
+      if (unlinkResult.error === 'FORBIDDEN') {
+        return res.status(403).json({
+          success: false,
+          message: 'Je hebt geen toegang tot deze submission',
+          error: 'FORBIDDEN'
+        });
+      }
+      if (unlinkResult.error === 'ALREADY_UNLINKED') {
+        return res.status(400).json({
+          success: false,
+          message: 'Deze submission heeft al geen repository gekoppeld',
+          error: 'ALREADY_UNLINKED'
+        });
+      }
+      // Default case for unknown errors
+      return res.status(500).json({
+        success: false,
+        message: 'Fout bij ontkoppelen repository',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+
+    // Delete webhook van GitHub indien aanwezig
+    if (unlinkResult.oldWebhookInfo) {
+      try {
+        await githubService.deleteWebhook(
+          unlinkResult.oldWebhookInfo.owner,
+          unlinkResult.oldWebhookInfo.repo,
+          unlinkResult.oldWebhookInfo.webhookId
+        );
+        console.log(`[WEBHOOK] Webhook verwijderd voor ${unlinkResult.oldWebhookInfo.owner}/${unlinkResult.oldWebhookInfo.repo}`);
+      } catch (webhookError) {
+        console.warn('[WEBHOOK] Kon webhook niet verwijderen:', webhookError.message);
+        // Geen error naar client - submission is wel ontkoppeld
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: unlinkResult.submission,
+      message: 'Repository succesvol ontkoppeld',
+      error: null
+    });
+  } catch (error) {
+    console.error('Fout bij ontkoppelen submission:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ontkoppelen repository',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
 module.exports = router;

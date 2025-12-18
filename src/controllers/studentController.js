@@ -538,6 +538,71 @@ async function updateSubmission(submissionId, studentId, githubUrl, commitSha) {
 }
 
 /**
+ * Ontkoppel GitHub repository van een submission
+ * @param {number} submissionId - ID van de submission
+ * @param {number} studentId - ID van de student (voor autorisatie)
+ * @returns {Promise<object>} - Object met resultaat: { success, submission, oldWebhookInfo, error }
+ */
+async function unlinkSubmission(submissionId, studentId) {
+  try {
+    // Haal bestaande submission op
+    const existingResult = await db.query(
+      `SELECT id, user_id, assignment_id, github_url, webhook_id, webhook_secret
+       FROM submission
+       WHERE id = $1`,
+      [submissionId]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return { success: false, error: 'NOT_FOUND' };
+    }
+
+    const existing = existingResult.rows[0];
+
+    // Autorisatie check
+    if (existing.user_id !== studentId) {
+      return { success: false, error: 'FORBIDDEN' };
+    }
+
+    // Check of er iets te ontkoppelen valt
+    if (!existing.github_url) {
+      return { success: false, error: 'ALREADY_UNLINKED' };
+    }
+
+    // Parse oude URL voor webhook verwijdering
+    let oldWebhookInfo = null;
+    if (existing.webhook_id && existing.github_url) {
+      const oldUrlMatch = existing.github_url.match(/github\.com\/([^/]+)\/([^/]+)/);
+      if (oldUrlMatch) {
+        oldWebhookInfo = {
+          webhookId: existing.webhook_id,
+          owner: oldUrlMatch[1],
+          repo: oldUrlMatch[2].replace(/\.git$/, '')
+        };
+      }
+    }
+
+    // Update submission: clear github_url, webhook info, set status to 'unlinked'
+    const updateResult = await db.query(
+      `UPDATE submission
+       SET github_url = NULL, webhook_id = NULL, webhook_secret = NULL, status = 'unlinked', updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, assignment_id, user_id, github_url, webhook_id, webhook_secret, status, created_at, updated_at`,
+      [submissionId]
+    );
+
+    return {
+      success: true,
+      submission: updateResult.rows[0],
+      oldWebhookInfo
+    };
+  } catch (error) {
+    console.error('Fout bij ontkoppelen submission:', error);
+    throw error;
+  }
+}
+
+/**
  * Haal assignment details op met course context en submission status
  * @param {number} assignmentId - ID van de assignment
  * @param {number} studentId - ID van de student
@@ -641,5 +706,6 @@ module.exports = {
   updateSubmissionWebhook,
   joinCourseByCode,
   updateSubmission,
+  unlinkSubmission,
   getAssignmentDetail
 };
