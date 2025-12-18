@@ -2452,10 +2452,13 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
  * @swagger
  * /api/admin/courses/{courseId}/settings:
  *   get:
+ *     deprecated: true
  *     tags:
  *       - Admin - Courses
- *     summary: Haal vakinstellingen op
- *     description: Verkrijg de instellingen (rubric en AI guidelines) van een vak (alleen voor admins)
+ *     summary: Haal vakinstellingen op (DEPRECATED)
+ *     description: |
+ *       **DEPRECATED**: Deze endpoint is verouderd. Settings zijn nu per opdracht in plaats van per vak.
+ *       Gebruik in plaats daarvan: GET /api/admin/assignments/{assignmentId}/settings
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2466,133 +2469,31 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
  *           type: integer
  *         description: ID van het vak
  *     responses:
- *       200:
- *         description: Vakinstellingen succesvol opgehaald
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     course_id:
- *                       type: integer
- *                     rubric:
- *                       type: string
- *                     ai_guidelines:
- *                       type: string
- *                     created_at:
- *                       type: string
- *                     updated_at:
- *                       type: string
- *                 message:
- *                   type: string
- *       403:
- *         description: Geen admin rechten
- *       404:
- *         description: Vak of instellingen niet gevonden
+ *       410:
+ *         description: Endpoint is verwijderd - gebruik assignment settings endpoints
  */
 router.get('/admin/courses/:courseId/settings', authenticateToken, async (req, res) => {
   const logger = require('../utils/logger');
-  const adminId = req.user?.id || parseInt(req.query.adminId);
-  const courseId = parseInt(req.params.courseId);
-
-  logger.info('Admin-CourseSettings', `Admin ${adminId || 'unknown'} aanvraag om instellingen van vak ${courseId} op te halen`);
-
-  try {
-    // Validatie: admin ID
-    if (!adminId) {
-      logger.warn('Admin-CourseSettings', 'Request denied: no admin ID provided');
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Validatie: course ID
-    if (!courseId || isNaN(courseId)) {
-      logger.warn('Admin-CourseSettings', `Invalid course ID: ${req.params.courseId}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Ongeldig vak ID',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      logger.warn('Admin-CourseSettings', `Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
-      });
-    }
-
-    // Controleer of vak bestaat
-    const course = await adminController.getCourseDetails(courseId);
-    if (!course) {
-      logger.warn('Admin-CourseSettings', `Course ${courseId} not found`);
-      return res.status(404).json({
-        success: false,
-        message: 'Vak niet gevonden',
-        error: 'NOT_FOUND'
-      });
-    }
-
-    // Haal instellingen op
-    const settings = await adminController.getCourseSettings(courseId);
-
-    if (!settings) {
-      logger.info('Admin-CourseSettings', `No settings found for course ${courseId}, returning empty settings`);
-      // Return empty settings als ze nog niet bestaan
-      return res.status(200).json({
-        success: true,
-        data: {
-          course_id: courseId,
-          rubric: null,
-          ai_guidelines: null
-        },
-        message: 'Geen instellingen gevonden voor dit vak',
-        error: null
-      });
-    }
-
-    logger.success('Admin-CourseSettings', `Successfully retrieved settings for course ${courseId}`);
-
-    res.status(200).json({
-      success: true,
-      data: settings,
-      message: 'Vakinstellingen succesvol opgehaald',
-      error: null
-    });
-  } catch (error) {
-    logger.error('Admin-CourseSettings', `Failed to retrieve settings for course ${courseId}`, error);
-
-    res.status(500).json({
-      success: false,
-      message: 'Fout bij ophalen vakinstellingen',
-      error: 'INTERNAL_SERVER_ERROR'
-    });
-  }
+  logger.warn('Admin-CourseSettings', 'DEPRECATED endpoint accessed: GET /admin/courses/:courseId/settings');
+  
+  res.status(410).json({
+    success: false,
+    message: 'Deze endpoint is verouderd. Settings zijn nu per opdracht. Gebruik GET /api/admin/assignments/{assignmentId}/settings',
+    error: 'ENDPOINT_DEPRECATED'
+  });
 });
 
 /**
  * @swagger
  * /api/admin/courses/{courseId}/settings:
  *   put:
+ *     deprecated: true
  *     tags:
  *       - Admin - Courses
- *     summary: Update vakinstellingen
- *     description: Werk de instellingen (rubric en AI guidelines) van een vak bij (alleen voor admins)
+ *     summary: Update vakinstellingen (DEPRECATED)
+ *     description: |
+ *       **DEPRECATED**: Deze endpoint is verouderd. Settings zijn nu per opdracht in plaats van per vak.
+ *       Gebruik in plaats daarvan: PUT /api/admin/assignments/{assignmentId}/settings
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2654,143 +2555,25 @@ router.get('/admin/courses/:courseId/settings', authenticateToken, async (req, r
  */
 router.put('/admin/courses/:courseId/settings', authenticateToken, async (req, res) => {
   const logger = require('../utils/logger');
-  const adminId = req.user?.id || parseInt(req.query.adminId);
-  const courseId = parseInt(req.params.courseId);
-  const { rubric, ai_guidelines } = req.body;
-
-  // Audit log: request ontvangen
-  logger.info('Admin-CourseSettings', `Admin ${adminId || 'unknown'} aanvraag om instellingen van vak ${courseId} te updaten`);
-
-  try {
-    // Validatie: admin ID
-    if (!adminId) {
-      logger.warn('Admin-CourseSettings', 'Request denied: no admin ID provided');
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Validatie: course ID
-    if (!courseId || isNaN(courseId)) {
-      logger.warn('Admin-CourseSettings', `Invalid course ID: ${req.params.courseId}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Ongeldig vak ID',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      logger.warn('Admin-CourseSettings', `Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
-      });
-    }
-
-    // Validatie: minimaal één veld moet worden geüpdatet
-    if (rubric === undefined && ai_guidelines === undefined) {
-      logger.warn('Admin-CourseSettings', `No fields to update for course ${courseId}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Minimaal één veld (rubric, ai_guidelines) moet worden opgegeven',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Validatie: type checking
-    if (rubric !== undefined && rubric !== null && typeof rubric !== 'string') {
-      logger.warn('Admin-CourseSettings', `Invalid rubric type: ${typeof rubric}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Rubric moet een string zijn',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    if (ai_guidelines !== undefined && ai_guidelines !== null && typeof ai_guidelines !== 'string') {
-      logger.warn('Admin-CourseSettings', `Invalid ai_guidelines type: ${typeof ai_guidelines}`);
-      return res.status(400).json({
-        success: false,
-        message: 'AI guidelines moet een string zijn',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Haal oude instellingen op voor audit logging
-    const oldSettings = await adminController.getCourseSettings(courseId);
-
-    // Update de vakinstellingen
-    const updatedSettings = await adminController.updateCourseSettings(courseId, {
-      rubric,
-      ai_guidelines
-    });
-
-    // Audit log: success met details van wijzigingen
-    const changes = [];
-    if (rubric !== undefined && (!oldSettings || oldSettings.rubric !== rubric)) {
-      changes.push(`rubric (${oldSettings?.rubric ? 'updated' : 'added'})`);
-    }
-    if (ai_guidelines !== undefined && (!oldSettings || oldSettings.ai_guidelines !== ai_guidelines)) {
-      changes.push(`ai_guidelines (${oldSettings?.ai_guidelines ? 'updated' : 'added'})`);
-    }
-
-    logger.success(
-      'Admin-CourseSettings',
-      `Admin ${adminId} updated settings for course ${courseId}`,
-      {
-        courseId,
-        adminId,
-        changes: changes.join(', '),
-        oldSettings: oldSettings ? { 
-          rubric: oldSettings.rubric ? 'exists' : 'null', 
-          ai_guidelines: oldSettings.ai_guidelines ? 'exists' : 'null' 
-        } : 'none',
-        timestamp: new Date().toISOString()
-      }
-    );
-
-    res.status(200).json({
-      success: true,
-      data: updatedSettings,
-      message: 'Vakinstellingen succesvol bijgewerkt',
-      error: null
-    });
-  } catch (error) {
-    // Specifieke error handling
-    if (error.message === 'COURSE_NOT_FOUND') {
-      logger.warn('Admin-CourseSettings', `Course ${courseId} not found`);
-      return res.status(404).json({
-        success: false,
-        message: 'Vak niet gevonden',
-        error: 'NOT_FOUND'
-      });
-    }
-
-    // Algemene error logging
-    logger.error('Admin-CourseSettings', `Failed to update settings for course ${courseId}`, error);
-
-    res.status(500).json({
-      success: false,
-      message: 'Fout bij bijwerken vakinstellingen',
-      error: 'INTERNAL_SERVER_ERROR'
-    });
-  }
+  logger.warn('Admin-CourseSettings', 'DEPRECATED endpoint accessed: PUT /admin/courses/:courseId/settings');
+  
+  res.status(410).json({
+    success: false,
+    message: 'Deze endpoint is verouderd. Settings zijn nu per opdracht. Gebruik PUT /api/admin/assignments/{assignmentId}/settings',
+    error: 'ENDPOINT_DEPRECATED'
+  });
 });
 
 /**
  * @swagger
  * /api/admin/courses/{courseId}/settings:
  *   delete:
+ *     deprecated: true
  *     tags:
  *       - Admin - Courses
- *     summary: Verwijder vakinstellingen
- *     description: Reset de instellingen van een vak naar defaults door ze te verwijderen (alleen voor admins)
+ *     summary: Verwijder vakinstellingen (DEPRECATED)
+ *     description: |
+ *       **DEPRECATED**: Deze endpoint is verouderd. Settings zijn nu per opdracht en kunnen niet meer op vak-niveau worden verwijderd.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2831,104 +2614,25 @@ router.put('/admin/courses/:courseId/settings', authenticateToken, async (req, r
  */
 router.delete('/admin/courses/:courseId/settings', authenticateToken, async (req, res) => {
   const logger = require('../utils/logger');
-  const adminId = req.user?.id || parseInt(req.query.adminId);
-  const courseId = parseInt(req.params.courseId);
-
-  logger.info('Admin-CourseSettings', `Admin ${adminId || 'unknown'} aanvraag om instellingen van vak ${courseId} te verwijderen`);
-
-  try {
-    // Validatie: admin ID
-    if (!adminId) {
-      logger.warn('Admin-CourseSettings', 'Request denied: no admin ID provided');
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Validatie: course ID
-    if (!courseId || isNaN(courseId)) {
-      logger.warn('Admin-CourseSettings', `Invalid course ID: ${req.params.courseId}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Ongeldig vak ID',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      logger.warn('Admin-CourseSettings', `Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
-      });
-    }
-
-    // Verwijder de instellingen
-    const deletedSettings = await adminController.deleteCourseSettings(courseId);
-
-    if (!deletedSettings) {
-      logger.info('Admin-CourseSettings', `No settings to delete for course ${courseId}`);
-      return res.status(404).json({
-        success: false,
-        message: 'Geen instellingen gevonden om te verwijderen',
-        error: 'NOT_FOUND'
-      });
-    }
-
-    // Audit log: success
-    logger.success(
-      'Admin-CourseSettings',
-      `Admin ${adminId} deleted settings for course ${courseId}`,
-      {
-        courseId,
-        adminId,
-        deletedSettings: {
-          had_rubric: !!deletedSettings.rubric,
-          had_ai_guidelines: !!deletedSettings.ai_guidelines
-        },
-        timestamp: new Date().toISOString()
-      }
-    );
-
-    res.status(200).json({
-      success: true,
-      data: deletedSettings,
-      message: 'Vakinstellingen succesvol verwijderd',
-      error: null
-    });
-  } catch (error) {
-    if (error.message === 'COURSE_NOT_FOUND') {
-      logger.warn('Admin-CourseSettings', `Course ${courseId} not found`);
-      return res.status(404).json({
-        success: false,
-        message: 'Vak niet gevonden',
-        error: 'NOT_FOUND'
-      });
-    }
-
-    logger.error('Admin-CourseSettings', `Failed to delete settings for course ${courseId}`, error);
-
-    res.status(500).json({
-      success: false,
-      message: 'Fout bij verwijderen vakinstellingen',
-      error: 'INTERNAL_SERVER_ERROR'
-    });
-  }
+  logger.warn('Admin-CourseSettings', 'DEPRECATED endpoint accessed: DELETE /admin/courses/:courseId/settings');
+  
+  res.status(410).json({
+    success: false,
+    message: 'Deze endpoint is verouderd. Settings zijn nu per opdracht en kunnen niet meer op vak-niveau worden verwijderd.',
+    error: 'ENDPOINT_DEPRECATED'
+  });
 });
 
 /**
  * @swagger
  * /api/admin/courses/{courseId}/settings/copy:
  *   post:
+ *     deprecated: true
  *     tags:
  *       - Admin - Courses
- *     summary: Kopieer vakinstellingen van ander vak
- *     description: Kopieer rubric en AI guidelines van een ander vak (alleen voor admins)
+ *     summary: Kopieer vakinstellingen van ander vak (DEPRECATED)
+ *     description: |
+ *       **DEPRECATED**: Deze endpoint is verouderd. Settings zijn nu per opdracht en moeten per opdracht gekopieerd worden.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2988,122 +2692,25 @@ router.delete('/admin/courses/:courseId/settings', authenticateToken, async (req
  */
 router.post('/admin/courses/:courseId/settings/copy', authenticateToken, async (req, res) => {
   const logger = require('../utils/logger');
-  const adminId = req.user?.id || parseInt(req.query.adminId);
-  const targetCourseId = parseInt(req.params.courseId);
-  const { sourceCourseId } = req.body;
-
-  logger.info('Admin-CourseSettings', `Admin ${adminId || 'unknown'} aanvraag om instellingen te kopiëren van vak ${sourceCourseId} naar ${targetCourseId}`);
-
-  try {
-    // Validatie: admin ID
-    if (!adminId) {
-      logger.warn('Admin-CourseSettings', 'Request denied: no admin ID provided');
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Validatie: course IDs
-    if (!targetCourseId || isNaN(targetCourseId)) {
-      logger.warn('Admin-CourseSettings', `Invalid target course ID: ${req.params.courseId}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Ongeldig target vak ID',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    if (!sourceCourseId || isNaN(parseInt(sourceCourseId))) {
-      logger.warn('Admin-CourseSettings', `Invalid source course ID: ${sourceCourseId}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Ongeldig source vak ID',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const sourceId = parseInt(sourceCourseId);
-
-    if (targetCourseId === sourceId) {
-      logger.warn('Admin-CourseSettings', `Cannot copy to same course: ${targetCourseId}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Kan niet kopiëren naar hetzelfde vak',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      logger.warn('Admin-CourseSettings', `Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
-      });
-    }
-
-    // Kopieer de instellingen
-    const copiedSettings = await adminController.copyCourseSettings(targetCourseId, sourceId);
-
-    // Audit log: success
-    logger.success(
-      'Admin-CourseSettings',
-      `Admin ${adminId} copied settings from course ${sourceId} to course ${targetCourseId}`,
-      {
-        targetCourseId,
-        sourceCourseId: sourceId,
-        adminId,
-        timestamp: new Date().toISOString()
-      }
-    );
-
-    res.status(200).json({
-      success: true,
-      data: copiedSettings,
-      message: 'Vakinstellingen succesvol gekopieerd',
-      error: null
-    });
-  } catch (error) {
-    if (error.message === 'COURSE_NOT_FOUND') {
-      logger.warn('Admin-CourseSettings', `One or both courses not found: ${targetCourseId}, ${sourceCourseId}`);
-      return res.status(404).json({
-        success: false,
-        message: 'Één of beide vakken niet gevonden',
-        error: 'NOT_FOUND'
-      });
-    }
-
-    if (error.message === 'SOURCE_SETTINGS_NOT_FOUND') {
-      logger.warn('Admin-CourseSettings', `Source course ${sourceCourseId} has no settings`);
-      return res.status(400).json({
-        success: false,
-        message: 'Bronvak heeft geen instellingen om te kopiëren',
-        error: 'SOURCE_NO_SETTINGS'
-      });
-    }
-
-    logger.error('Admin-CourseSettings', `Failed to copy settings from ${sourceCourseId} to ${targetCourseId}`, error);
-
-    res.status(500).json({
-      success: false,
-      message: 'Fout bij kopiëren vakinstellingen',
-      error: 'INTERNAL_SERVER_ERROR'
-    });
-  }
+  logger.warn('Admin-CourseSettings', 'DEPRECATED endpoint accessed: POST /admin/courses/:courseId/settings/copy');
+  
+  res.status(410).json({
+    success: false,
+    message: 'Deze endpoint is verouderd. Settings zijn nu per opdracht en moeten per opdracht gekopieerd worden.',
+    error: 'ENDPOINT_DEPRECATED'
+  });
 });
 
 /**
  * @swagger
  * /api/admin/courses/settings:
  *   get:
+ *     deprecated: true
  *     tags:
  *       - Admin - Courses
- *     summary: Haal alle vakinstellingen op (bulk)
- *     description: Verkrijg een overzicht van alle vakken met hun instellingen status (alleen voor admins)
+ *     summary: Haal alle vakinstellingen op (DEPRECATED)
+ *     description: |
+ *       **DEPRECATED**: Deze endpoint is verouderd. Settings zijn nu per opdracht in plaats van per vak.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -3152,65 +2759,13 @@ router.post('/admin/courses/:courseId/settings/copy', authenticateToken, async (
  */
 router.get('/admin/courses/settings', authenticateToken, async (req, res) => {
   const logger = require('../utils/logger');
-  const adminId = req.user?.id || parseInt(req.query.adminId);
-
-  logger.info('Admin-CourseSettings', `Admin ${adminId || 'unknown'} aanvraag om alle vakinstellingen op te halen`);
-
-  try {
-    // Validatie: admin ID
-    if (!adminId) {
-      logger.warn('Admin-CourseSettings', 'Request denied: no admin ID provided');
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      logger.warn('Admin-CourseSettings', `Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
-      });
-    }
-
-    // Haal alle instellingen op
-    const allSettings = await adminController.getAllCourseSettings();
-
-    const withSettings = allSettings.filter(s => s.has_settings).length;
-    const withoutSettings = allSettings.length - withSettings;
-
-    logger.success(
-      'Admin-CourseSettings',
-      `Admin ${adminId} retrieved all course settings overview`,
-      {
-        adminId,
-        totalCourses: allSettings.length,
-        withSettings,
-        withoutSettings,
-        timestamp: new Date().toISOString()
-      }
-    );
-
-    res.status(200).json({
-      success: true,
-      data: allSettings,
-      message: `${allSettings.length} vakken opgehaald (${withSettings} met instellingen, ${withoutSettings} zonder)`,
-      error: null
-    });
-  } catch (error) {
-    logger.error('Admin-CourseSettings', `Failed to retrieve all course settings`, error);
-
-    res.status(500).json({
-      success: false,
-      message: 'Fout bij ophalen vakinstellingen overzicht',
-      error: 'INTERNAL_SERVER_ERROR'
-    });
-  }
+  logger.warn('Admin-CourseSettings', 'DEPRECATED endpoint accessed: GET /admin/courses/settings');
+  
+  res.status(410).json({
+    success: false,
+    message: 'Deze endpoint is verouderd. Settings zijn nu per opdracht in plaats van per vak.',
+    error: 'ENDPOINT_DEPRECATED'
+  });
 });
 
 /**
@@ -3834,6 +3389,221 @@ router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req,
     res.status(500).json({
       success: false,
       message: 'Fout bij verwijderen opdracht',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/assignments/{assignmentId}/settings:
+ *   get:
+ *     tags:
+ *       - Admin - Assignments
+ *     summary: Haal opdracht instellingen op
+ *     description: Verkrijg de instellingen (rubric en AI guidelines) van een opdracht (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: Opdracht instellingen succesvol opgehaald
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Opdracht niet gevonden
+ */
+router.get('/admin/assignments/:assignmentId/settings', authenticateToken, async (req, res) => {
+  const logger = require('../utils/logger');
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const assignmentId = parseInt(req.params.assignmentId);
+
+  logger.info('Admin-AssignmentSettings', `Admin ${adminId || 'unknown'} requesting settings for assignment ${assignmentId}`);
+
+  try {
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    if (!assignmentId || isNaN(assignmentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig opdracht ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze functie',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    const settings = await adminController.getAssignmentSettings(assignmentId);
+
+    if (!settings) {
+      return res.status(404).json({
+        success: false,
+        message: 'Opdracht niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    logger.success('Admin-AssignmentSettings', `Retrieved settings for assignment ${assignmentId}`);
+
+    res.status(200).json({
+      success: true,
+      data: settings,
+      message: 'Opdracht instellingen succesvol opgehaald',
+      error: null
+    });
+  } catch (error) {
+    logger.error('Admin-AssignmentSettings', `Failed to retrieve settings for assignment ${assignmentId}`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen opdracht instellingen',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/assignments/{assignmentId}/settings:
+ *   put:
+ *     tags:
+ *       - Admin - Assignments
+ *     summary: Update opdracht instellingen
+ *     description: Werk de instellingen (rubric en AI guidelines) van een opdracht bij (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               rubric:
+ *                 type: string
+ *                 description: Beoordelingsrubric voor de opdracht
+ *               ai_guidelines:
+ *                 type: string
+ *                 description: AI feedback richtlijnen
+ *     responses:
+ *       200:
+ *         description: Opdracht instellingen succesvol bijgewerkt
+ *       400:
+ *         description: Geen velden om te updaten of ongeldige data
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Opdracht niet gevonden
+ */
+router.put('/admin/assignments/:assignmentId/settings', authenticateToken, async (req, res) => {
+  const logger = require('../utils/logger');
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const assignmentId = parseInt(req.params.assignmentId);
+  const { rubric, ai_guidelines } = req.body;
+
+  logger.info('Admin-AssignmentSettings', `Admin ${adminId || 'unknown'} updating settings for assignment ${assignmentId}`);
+
+  try {
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    if (!assignmentId || isNaN(assignmentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig opdracht ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze functie',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    if (rubric === undefined && ai_guidelines === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Minimaal één veld (rubric, ai_guidelines) moet worden opgegeven',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    if (rubric !== undefined && rubric !== null && typeof rubric !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Rubric moet een string zijn',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    if (ai_guidelines !== undefined && ai_guidelines !== null && typeof ai_guidelines !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'AI guidelines moet een string zijn',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const updatedSettings = await adminController.updateAssignmentSettings(assignmentId, {
+      rubric,
+      ai_guidelines
+    });
+
+    logger.success('Admin-AssignmentSettings', `Admin ${adminId} updated settings for assignment ${assignmentId}`);
+
+    res.status(200).json({
+      success: true,
+      data: updatedSettings,
+      message: 'Opdracht instellingen succesvol bijgewerkt',
+      error: null
+    });
+  } catch (error) {
+    if (error.message === 'ASSIGNMENT_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: 'Opdracht niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    logger.error('Admin-AssignmentSettings', `Failed to update settings for assignment ${assignmentId}`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij bijwerken opdracht instellingen',
       error: 'INTERNAL_SERVER_ERROR'
     });
   }

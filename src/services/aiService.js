@@ -168,8 +168,7 @@ async function analyzeFile(filePath, content, language, courseSettings) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3, // Lage temperature voor consistente output
-        max_tokens: 2000
+        max_completion_tokens: 16000  // GPT-5 mini gebruikt reasoning tokens, dus we hebben meer nodig
       },
       {
         headers: getOpenAIHeaders(),
@@ -177,10 +176,20 @@ async function analyzeFile(filePath, content, language, courseSettings) {
       }
     );
 
+    // Log de volledige response structuur voor debugging
+    console.log(`[API] AI response structure:`, JSON.stringify({
+      hasData: !!response.data,
+      hasChoices: !!response.data?.choices,
+      choicesLength: response.data?.choices?.length,
+      firstChoice: response.data?.choices?.[0],
+      usage: response.data?.usage
+    }, null, 2));
+
     const aiResponse = response.data.choices[0]?.message?.content;
 
     if (!aiResponse) {
       console.warn(`[API] AI: No response for ${filePath}`);
+      console.warn(`[API] AI: Full response data:`, JSON.stringify(response.data));
       return [];
     }
 

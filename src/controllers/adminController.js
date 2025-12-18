@@ -613,169 +613,73 @@ async function getStudentSubmissions(studentId) {
 }
 
 /**
- * Haalt de instellingen van een vak op
- * @param {number} courseId - ID van het vak
+ * Haalt de instellingen van een opdracht op
+ * @param {number} assignmentId - ID van de opdracht
  * @returns {Promise<Object|null>} Object met instellingen of null als niet gevonden
  */
-async function getCourseSettings(courseId) {
+async function getAssignmentSettings(assignmentId) {
   const result = await db.query(
-    `SELECT cs.id, cs.course_id, cs.rubric, cs.ai_guidelines, cs.created_at, cs.updated_at
-     FROM course_settings cs
-     WHERE cs.course_id = $1`,
-    [courseId]
+    `SELECT a.id, a.rubric, a.ai_guidelines
+     FROM assignment a
+     WHERE a.id = $1`,
+    [assignmentId]
   );
   return result.rows.length > 0 ? result.rows[0] : null;
 }
 
 /**
- * Werkt de instellingen van een vak bij
- * @param {number} courseId - ID van het vak
+ * Werkt de instellingen van een opdracht bij
+ * @param {number} assignmentId - ID van de opdracht
  * @param {Object} settingsData - Object met te updaten velden (rubric, ai_guidelines)
  * @returns {Promise<Object>} Bijgewerkte instellingen
  */
-async function updateCourseSettings(courseId, settingsData) {
+async function updateAssignmentSettings(assignmentId, settingsData) {
   const { rubric, ai_guidelines } = settingsData;
 
-  // Controleer eerst of het vak bestaat
-  const courseCheck = await db.query(
-    `SELECT id FROM course WHERE id = $1`,
-    [courseId]
+  // Controleer eerst of de opdracht bestaat
+  const assignmentCheck = await db.query(
+    `SELECT id FROM assignment WHERE id = $1`,
+    [assignmentId]
   );
 
-  if (courseCheck.rows.length === 0) {
-    throw new Error('COURSE_NOT_FOUND');
+  if (assignmentCheck.rows.length === 0) {
+    throw new Error('ASSIGNMENT_NOT_FOUND');
   }
 
-  // Controleer of er al instellingen bestaan voor dit vak
-  const existingSettings = await getCourseSettings(courseId);
+  // Update de opdracht
+  const updates = [];
+  const values = [];
+  let paramCount = 1;
 
-  if (existingSettings) {
-    // Update bestaande instellingen
-    const updates = [];
-    const values = [];
-    let paramCount = 1;
-
-    if (rubric !== undefined) {
-      updates.push(`rubric = $${paramCount}`);
-      values.push(rubric);
-      paramCount++;
-    }
-
-    if (ai_guidelines !== undefined) {
-      updates.push(`ai_guidelines = $${paramCount}`);
-      values.push(ai_guidelines);
-      paramCount++;
-    }
-
-    if (updates.length === 0) {
-      // Geen wijzigingen, return bestaande instellingen
-      return existingSettings;
-    }
-
-    updates.push(`updated_at = NOW()`);
-    values.push(courseId);
-
-    const query = `
-      UPDATE course_settings
-      SET ${updates.join(', ')}
-      WHERE course_id = $${paramCount}
-      RETURNING id, course_id, rubric, ai_guidelines, created_at, updated_at
-    `;
-
-    const result = await db.query(query, values);
-    return result.rows[0];
-  } else {
-    // Maak nieuwe instellingen aan
-    const result = await db.query(
-      `INSERT INTO course_settings (course_id, rubric, ai_guidelines)
-       VALUES ($1, $2, $3)
-       RETURNING id, course_id, rubric, ai_guidelines, created_at, updated_at`,
-      [courseId, rubric || null, ai_guidelines || null]
-    );
-    return result.rows[0];
-  }
-}
-
-/**
- * Verwijdert de instellingen van een vak (reset naar defaults)
- * @param {number} courseId - ID van het vak
- * @returns {Promise<Object|null>} Verwijderde instellingen of null als niet gevonden
- */
-async function deleteCourseSettings(courseId) {
-  // Controleer eerst of het vak bestaat
-  const courseCheck = await db.query(
-    `SELECT id FROM course WHERE id = $1`,
-    [courseId]
-  );
-
-  if (courseCheck.rows.length === 0) {
-    throw new Error('COURSE_NOT_FOUND');
+  if (rubric !== undefined) {
+    updates.push(`rubric = $${paramCount}`);
+    values.push(rubric);
+    paramCount++;
   }
 
-  // Verwijder de instellingen als ze bestaan
-  const result = await db.query(
-    `DELETE FROM course_settings
-     WHERE course_id = $1
-     RETURNING id, course_id, rubric, ai_guidelines, created_at, updated_at`,
-    [courseId]
-  );
-
-  return result.rows.length > 0 ? result.rows[0] : null;
-}
-
-/**
- * Kopieert instellingen van een vak naar een ander vak
- * @param {number} targetCourseId - ID van het vak waar naartoe gekopieerd wordt
- * @param {number} sourceCourseId - ID van het vak waarvan gekopieerd wordt
- * @returns {Promise<Object>} Gekopieerde instellingen
- */
-async function copyCourseSettings(targetCourseId, sourceCourseId) {
-  // Controleer of beide vakken bestaan
-  const coursesCheck = await db.query(
-    `SELECT id FROM course WHERE id IN ($1, $2)`,
-    [targetCourseId, sourceCourseId]
-  );
-
-  if (coursesCheck.rows.length !== 2) {
-    throw new Error('COURSE_NOT_FOUND');
+  if (ai_guidelines !== undefined) {
+    updates.push(`ai_guidelines = $${paramCount}`);
+    values.push(ai_guidelines);
+    paramCount++;
   }
 
-  // Haal bron instellingen op
-  const sourceSettings = await getCourseSettings(sourceCourseId);
-  
-  if (!sourceSettings) {
-    throw new Error('SOURCE_SETTINGS_NOT_FOUND');
+  if (updates.length === 0) {
+    // Geen wijzigingen, haal bestaande opdracht op
+    return await getAssignmentSettings(assignmentId);
   }
 
-  // Kopieer naar target vak
-  const copiedSettings = await updateCourseSettings(targetCourseId, {
-    rubric: sourceSettings.rubric,
-    ai_guidelines: sourceSettings.ai_guidelines
-  });
+  updates.push(`updated_at = NOW()`);
+  values.push(assignmentId);
 
-  return copiedSettings;
-}
+  const query = `
+    UPDATE assignment
+    SET ${updates.join(', ')}
+    WHERE id = $${paramCount}
+    RETURNING id, rubric, ai_guidelines, updated_at
+  `;
 
-/**
- * Haalt alle vakinstellingen op (bulk)
- * @returns {Promise<Array>} Array met alle vakinstellingen
- */
-async function getAllCourseSettings() {
-  const result = await db.query(
-    `SELECT 
-       c.id as course_id,
-       c.title as course_title,
-       cs.id as settings_id,
-       cs.rubric,
-       cs.ai_guidelines,
-       cs.created_at as settings_created_at,
-       cs.updated_at as settings_updated_at,
-       CASE WHEN cs.id IS NOT NULL THEN true ELSE false END as has_settings
-     FROM course c
-     LEFT JOIN course_settings cs ON c.id = cs.course_id
-     ORDER BY c.title ASC`
-  );
-  return result.rows;
+  const result = await db.query(query, values);
+  return result.rows[0];
 }
 
 module.exports = {
@@ -803,9 +707,6 @@ module.exports = {
   deleteStudent,
   getStudentEnrollments,
   getStudentSubmissions,
-  getCourseSettings,
-  updateCourseSettings,
-  deleteCourseSettings,
-  copyCourseSettings,
-  getAllCourseSettings
+  getAssignmentSettings,
+  updateAssignmentSettings
 };

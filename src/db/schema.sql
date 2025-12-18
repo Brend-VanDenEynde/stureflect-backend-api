@@ -48,18 +48,6 @@ CREATE TABLE course_teacher (
 );
 
 -------------------------------------------------
--- COURSE SETTINGS (AI CONFIG)
--------------------------------------------------
-CREATE TABLE course_settings (
-    id                 SERIAL PRIMARY KEY,
-    course_id          INT NOT NULL REFERENCES course(id) ON DELETE CASCADE,
-    rubric             TEXT,
-    ai_guidelines      TEXT,
-    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--------------------------------------------------
 -- ENROLLMENT TABLE
 -------------------------------------------------
 CREATE TABLE enrollment (
@@ -79,6 +67,8 @@ CREATE TABLE assignment (
     description        TEXT,
     course_id          INT NOT NULL REFERENCES course(id) ON DELETE CASCADE,
     due_date           TIMESTAMPTZ,
+    rubric             TEXT,
+    ai_guidelines      TEXT,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
