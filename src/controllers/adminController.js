@@ -547,6 +547,21 @@ async function deleteStudent(studentId) {
 }
 
 /**
+ * Verwijdert een gebruiker uit de database (ongeacht rol)
+ * @param {number} userId - ID van de gebruiker
+ * @returns {Promise<Object|null>} Verwijderde gebruikersgegevens of null als niet gevonden
+ */
+async function deleteUser(userId) {
+  const result = await db.query(
+    `DELETE FROM "user"
+     WHERE id = $1
+     RETURNING id, email, name, github_id, role, created_at`,
+    [userId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
  * Haalt alle vakken op waarin een student is ingeschreven
  * @param {number} studentId - ID van de student
  * @returns {Promise<Array>} Array met vakinformatie
@@ -971,6 +986,7 @@ module.exports = {
   getStudentById,
   updateStudent,
   deleteStudent,
+  deleteUser,
   getStudentEnrollments,
   getStudentSubmissions,
   getAssignmentSettings,

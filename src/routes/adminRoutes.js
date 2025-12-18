@@ -1472,6 +1472,142 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
 
 /**
  * @swagger
+ * /api/admin/users/{userId}:
+ *   delete:
+ *     tags:
+ *       - Admin - Users
+ *     summary: Verwijder een gebruiker
+ *     description: Verwijder een gebruikersaccount permanent uit het systeem (alleen voor admins). Let op - cascade delete voor alle gerelateerde gegevens zoals enrollments, submissions, courses (indien docent), etc.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de gebruiker
+ *     responses:
+ *       200:
+ *         description: Gebruiker succesvol verwijderd
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldige gebruiker ID
+ *       403:
+ *         description: Geen admin rechten of poging om zichzelf te verwijderen
+ *       404:
+ *         description: Gebruiker niet gevonden
+ */
+router.delete('/admin/users/:userId', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const userId = parseInt(req.params.userId);
+
+  console.log(`[AUDIT] Admin ${adminId || 'unknown'} attempting to delete user ${userId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer gebruiker ID
+    if (!userId || isNaN(userId)) {
+      console.log(`[AUDIT] Invalid user ID: ${req.params.userId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig gebruiker ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of uitvoerende gebruiker admin is
+    if (!adminId) {
+      console.log(`[AUDIT] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins kunnen gebruikers verwijderen',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Validatie: voorkom dat admin zichzelf verwijdert
+    if (adminId === userId) {
+      console.log(`[AUDIT] Admin ${adminId} attempted to delete themselves`);
+      return res.status(403).json({
+        success: false,
+        message: 'Je kunt jezelf niet verwijderen',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Validatie: controleer of gebruiker bestaat
+    const user = await adminController.getUserById(userId);
+    if (!user) {
+      console.log(`[AUDIT] User ${userId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Gebruiker niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    // Gebruiker verwijderen (hard delete)
+    const deletedUser = await adminController.deleteUser(userId);
+
+    if (!deletedUser) {
+      console.log(`[AUDIT] Failed to delete user ${userId}`);
+      return res.status(500).json({
+        success: false,
+        message: 'Fout bij verwijderen gebruiker',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+
+    console.log(`[AUDIT] Admin ${adminId} successfully deleted user ${userId} (${deletedUser.email}, role: ${deletedUser.role})`);
+
+    res.status(200).json({
+      success: true,
+      data: deletedUser,
+      message: `Gebruiker ${deletedUser.name} (${deletedUser.role}) succesvol verwijderd`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[AUDIT] Admin ${adminId} failed to delete user ${userId}:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij verwijderen gebruiker',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/admin/courses:
  *   get:
  *     tags:
