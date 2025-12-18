@@ -357,57 +357,6 @@
           }
         }
       }
-    },
-    "/api/admin/users/{userId}/demote": {
-      "put": {
-        "tags": ["Admin"],
-        "summary": "Degradeer gebruiker",
-        "description": "Verwijder speciale rechten van een gebruiker (alleen voor admins)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "ID van de gebruiker"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Gebruiker succesvol gedegradeerd",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Gebruiker succesvol gedegradeerd"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Geen admin rechten"
-          },
-          "404": {
-            "description": "Gebruiker niet gevonden"
-          }
-        }
-      }
     }
   }
 }

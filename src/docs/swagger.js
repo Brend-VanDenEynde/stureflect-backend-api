@@ -1,6 +1,7 @@
 /**
  * Dynamisch gegenereerde Swagger documentatie
- * Dit voorkomt problemen met het renderen van grote JSON bestanden
+ * Deze module is niet meer nodig - Swagger gebruikt nu alleen JSDoc comments
+ * Dit bestand blijft bestaan voor backwards compatibility maar laadt geen endpoints meer
  */
 
 const baseSpec = {
@@ -193,102 +194,12 @@ const baseSpec = {
     }
   },
   paths: {
-    "/": {
-      get: {
-        tags: ["Algemeen"],
-        summary: "API Root - Welkomstbericht",
-        description: "Geeft een welkomstbericht en basisinformatie over de API",
-        responses: {
-          "200": {
-            description: "Succesvol",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Welcome to StuReflect API"
-                    },
-                    version: {
-                      type: "string",
-                      example: "1.0.0"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/health": {
-      get: {
-        tags: ["Algemeen"],
-        summary: "Health Check",
-        description: "Controleert of de API actief is",
-        responses: {
-          "200": {
-            description: "API is operationeel",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: {
-                      type: "string",
-                      example: "OK"
-                    },
-                    timestamp: {
-                      type: "string",
-                      format: "date-time"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    // Geen paths meer - deze worden nu allemaal via JSDoc geladen
   }
 };
 
-// Helper functie om endpoints toe te voegen
-function addEndpoints(spec, endpoints) {
-  if (endpoints && endpoints.paths) {
-    spec.paths = { ...spec.paths, ...endpoints.paths };
-  }
-  return spec;
-}
+// NOTE: JSON endpoint files worden niet meer gebruikt
+// Alle endpoints worden nu gedefinieerd via JSDoc comments in de route bestanden
+// Dit voorkomt duplicaten en conflicten in de Swagger UI
 
-// Laad de verschillende endpoint definities
-function buildSwaggerSpec() {
-  let spec = { ...baseSpec };
-  
-  // Array van alle endpoint bestanden
-  const endpointFiles = [
-    { name: 'auth-endpoints.json', label: 'Auth' },
-    { name: 'admin-endpoints.json', label: 'Admin' },
-    { name: 'course-endpoints.json', label: 'Course' },
-    { name: 'student-endpoints.json', label: 'Student' },
-    { name: 'student-submissions-endpoints.json', label: 'Submission' },
-    { name: 'docent-endpoints.json', label: 'Docent' },
-    { name: 'github-submission-endpoints.json', label: 'GitHub' }
-  ];
-
-  // Laad elk endpoint bestand
-  endpointFiles.forEach(({ name, label }) => {
-    try {
-      const endpoints = require(`./${name}`);
-      spec = addEndpoints(spec, endpoints);
-      console.log(`✓ ${label} endpoints geladen`);
-    } catch (error) {
-      console.log(`✗ ${label} endpoints niet gevonden, wordt overgeslagen`);
-    }
-  });
-
-  return spec;
-}
-
-module.exports = buildSwaggerSpec();
+module.exports = baseSpec;
