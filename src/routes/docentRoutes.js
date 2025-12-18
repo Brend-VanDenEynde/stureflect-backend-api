@@ -17,7 +17,8 @@ const {
 	createAssignment,
 	getAssignmentDetail,
 	updateAssignment,
-	deleteAssignment
+	deleteAssignment,
+	getAssignmentStatistics
 } = require('../controllers/docentController');
 
 /**
@@ -323,6 +324,101 @@ router.get('/assignments', getDocentAssignments);
  *         description: Interne serverfout
  */
 router.get('/assignments/:assignmentId', getAssignmentDetail);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}/statistics:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal live statistieken voor een opdracht op
+ *     description: Haalt real-time statistieken op voor een specifieke opdracht, inclusief inzendingspercentages en status distributie
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: Opdracht statistieken
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     courseId:
+ *                       type: integer
+ *                     courseTitle:
+ *                       type: string
+ *                 statistics:
+ *                   type: object
+ *                   properties:
+ *                     totalStudents:
+ *                       type: integer
+ *                       description: Totaal aantal ingeschreven studenten
+ *                     totalSubmissions:
+ *                       type: integer
+ *                       description: Totaal aantal inzendingen
+ *                     studentsSubmitted:
+ *                       type: integer
+ *                       description: Aantal studenten dat heeft ingediend
+ *                     studentsNoSubmission:
+ *                       type: integer
+ *                       description: Aantal studenten zonder inzending
+ *                     submissionPercentage:
+ *                       type: number
+ *                       description: Percentage studenten dat heeft ingediend
+ *                     statusDistribution:
+ *                       type: object
+ *                       properties:
+ *                         noSubmission:
+ *                           type: integer
+ *                           description: Studenten zonder inzending
+ *                         pending:
+ *                           type: integer
+ *                           description: Studenten met pending status
+ *                         completed:
+ *                           type: integer
+ *                           description: Studenten met completed status
+ *                         graded:
+ *                           type: integer
+ *                           description: Studenten met graded status
+ *                     scores:
+ *                       type: object
+ *                       properties:
+ *                         average:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Gemiddelde score
+ *                         minimum:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Minimum score
+ *                         maximum:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Maximum score
+ *       400:
+ *         description: Ongeldige opdracht ID
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       404:
+ *         description: Opdracht niet gevonden of geen toegang
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId/statistics', getAssignmentStatistics);
 
 /**
  * @swagger
