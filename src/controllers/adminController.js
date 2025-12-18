@@ -801,6 +801,65 @@ async function updateAssignmentSettings(assignmentId, settingsData) {
   return result.rows[0];
 }
 
+/**
+ * Maakt een nieuwe opdracht aan voor een specifiek vak
+ * @param {number} courseId - ID van het vak
+ * @param {Object} assignmentData - Object met opdracht gegevens
+ * @param {string} assignmentData.title - Titel van de opdracht
+ * @param {string} assignmentData.description - Beschrijving van de opdracht
+ * @param {string} [assignmentData.due_date] - Deadline van de opdracht (ISO string)
+ * @param {string} [assignmentData.rubric] - Rubric voor de opdracht
+ * @param {string} [assignmentData.ai_guidelines] - AI richtlijnen voor feedback
+ * @returns {Promise<Object>} Nieuw aangemaakte opdracht
+ */
+async function createAssignment(courseId, assignmentData) {
+  const { title, description, due_date, rubric, ai_guidelines } = assignmentData;
+
+  // Validatie: controleer of vak bestaat
+  const courseCheck = await db.query(
+    `SELECT id FROM course WHERE id = $1`,
+    [courseId]
+  );
+
+  if (courseCheck.rows.length === 0) {
+    throw new Error('COURSE_NOT_FOUND');
+  }
+
+  // Validatie: verplichte velden
+  if (!title || title.trim().length === 0) {
+    throw new Error('TITLE_REQUIRED');
+  }
+
+  if (!description || description.trim().length === 0) {
+    throw new Error('DESCRIPTION_REQUIRED');
+  }
+
+  // Validatie: due_date moet valide datum zijn (optioneel)
+  if (due_date) {
+    const parsedDate = new Date(due_date);
+    if (isNaN(parsedDate.getTime())) {
+      throw new Error('INVALID_DUE_DATE');
+    }
+  }
+
+  // Maak de opdracht aan
+  const result = await db.query(
+    `INSERT INTO assignment (title, description, course_id, due_date, rubric, ai_guidelines)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, title, description, course_id, due_date, rubric, ai_guidelines, created_at, updated_at`,
+    [
+      title.trim(),
+      description.trim(),
+      courseId,
+      due_date || null,
+      rubric || null,
+      ai_guidelines || null
+    ]
+  );
+
+  return result.rows[0];
+}
+
 module.exports = {
   getAllStudents,
   getAllTeachers,
@@ -824,6 +883,7 @@ module.exports = {
   getAllSubmissions,
   getSubmissionsByCourse,
   deleteAssignment,
+  createAssignment,
   getStudentById,
   updateStudent,
   deleteStudent,

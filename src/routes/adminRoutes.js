@@ -3476,6 +3476,198 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
 
 /**
  * @swagger
+ * /api/admin/courses/{courseId}/assignments:
+ *   post:
+ *     tags:
+ *       - Admin - Courses
+ *     summary: Voeg een nieuwe opdracht toe aan een vak
+ *     description: Maak een nieuwe opdracht aan en koppel deze aan het opgegeven vak (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van het vak
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - description
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Titel van de opdracht
+ *                 example: "REST API Implementatie"
+ *               description:
+ *                 type: string
+ *                 description: Beschrijving van de opdracht
+ *                 example: "Bouw een RESTful API met Node.js en Express"
+ *               due_date:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Deadline voor de opdracht (optioneel)
+ *                 example: "2025-12-31T23:59:59Z"
+ *               rubric:
+ *                 type: string
+ *                 description: Beoordelingsrichtlijnen (optioneel)
+ *                 example: "Code kwaliteit: 40%, Functionaliteit: 40%, Documentatie: 20%"
+ *               ai_guidelines:
+ *                 type: string
+ *                 description: AI feedback richtlijnen (optioneel)
+ *                 example: "Let op code style, error handling en API design"
+ *     responses:
+ *       201:
+ *         description: Opdracht succesvol aangemaakt
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     course_id:
+ *                       type: integer
+ *                     due_date:
+ *                       type: string
+ *                       format: date-time
+ *                     rubric:
+ *                       type: string
+ *                     ai_guidelines:
+ *                       type: string
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                     updated_at:
+ *                       type: string
+ *                       format: date-time
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldige input (missing fields, invalid date)
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Vak niet gevonden
+ */
+router.post('/admin/courses/:courseId/assignments', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const courseId = parseInt(req.params.courseId);
+  const { title, description, due_date, rubric, ai_guidelines } = req.body;
+
+  console.log(`[API] Admin ${adminId || 'unknown'} creating assignment for course ${courseId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer of admin ID aanwezig is
+    if (!adminId) {
+      console.log(`[API] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Validatie: controleer of vak ID geldig is
+    if (!courseId || isNaN(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig vak ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze functie',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Maak opdracht aan (inclusief validatie van vak en input)
+    const newAssignment = await adminController.createAssignment(courseId, {
+      title,
+      description,
+      due_date,
+      rubric,
+      ai_guidelines
+    });
+
+    // Audit log: succesvolle aanmaak
+    console.log(`[API] Admin ${adminId} created assignment ${newAssignment.id} ('${newAssignment.title}') for course ${courseId}`);
+
+    res.status(201).json({
+      success: true,
+      data: newAssignment,
+      message: `Opdracht '${newAssignment.title}' succesvol aangemaakt`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[API] Admin ${adminId || 'unknown'} failed to create assignment for course ${courseId}:`, error.message);
+    
+    // Specifieke error handling
+    if (error.message === 'COURSE_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: 'Vak niet gevonden',
+        error: 'COURSE_NOT_FOUND'
+      });
+    }
+
+    if (error.message === 'TITLE_REQUIRED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Titel is verplicht',
+        error: 'TITLE_REQUIRED'
+      });
+    }
+
+    if (error.message === 'DESCRIPTION_REQUIRED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Beschrijving is verplicht',
+        error: 'DESCRIPTION_REQUIRED'
+      });
+    }
+
+    if (error.message === 'INVALID_DUE_DATE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldige deadline datum',
+        error: 'INVALID_DUE_DATE'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij aanmaken opdracht',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/admin/assignments/{assignmentId}:
  *   delete:
  *     tags:
