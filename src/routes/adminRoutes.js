@@ -3029,13 +3029,87 @@ router.get('/admin/assignments', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req, res) => {
+/**
+ * @swagger
+ * /api/admin/submissions:
+ *   get:
+ *     tags:
+ *       - Admin - Courses
+ *     summary: Haal alle ingediende opdrachten op
+ *     description: Verkrijg een lijst van alle submissions ongeacht vak, inclusief vak-, opdracht- en studentinformatie (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lijst van alle submissions met metadata
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       github_url:
+ *                         type: string
+ *                       commit_sha:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       ai_score:
+ *                         type: integer
+ *                       manual_score:
+ *                         type: integer
+ *                       assignment_id:
+ *                         type: integer
+ *                       assignment_title:
+ *                         type: string
+ *                       assignment_description:
+ *                         type: string
+ *                       assignment_due_date:
+ *                         type: string
+ *                         format: date-time
+ *                       course_id:
+ *                         type: integer
+ *                       course_title:
+ *                         type: string
+ *                       course_description:
+ *                         type: string
+ *                       student_id:
+ *                         type: integer
+ *                       student_name:
+ *                         type: string
+ *                       student_email:
+ *                         type: string
+ *                       feedback_count:
+ *                         type: integer
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Geen submissions gevonden
+ */
+router.get('/admin/submissions', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
-  const courseId = parseInt(req.params.courseId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested assignments for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId || 'unknown'} requested all submissions at ${new Date().toISOString()}`);
 
   try {
+    // Validatie: controleer of admin ID aanwezig is
     if (!adminId) {
       console.log(`[API] Request denied: no admin ID provided`);
       return res.status(400).json({
@@ -3045,6 +3119,144 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
       });
     }
 
+    // Autorisatie: controleer of gebruiker admin is
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze data',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Haal alle submissions op
+    const submissions = await adminController.getAllSubmissions();
+
+    // Audit log: succesvolle request
+    console.log(`[API] Admin ${adminId} retrieved ${submissions.length} submissions`);
+
+    // Validatie: controleer of er submissions bestaan
+    if (submissions.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: 'Geen ingediende opdrachten gevonden',
+        error: null
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: submissions,
+      message: `${submissions.length} ingediende opdrachten gevonden`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[API] Admin ${adminId || 'unknown'} failed to retrieve submissions:`, error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen ingediende opdrachten',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/courses/{courseId}/assignments:
+ *   get:
+ *     tags:
+ *       - Admin - Courses
+ *     summary: Haal alle opdrachten van een specifiek vak op
+ *     description: Verkrijg een lijst van alle opdrachten voor een specifiek vak, inclusief vakinformatie en statistieken (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van het vak
+ *     responses:
+ *       200:
+ *         description: Lijst van opdrachten voor het vak met vakinformatie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     course:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         description:
+ *                           type: string
+ *                         join_code:
+ *                           type: string
+ *                         student_count:
+ *                           type: integer
+ *                         assignment_count:
+ *                           type: integer
+ *                     assignments:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           title:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           due_date:
+ *                             type: string
+ *                             format: date-time
+ *                           submission_count:
+ *                             type: integer
+ *                           created_at:
+ *                             type: string
+ *                             format: date-time
+ *                           updated_at:
+ *                             type: string
+ *                             format: date-time
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Ongeldig vak ID
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Vak niet gevonden
+ */
+router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const courseId = parseInt(req.params.courseId);
+
+  console.log(`[API] Admin ${adminId || 'unknown'} requested assignments for course ${courseId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer of admin ID aanwezig is
+    if (!adminId) {
+      console.log(`[API] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Validatie: controleer of vak ID geldig is
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
         success: false,
@@ -3053,6 +3265,7 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
       });
     }
 
+    // Autorisatie: controleer of gebruiker admin is
     const isAdmin = await adminController.isUserAdmin(adminId);
     if (!isAdmin) {
       console.log(`[API] Access denied for user ${adminId}: not an admin`);
@@ -3063,9 +3276,10 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
       });
     }
 
-    // Controleer of vak bestaat
+    // Validatie: controleer of vak bestaat
     const course = await adminController.getCourseDetails(courseId);
     if (!course) {
+      console.log(`[API] Course ${courseId} not found`);
       return res.status(404).json({
         success: false,
         message: 'Vak niet gevonden',
@@ -3073,18 +3287,31 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
       });
     }
 
+    // Haal opdrachten op voor dit vak
     const assignments = await adminController.getCourseAssignments(courseId);
 
-    console.log(`[API] Admin ${adminId} retrieved ${assignments.length} assignments for course ${courseId}`);
+    // Audit log: succesvolle request
+    console.log(`[API] Admin ${adminId} retrieved ${assignments.length} assignments for course ${courseId} ('${course.title}')`);
 
+    // Datastructuur: vak + opdrachten
     res.status(200).json({
       success: true,
-      data: assignments,
+      data: {
+        course: {
+          id: course.id,
+          title: course.title,
+          description: course.description,
+          join_code: course.join_code,
+          student_count: course.student_count,
+          assignment_count: course.assignment_count
+        },
+        assignments: assignments
+      },
       message: `${assignments.length} opdrachten gevonden voor vak '${course.title}'`,
       error: null
     });
   } catch (error) {
-    console.error(`[API] Admin ${adminId} failed to retrieve assignments for course ${courseId}`, error.message);
+    console.error(`[API] Admin ${adminId} failed to retrieve assignments for course ${courseId}:`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen opdrachten',

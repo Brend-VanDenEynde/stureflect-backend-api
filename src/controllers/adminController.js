@@ -644,6 +644,45 @@ async function getAllAssignments() {
 }
 
 /**
+ * Haalt alle ingediende opdrachten (submissions) op uit de database, ongeacht vak
+ * @returns {Promise<Array>} Array met submission gegevens inclusief vak, opdracht en studentinformatie
+ */
+async function getAllSubmissions() {
+  const result = await db.query(
+    `SELECT 
+      s.id,
+      s.github_url,
+      s.commit_sha,
+      s.status,
+      s.ai_score,
+      s.manual_score,
+      s.created_at,
+      s.updated_at,
+      a.id as assignment_id,
+      a.title as assignment_title,
+      a.description as assignment_description,
+      a.due_date as assignment_due_date,
+      c.id as course_id,
+      c.title as course_title,
+      c.description as course_description,
+      u.id as student_id,
+      u.name as student_name,
+      u.email as student_email,
+      CAST(COUNT(DISTINCT f.id) AS INTEGER) as feedback_count
+     FROM submission s
+     JOIN assignment a ON s.assignment_id = a.id
+     JOIN course c ON a.course_id = c.id
+     JOIN "user" u ON s.user_id = u.id
+     LEFT JOIN feedback f ON s.id = f.submission_id
+     GROUP BY s.id, s.github_url, s.commit_sha, s.status, s.ai_score, s.manual_score,
+              s.created_at, s.updated_at, a.id, a.title, a.description, a.due_date,
+              c.id, c.title, c.description, u.id, u.name, u.email
+     ORDER BY s.created_at DESC`
+  );
+  return result.rows;
+}
+
+/**
  * Haalt de instellingen van een opdracht op
  * @param {number} assignmentId - ID van de opdracht
  * @returns {Promise<Object|null>} Object met instellingen of null als niet gevonden
@@ -733,6 +772,7 @@ module.exports = {
   unenrollStudent,
   getCourseAssignments,
   getAllAssignments,
+  getAllSubmissions,
   deleteAssignment,
   getStudentById,
   updateStudent,
