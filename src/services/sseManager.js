@@ -19,6 +19,7 @@ function subscribe(submissionId, res) {
   }
 
   connections.get(submissionId).add(res);
+  console.log(`[SSE] ✅ Client subscribed to submission ${submissionId}. Active connections: ${connections.get(submissionId).size}`);
 
   // Set up cleanup on connection close
   res.on('close', () => {
@@ -51,9 +52,12 @@ function unsubscribe(submissionId, res) {
  */
 function broadcast(submissionId, eventType, data = {}) {
   const submissionConnections = connections.get(submissionId);
-  if (!submissionConnections) {
+  if (!submissionConnections || submissionConnections.size === 0) {
+    console.log(`[SSE] ⚠️ No active connections for submission ${submissionId}, broadcast skipped`);
     return;
   }
+
+  console.log(`[SSE] 📤 Broadcasting ${eventType} to ${submissionConnections.size} client(s) for submission ${submissionId}`);
 
   const eventData = {
     ...data,
