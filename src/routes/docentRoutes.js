@@ -15,7 +15,8 @@ const {
 	getDocentAssignments,
 	getDocentCourseAssignments,
 	createAssignment,
-	getAssignmentDetail
+	getAssignmentDetail,
+	updateAssignment
 } = require('../controllers/docentController');
 
 /**
@@ -321,6 +322,156 @@ router.get('/assignments', getDocentAssignments);
  *         description: Interne serverfout
  */
 router.get('/assignments/:assignmentId', getAssignmentDetail);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}:
+ *   put:
+ *     tags:
+ *       - Docenten
+ *     summary: Update een bestaande opdracht
+ *     description: Werk de details van een opdracht bij. Alleen docenten van de cursus en admins kunnen opdrachten wijzigen.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht die moet worden bijgewerkt
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 maxLength: 255
+ *                 description: Titel van de opdracht (mag niet leeg zijn indien opgegeven)
+ *                 example: "Updated REST API Implementation"
+ *               description:
+ *                 type: string
+ *                 description: Beschrijving van de opdracht
+ *                 example: "Build a comprehensive RESTful API with Node.js, Express, and PostgreSQL"
+ *               dueDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Deadline voor de opdracht (ISO8601 format)
+ *                 example: "2025-12-31T23:59:59Z"
+ *               rubric:
+ *                 type: string
+ *                 description: Beoordelingsrubriek voor de opdracht
+ *                 example: "Functionality (40%), Code quality (30%), Documentation (20%), Testing (10%)"
+ *               aiGuidelines:
+ *                 type: string
+ *                 description: AI feedback richtlijnen
+ *                 example: "Check for RESTful best practices, proper error handling, and security measures"
+ *           example:
+ *             title: "Updated REST API Implementation"
+ *             description: "Build a comprehensive RESTful API with Node.js, Express, and PostgreSQL"
+ *             dueDate: "2025-12-31T23:59:59Z"
+ *             rubric: "Functionality (40%), Code quality (30%), Documentation (20%), Testing (10%)"
+ *             aiGuidelines: "Check for RESTful best practices, proper error handling, and security measures"
+ *     responses:
+ *       200:
+ *         description: Opdracht succesvol bijgewerkt
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       description: Unieke ID van de opdracht
+ *                     title:
+ *                       type: string
+ *                       description: Titel van de opdracht
+ *                     description:
+ *                       type: string
+ *                       description: Beschrijving van de opdracht
+ *                     courseId:
+ *                       type: integer
+ *                       description: ID van de cursus
+ *                     dueDate:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Deadline voor de opdracht
+ *                     rubric:
+ *                       type: string
+ *                       description: Beoordelingsrubriek
+ *                     aiGuidelines:
+ *                       type: string
+ *                       description: AI feedback richtlijnen
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Aanmaakdatum
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Laatste wijzigingsdatum
+ *             example:
+ *               assignment:
+ *                 id: 1
+ *                 title: "Updated REST API Implementation"
+ *                 description: "Build a comprehensive RESTful API with Node.js, Express, and PostgreSQL"
+ *                 courseId: 1
+ *                 dueDate: "2025-12-31T23:59:59.000Z"
+ *                 rubric: "Functionality (40%), Code quality (30%), Documentation (20%), Testing (10%)"
+ *                 aiGuidelines: "Check for RESTful best practices, proper error handling, and security measures"
+ *                 createdAt: "2024-12-01T10:00:00.000Z"
+ *                 updatedAt: "2024-12-18T14:30:00.000Z"
+ *       400:
+ *         description: Validatiefout (ongeldige invoer, lege titel, etc.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *             examples:
+ *               noFields:
+ *                 value:
+ *                   error: "No fields provided to update"
+ *               emptyTitle:
+ *                 value:
+ *                   error: "Title cannot be empty"
+ *               invalidDate:
+ *                 value:
+ *                   error: "Invalid dueDate format: must be a valid ISO8601 date"
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toestemming (gebruiker is geen docent van deze cursus)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Forbidden: You are not a teacher of this course"
+ *       404:
+ *         description: Opdracht niet gevonden
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Assignment not found"
+ *       500:
+ *         description: Interne serverfout
+ */
+router.put('/assignments/:assignmentId', authenticateToken, updateAssignment);
 
 /**
  * @swagger
