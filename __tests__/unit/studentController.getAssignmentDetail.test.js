@@ -32,6 +32,14 @@ describe('studentController.getAssignmentDetail', () => {
         rubric: 'Code kwaliteit: 40%...',
         ai_guidelines: 'Focus op clean code principes...',
         submission_id: 42,
+        submission_status: 'analyzed',
+        ai_score: 85,
+        last_analysis_date: '2025-01-10T14:30:00Z',
+        critical_count: 0,
+        high_count: 0,
+        medium_count: 1,
+        low_count: 2,
+        feedback_count: 3,
         enrollment_id: 1  // Student is enrolled
       };
 
@@ -39,28 +47,25 @@ describe('studentController.getAssignmentDetail', () => {
 
       const result = await getAssignmentDetail(1, 5);
 
-      expect(result).toEqual({
-        success: true,
-        data: {
-          assignment: {
-            id: 1,
-            title: 'JavaScript Basics',
-            description: 'Maak een calculator app',
-            due_date: '2025-01-15T23:59:59Z',
-            created_at: '2025-01-01T10:00:00Z'
-          },
-          course: {
-            id: 5,
-            title: 'Web Development 101',
-            rubric: 'Code kwaliteit: 40%...',
-            ai_guidelines: 'Focus op clean code principes...'
-          },
-          submission_status: {
-            has_submitted: true,
-            submission_id: 42
-          }
-        }
+      expect(result.success).toBe(true);
+      expect(result.data.assignment).toEqual({
+        id: 1,
+        title: 'JavaScript Basics',
+        description: 'Maak een calculator app',
+        due_date: '2025-01-15T23:59:59Z',
+        created_at: '2025-01-01T10:00:00Z'
       });
+      expect(result.data.course).toEqual({
+        id: 5,
+        title: 'Web Development 101',
+        rubric: 'Code kwaliteit: 40%...',
+        ai_guidelines: 'Focus op clean code principes...'
+      });
+      expect(result.data.submission_status.has_submitted).toBe(true);
+      expect(result.data.submission_status.submission_id).toBe(42);
+      // New enhanced fields
+      expect(result.data.submission_status.status_text).toBe('Goed op weg');
+      expect(result.data.submission_status.progress_percentage).toBe(85);
     });
 
     it('should return has_submitted false when no submission exists', async () => {
@@ -75,6 +80,14 @@ describe('studentController.getAssignmentDetail', () => {
         rubric: null,
         ai_guidelines: null,
         submission_id: null,
+        submission_status: null,
+        ai_score: null,
+        last_analysis_date: null,
+        critical_count: 0,
+        high_count: 0,
+        medium_count: 0,
+        low_count: 0,
+        feedback_count: 0,
         enrollment_id: 1
       };
 
@@ -83,10 +96,10 @@ describe('studentController.getAssignmentDetail', () => {
       const result = await getAssignmentDetail(1, 5);
 
       expect(result.success).toBe(true);
-      expect(result.data.submission_status).toEqual({
-        has_submitted: false,
-        submission_id: null
-      });
+      expect(result.data.submission_status.has_submitted).toBe(false);
+      expect(result.data.submission_status.submission_id).toBeNull();
+      expect(result.data.submission_status.status_text).toBe('Nog niet ingediend');
+      expect(result.data.submission_status.progress_percentage).toBe(0);
     });
 
     it('should handle null rubric and ai_guidelines', async () => {
@@ -163,6 +176,169 @@ describe('studentController.getAssignmentDetail', () => {
 
       await expect(getAssignmentDetail(1, 5))
         .rejects.toThrow('Connection failed');
+    });
+  });
+
+  // ==========================================
+  // Enhanced Submission Status
+  // ==========================================
+  describe('Enhanced Submission Status', () => {
+    it('should return feedback_summary with severity counts', async () => {
+      const mockAssignmentData = {
+        id: 1,
+        title: 'JavaScript Basics',
+        description: 'Test opdracht',
+        due_date: '2025-01-15T23:59:59Z',
+        created_at: '2025-01-01T10:00:00Z',
+        course_id: 5,
+        course_title: 'Web Development 101',
+        rubric: null,
+        ai_guidelines: null,
+        submission_id: 42,
+        submission_status: 'analyzed',
+        ai_score: 85,
+        last_analysis_date: '2025-01-10T14:30:00Z',
+        critical_count: 0,
+        high_count: 1,
+        medium_count: 2,
+        low_count: 3,
+        feedback_count: 6,
+        enrollment_id: 1
+      };
+
+      db.query.mockResolvedValueOnce({ rows: [mockAssignmentData] });
+
+      const result = await getAssignmentDetail(1, 5);
+
+      expect(result.success).toBe(true);
+      expect(result.data.submission_status.feedback_summary).toEqual({
+        critical: 0,
+        high: 1,
+        medium: 2,
+        low: 3,
+        total: 6
+      });
+    });
+
+    it('should return status_text based on feedback severity', async () => {
+      const mockAssignmentData = {
+        id: 1,
+        title: 'Test',
+        description: null,
+        due_date: null,
+        created_at: '2025-01-01T10:00:00Z',
+        course_id: 5,
+        course_title: 'Course',
+        rubric: null,
+        ai_guidelines: null,
+        submission_id: 42,
+        submission_status: 'analyzed',
+        ai_score: 60,
+        last_analysis_date: '2025-01-10T14:30:00Z',
+        critical_count: 1,
+        high_count: 2,
+        medium_count: 0,
+        low_count: 0,
+        feedback_count: 3,
+        enrollment_id: 1
+      };
+
+      db.query.mockResolvedValueOnce({ rows: [mockAssignmentData] });
+
+      const result = await getAssignmentDetail(1, 5);
+
+      expect(result.data.submission_status.status_text).toBe('Actie vereist');
+    });
+
+    it('should return progress_percentage from ai_score', async () => {
+      const mockAssignmentData = {
+        id: 1,
+        title: 'Test',
+        description: null,
+        due_date: null,
+        created_at: '2025-01-01T10:00:00Z',
+        course_id: 5,
+        course_title: 'Course',
+        rubric: null,
+        ai_guidelines: null,
+        submission_id: 42,
+        submission_status: 'analyzed',
+        ai_score: 75,
+        last_analysis_date: '2025-01-10T14:30:00Z',
+        critical_count: 0,
+        high_count: 0,
+        medium_count: 1,
+        low_count: 1,
+        feedback_count: 2,
+        enrollment_id: 1
+      };
+
+      db.query.mockResolvedValueOnce({ rows: [mockAssignmentData] });
+
+      const result = await getAssignmentDetail(1, 5);
+
+      expect(result.data.submission_status.progress_percentage).toBe(75);
+    });
+
+    it('should return last_analysis_date from submission', async () => {
+      const mockAssignmentData = {
+        id: 1,
+        title: 'Test',
+        description: null,
+        due_date: null,
+        created_at: '2025-01-01T10:00:00Z',
+        course_id: 5,
+        course_title: 'Course',
+        rubric: null,
+        ai_guidelines: null,
+        submission_id: 42,
+        submission_status: 'analyzed',
+        ai_score: 90,
+        last_analysis_date: '2025-01-10T14:30:00Z',
+        critical_count: 0,
+        high_count: 0,
+        medium_count: 0,
+        low_count: 0,
+        feedback_count: 0,
+        enrollment_id: 1
+      };
+
+      db.query.mockResolvedValueOnce({ rows: [mockAssignmentData] });
+
+      const result = await getAssignmentDetail(1, 5);
+
+      expect(result.data.submission_status.last_analysis_date).toBe('2025-01-10T14:30:00Z');
+    });
+
+    it('should return status_text "Nog niet ingediend" when no submission', async () => {
+      const mockAssignmentData = {
+        id: 1,
+        title: 'Test',
+        description: null,
+        due_date: null,
+        created_at: '2025-01-01T10:00:00Z',
+        course_id: 5,
+        course_title: 'Course',
+        rubric: null,
+        ai_guidelines: null,
+        submission_id: null,
+        submission_status: null,
+        ai_score: null,
+        last_analysis_date: null,
+        critical_count: 0,
+        high_count: 0,
+        medium_count: 0,
+        low_count: 0,
+        feedback_count: 0,
+        enrollment_id: 1
+      };
+
+      db.query.mockResolvedValueOnce({ rows: [mockAssignmentData] });
+
+      const result = await getAssignmentDetail(1, 5);
+
+      expect(result.data.submission_status.status_text).toBe('Nog niet ingediend');
+      expect(result.data.submission_status.progress_percentage).toBe(0);
     });
   });
 

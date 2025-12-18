@@ -681,7 +681,53 @@ router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/Assignment'
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                         nullable: true
+ *                       due_date:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       submission_id:
+ *                         type: integer
+ *                         nullable: true
+ *                       submission_status:
+ *                         type: string
+ *                         enum: [submitted, pending]
+ *                       status:
+ *                         type: string
+ *                         nullable: true
+ *                         description: Submission status (pending, analyzed, etc.)
+ *                       ai_score:
+ *                         type: integer
+ *                         nullable: true
+ *                         description: AI score (0-100)
+ *                       progress_percentage:
+ *                         type: integer
+ *                         description: Voortgangspercentage gebaseerd op ai_score
+ *                         example: 75
+ *                       status_text:
+ *                         type: string
+ *                         description: Leesbare status tekst
+ *                         example: Goed op weg
+ *                       feedback_count:
+ *                         type: integer
+ *                         description: Totaal aantal feedback items
+ *                         example: 6
+ *                       last_analysis_date:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         description: Datum van laatste AI analyse
  *       400:
  *         description: Ongeldig cursus ID
  *       403:
@@ -1186,6 +1232,38 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
  *                         submission_id:
  *                           type: integer
  *                           nullable: true
+ *                         status_text:
+ *                           type: string
+ *                           description: Leesbare status tekst
+ *                           example: Goed op weg
+ *                         progress_percentage:
+ *                           type: integer
+ *                           description: Voortgangspercentage gebaseerd op ai_score
+ *                           example: 75
+ *                         last_analysis_date:
+ *                           type: string
+ *                           format: date-time
+ *                           nullable: true
+ *                           description: Datum van laatste AI analyse
+ *                         feedback_summary:
+ *                           type: object
+ *                           description: Samenvatting van feedback per severity
+ *                           properties:
+ *                             critical:
+ *                               type: integer
+ *                               example: 0
+ *                             high:
+ *                               type: integer
+ *                               example: 1
+ *                             medium:
+ *                               type: integer
+ *                               example: 2
+ *                             low:
+ *                               type: integer
+ *                               example: 3
+ *                             total:
+ *                               type: integer
+ *                               example: 6
  *                 message:
  *                   type: string
  *                   example: Assignment opgehaald
