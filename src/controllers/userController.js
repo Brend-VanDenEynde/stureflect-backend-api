@@ -205,6 +205,103 @@ async function getProfile(req, res) {
   }
 }
 
+// Update user profile
+async function updateProfile(req, res) {
+  try {
+    const userId = req.user.id;
+    const { name, email } = req.body;
+
+    // Validation
+    const updates = {};
+    if (name !== undefined) {
+      if (typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: 'Naam moet een niet-lege string zijn.' });
+      }
+      updates.name = name.trim();
+    }
+
+    if (email !== undefined) {
+      if (typeof email !== 'string' || email.trim().length === 0) {
+        return res.status(400).json({ error: 'E-mailadres moet een niet-lege string zijn.' });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Ongeldig e-mailadres.' });
+      }
+      
+      // Check if email is already in use by another user
+      const existingUser = await userModel.getUserByEmail(email);
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(400).json({ error: 'E-mailadres is al in gebruik.' });
+      }
+      updates.email = email.trim().toLowerCase();
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'Geen velden om bij te werken.' });
+    }
+
+    const updatedUser = await userModel.updateUser(userId, updates);
+    
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'Gebruiker niet gevonden.' });
+    }
+
+    // Return updated user without password hash
+    const { password_hash, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (error) {
+    console.error('Fout bij bijwerken profiel:', error);
+    res.status(500).json({ error: 'Interne serverfout bij bijwerken profiel.' });
+  }
+}
+
+// Update or set user password
+async function updatePassword(req, res) {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate new password
+    if (!newPassword || typeof newPassword !== 'string') {
+      return res.status(400).json({ error: 'Nieuw wachtwoord is verplicht.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Wachtwoord moet minimaal 6 tekens bevatten.' });
+    }
+
+    // Get current user
+    const user = await userModel.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Gebruiker niet gevonden.' });
+    }
+
+    // If user already has a password, verify current password
+    if (user.password_hash) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Huidig wachtwoord is verplicht om je wachtwoord te wijzigen.' });
+      }
+
+      const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Huidig wachtwoord is onjuist.' });
+      }
+    }
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await userModel.updateUserPassword(userId, newPasswordHash);
+
+    res.json({ message: 'Wachtwoord succesvol bijgewerkt.' });
+  } catch (error) {
+    console.error('Fout bij bijwerken wachtwoord:', error);
+    res.status(500).json({ error: 'Interne serverfout bij bijwerken wachtwoord.' });
+  }
+}
+
 module.exports = {
   loginUser,
   registerUser,
@@ -212,4 +309,6 @@ module.exports = {
   logoutUser,
   githubCallback,
   getProfile,
+  updateProfile,
+  updatePassword,
 };

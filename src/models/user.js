@@ -67,6 +67,43 @@ async function updateUserGithubAccessToken(id, github_access_token) {
   return result.rows[0];
 }
 
+// Functie om gebruikersprofiel bij te werken
+async function updateUser(id, updates) {
+  const allowedFields = ['name', 'email'];
+  const fields = [];
+  const values = [];
+  let paramIndex = 1;
+
+  // Build dynamic query based on provided fields
+  for (const [key, value] of Object.entries(updates)) {
+    if (allowedFields.includes(key) && value !== undefined) {
+      fields.push(`${key} = $${paramIndex}`);
+      values.push(value);
+      paramIndex++;
+    }
+  }
+
+  if (fields.length === 0) {
+    throw new Error('Geen geldige velden om bij te werken');
+  }
+
+  // Add updated_at timestamp
+  fields.push(`updated_at = NOW()`);
+  
+  // Add user id as last parameter
+  values.push(id);
+
+  const query = `
+    UPDATE "user" 
+    SET ${fields.join(', ')} 
+    WHERE id = $${paramIndex} 
+    RETURNING *;
+  `;
+
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
 // Functie om een refresh token op te slaan
 async function saveRefreshToken(userId, token, expiresAt) {
   const tokenHash = hashToken(token);
@@ -118,6 +155,7 @@ module.exports = {
   updateUserPassword,
   updateUserGithubId,
   updateUserGithubAccessToken,
+  updateUser,
   saveRefreshToken,
   getRefreshToken,
   revokeRefreshToken,
