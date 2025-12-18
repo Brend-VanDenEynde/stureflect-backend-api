@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
+const { invalidateAssignmentCache, invalidateCourseCache } = require('../services/cachingService');
 
 /**
  * Valideer GitHub webhook signature
@@ -182,6 +183,14 @@ async function updateSubmissionStatus(submissionId, commitSha, status, branch = 
       }
     });
 
+    // Invalidate cache for assignment and course statistics
+    if (assignmentId) {
+      invalidateAssignmentCache(assignmentId);
+    }
+    if (courseId) {
+      invalidateCourseCache(courseId);
+    }
+
     return result.rows[0];
   } catch (error) {
     console.error('[API] Error updating submission:', error.message);
@@ -265,6 +274,20 @@ async function createOrUpdateSubmission(assignmentId, userId, githubUrl, commitS
        RETURNING id, assignment_id, user_id, github_url, commit_sha, status`,
       [assignmentId, userId, githubUrl, commitSha]
     );
+
+    // Invalidate cache for assignment statistics
+    if (assignmentId) {
+      invalidateAssignmentCache(assignmentId);
+      
+      // Get course ID and invalidate course cache too
+      const courseResult = await db.query(
+        'SELECT course_id FROM assignment WHERE id = $1',
+        [assignmentId]
+      );
+      if (courseResult.rows.length > 0) {
+        invalidateCourseCache(courseResult.rows[0].course_id);
+      }
+    }
 
     return result.rows[0];
   } catch (error) {
@@ -427,6 +450,10 @@ async function updateSubmissionWithScore(submissionId, commitSha, aiScore, statu
         assignmentId: submission.assignment_id,
         aiScore: aiScore
       });
+      
+      // Invalidate cache for assignment and course statistics
+      invalidateAssignmentCache(submission.assignment_id);
+      invalidateCourseCache(courseId);
       
       // Structured event log
       logger.event('submission_analyzed', {
