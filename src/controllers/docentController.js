@@ -829,6 +829,57 @@ const removeStudentFromCourse = async (req, res) => {
   }
 };
 
+const createCourse = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { title, description, join_code } = req.body;
+
+    // Authorization check
+    if (userRole !== 'teacher' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Only teachers and admins can create courses' });
+    }
+
+    // Validation: title required
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Title is required and cannot be empty' });
+    }
+
+    // Insert course
+    const courseResult = await pool.query(
+      `INSERT INTO course (title, description, join_code, created_at, updated_at)
+       VALUES ($1, $2, $3, NOW(), NOW())
+       RETURNING id, title, description, join_code, created_at as "createdAt", updated_at as "updatedAt"`,
+      [title.trim(), description || null, join_code || null]
+    );
+
+    const newCourse = courseResult.rows[0];
+
+    // Add authenticated user as teacher
+    await pool.query(
+      `INSERT INTO course_teacher (course_id, user_id, created_at)
+       VALUES ($1, $2, NOW())`,
+      [newCourse.id, userId]
+    );
+
+    console.log(`✅ Course created: ${newCourse.id} by user ${userId}`);
+    res.status(201).json({ course: newCourse });
+
+  } catch (error) {
+    console.error('❌ Error creating course:', error.message);
+
+    // Handle duplicate join_code
+    if (error.code === '23505' && error.constraint === 'course_join_code_key') {
+      return res.status(409).json({ error: 'Join code already exists' });
+    }
+
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 const getDocentCourses = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -959,6 +1010,7 @@ module.exports = {
   addStudentToCourse,
   removeStudentFromCourse,
   getDocentCourses,
+  createCourse,
   streamCourseStatistics
 };
 
