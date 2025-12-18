@@ -1139,6 +1139,112 @@ const streamCourseStatistics = async (req, res) => {
   }
 };
 
+// Haal alle opdrachten van de docent op (over alle vakken)
+const getDocentAssignments = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      courseId,
+      sortBy = 'dueDate',
+      sortOrder = 'asc',
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    // Validate sortBy
+    const validSortFields = ['dueDate', 'title', 'createdAt', 'courseTitle'];
+    const sortFieldMap = {
+      dueDate: 'a.due_date',
+      title: 'a.title',
+      createdAt: 'a.created_at',
+      courseTitle: 'c.title'
+    };
+    const safeSortBy = validSortFields.includes(sortBy) ? sortFieldMap[sortBy] : 'a.due_date';
+    const safeOrder = sortOrder.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+    // Build WHERE conditions
+    let whereConditions = ['ct.user_id = $1'];
+    let queryParams = [userId];
+    let paramCounter = 2;
+
+    if (courseId) {
+      whereConditions.push(`a.course_id = $${paramCounter}`);
+      queryParams.push(courseId);
+      paramCounter++;
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Count query for pagination
+    const countResult = await pool.query(`
+      SELECT COUNT(DISTINCT a.id) as total
+      FROM assignment a
+      INNER JOIN course c ON c.id = a.course_id
+      INNER JOIN course_teacher ct ON ct.course_id = c.id
+      WHERE ${whereClause}
+    `, queryParams);
+
+    const totalItems = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(totalItems / limit);
+    const offset = (page - 1) * limit;
+
+    // Add pagination params
+    queryParams.push(limit, offset);
+
+    // Main query
+    const result = await pool.query(`
+      SELECT 
+        a.id,
+        a.title,
+        a.description,
+        a.course_id,
+        a.due_date,
+        a.rubric,
+        a.ai_guidelines,
+        a.created_at,
+        a.updated_at,
+        c.title as course_title
+      FROM assignment a
+      INNER JOIN course c ON c.id = a.course_id
+      INNER JOIN course_teacher ct ON ct.course_id = c.id
+      WHERE ${whereClause}
+      ORDER BY ${safeSortBy} ${safeOrder} NULLS LAST
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+    `, queryParams);
+
+    // Map to camelCase
+    const assignments = result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      courseId: row.course_id,
+      courseTitle: row.course_title,
+      dueDate: row.due_date,
+      rubric: row.rubric,
+      aiGuidelines: row.ai_guidelines,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    res.json({
+      assignments,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('[API] Error fetching docent assignments:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1149,6 +1255,7 @@ module.exports = {
   createCourse,
   updateCourse,
   deleteCourse,
-  streamCourseStatistics
+  streamCourseStatistics,
+  getDocentAssignments
 };
 
