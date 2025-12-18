@@ -653,7 +653,7 @@ const addStudentToCourse = async (req, res) => {
     // 1. Find the user by email
     console.log('🔍 [STEP 1] Looking up user by email:', email);
     const userResult = await pool.query(
-      'SELECT id FROM "user" WHERE email = $1',
+      'SELECT id, role FROM "user" WHERE email = $1',
       [email]
     );
 
@@ -667,8 +667,19 @@ const addStudentToCourse = async (req, res) => {
       return res.status(404).json({ error: 'Student not found with this email' });
     }
 
-    const studentId = userResult.rows[0].id;
-    console.log('✅ [STEP 1] Student found - ID:', studentId);
+    const user = userResult.rows[0];
+    
+    // Validate that the user is a student
+    if (user.role !== 'student') {
+      console.log('❌ [STEP 1] User found but is not a student. Role:', user.role);
+      return res.status(400).json({ 
+        error: 'Only users with student role can be enrolled in courses',
+        userRole: user.role
+      });
+    }
+
+    const studentId = user.id;
+    console.log('✅ [STEP 1] Student found - ID:', studentId, '| Role:', user.role);
 
     // 2. Check if already enrolled
     console.log('🔍 [STEP 2] Checking if student is already enrolled');
