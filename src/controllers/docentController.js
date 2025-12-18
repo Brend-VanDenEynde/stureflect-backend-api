@@ -880,6 +880,75 @@ const createCourse = async (req, res) => {
   }
 };
 
+const updateCourse = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { title, description, join_code } = req.body;
+
+    // Validation: courseId required
+    if (!courseId) {
+      return res.status(400).json({ error: 'courseId is required' });
+    }
+
+    // Validation: title required and not empty
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Title is required and cannot be empty' });
+    }
+
+    // Check if course exists
+    const courseCheck = await pool.query(
+      'SELECT id FROM course WHERE id = $1',
+      [courseId]
+    );
+
+    if (courseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Authorization check: verify user is a teacher of this course
+    const accessCheck = await pool.query(
+      'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+      [courseId, userId]
+    );
+
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to edit this course' });
+    }
+
+    // Update course
+    const updateResult = await pool.query(
+      `UPDATE course 
+       SET title = $1, description = $2, join_code = $3, updated_at = NOW()
+       WHERE id = $4
+       RETURNING id, title, description, join_code, created_at as "createdAt", updated_at as "updatedAt"`,
+      [title.trim(), description || null, join_code || null, courseId]
+    );
+
+    const updatedCourse = updateResult.rows[0];
+
+    // Invalidate cache for this course
+    invalidateCourseCache(courseId);
+
+    console.log(`✅ Course updated: ${courseId} by user ${userId}`);
+    res.json({ course: updatedCourse });
+
+  } catch (error) {
+    console.error('❌ Error updating course:', error.message);
+
+    // Handle duplicate join_code
+    if (error.code === '23505' && error.constraint === 'course_join_code_key') {
+      return res.status(409).json({ error: 'Join code already exists' });
+    }
+
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 const getDocentCourses = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1011,6 +1080,7 @@ module.exports = {
   removeStudentFromCourse,
   getDocentCourses,
   createCourse,
+  updateCourse,
   streamCourseStatistics
 };
 
