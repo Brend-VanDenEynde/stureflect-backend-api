@@ -1400,6 +1400,7 @@ router.get('/me/assignments/:assignmentId', async (req, res) => {
  *         description: Server error
  */
 router.get('/me/assignments/:assignmentId/events', async (req, res) => {
+  console.log(`[SSE] 🔔 SSE endpoint hit: assignmentId=${req.params.assignmentId}, studentId=${req.query.studentId}`);
   try {
     const studentId = req.user?.id ||
       (process.env.NODE_ENV !== 'production' && req.query.studentId
