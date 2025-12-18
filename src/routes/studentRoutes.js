@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
-const authenticateToken = require('../middleware/authMiddleware');
+const { authenticateToken } = require('../middleware/authMiddleware');
 const studentController = require('../controllers/studentController');
 const githubService = require('../services/githubService');
 const { getFeedbackBySubmission } = require('../controllers/webhookController');
