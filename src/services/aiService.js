@@ -4,7 +4,7 @@ const axios = require('axios');
  * OpenAI API configuratie
  */
 const OPENAI_API_BASE = 'https://api.openai.com/v1';
-const OPENAI_MODEL = 'gpt-4o-mini'; // GPT-4o-mini model
+const OPENAI_MODEL = 'gpt-5-mini'; // GPT-5 mini model
 const OPENAI_TIMEOUT = 120000; // 120s timeout voor Dokploy
 
 /**
@@ -168,8 +168,7 @@ async function analyzeFile(filePath, content, language, courseSettings) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3, // Lage temperature voor consistente output
-        max_tokens: 2000
+        max_completion_tokens: 16000  // GPT-5 mini gebruikt reasoning tokens, dus we hebben meer nodig
       },
       {
         headers: getOpenAIHeaders(),
@@ -177,10 +176,20 @@ async function analyzeFile(filePath, content, language, courseSettings) {
       }
     );
 
+    // Log de volledige response structuur voor debugging
+    console.log(`[API] AI response structure:`, JSON.stringify({
+      hasData: !!response.data,
+      hasChoices: !!response.data?.choices,
+      choicesLength: response.data?.choices?.length,
+      firstChoice: response.data?.choices?.[0],
+      usage: response.data?.usage
+    }, null, 2));
+
     const aiResponse = response.data.choices[0]?.message?.content;
 
     if (!aiResponse) {
-      console.warn(`[AI] Geen response voor ${filePath}`);
+      console.warn(`[API] AI: No response for ${filePath}`);
+      console.warn(`[API] AI: Full response data:`, JSON.stringify(response.data));
       return [];
     }
 
@@ -189,11 +198,11 @@ async function analyzeFile(filePath, content, language, courseSettings) {
 
     return feedbackItems;
   } catch (error) {
-    console.error(`[AI ERROR] Fout bij analyseren ${filePath}:`, error.message);
+    console.error(`[API] AI error analyzing ${filePath}:`, error.message);
 
     if (error.response) {
-      console.error('[AI ERROR] Status:', error.response.status);
-      console.error('[AI ERROR] Data:', JSON.stringify(error.response.data));
+      console.error('[API] AI error status:', error.response.status);
+      console.error('[API] AI error data:', JSON.stringify(error.response.data));
     }
 
     // Return lege array bij fout, niet crashen
@@ -221,7 +230,7 @@ function parseAIResponse(response, filePath) {
     const parsed = JSON.parse(jsonStr);
 
     if (!Array.isArray(parsed)) {
-      console.warn(`[AI] Response is geen array voor ${filePath}`);
+      console.warn(`[API] AI: Response is not an array for ${filePath}`);
       return [];
     }
 
@@ -238,8 +247,8 @@ function parseAIResponse(response, filePath) {
       }))
       .slice(0, 10); // Max 10 items per bestand
   } catch (parseError) {
-    console.warn(`[AI] Kon response niet parsen voor ${filePath}:`, parseError.message);
-    console.warn(`[AI] Raw response:`, response.substring(0, 500));
+    console.warn(`[API] AI: Could not parse response for ${filePath}:`, parseError.message);
+    console.warn(`[API] AI: Raw response:`, response.substring(0, 500));
     return [];
   }
 }
@@ -259,15 +268,15 @@ async function analyzeFiles(files, courseSettings) {
     by_type: {}
   };
 
-  console.log(`[AI] Start analyse van ${files.length} bestanden`);
+  console.log(`[API] AI: Starting analysis of ${files.length} files`);
 
   for (const file of files) {
     if (!file.content) {
-      console.log(`[AI] Skip ${file.path} - geen content`);
+      console.log(`[API] AI: Skip ${file.path} - no content`);
       continue;
     }
 
-    console.log(`[AI] Analyseer ${file.path} (${file.language})`);
+    console.log(`[API] AI: Analyzing ${file.path} (${file.language})`);
 
     const feedback = await analyzeFile(
       file.path,
@@ -292,7 +301,7 @@ async function analyzeFiles(files, courseSettings) {
     }
   }
 
-  console.log(`[AI] Analyse compleet: ${summary.files_analyzed} bestanden, ${summary.total_feedback} feedback items`);
+  console.log(`[API] AI: Analysis complete - ${summary.files_analyzed} files, ${summary.total_feedback} feedback items`);
 
   return {
     success: true,
@@ -337,7 +346,7 @@ function calculateScore(feedback) {
  */
 function logAIEvent(action, details) {
   const timestamp = new Date().toISOString();
-  console.log(`[AI ${timestamp}] ${action} | ${details}`);
+  console.log(`[API] AI ${timestamp} | ${action} | ${details}`);
 }
 
 module.exports = {

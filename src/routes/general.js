@@ -27,6 +27,34 @@ router.get('/', (req, res) => {
 
 /**
  * @swagger
+ * /auth-callback:
+ *   get:
+ *     tags:
+ *       - Algemeen
+ *     summary: OAuth Callback Handler
+ *     description: Ontvangt OAuth tokens en redirect naar test UI
+ *     parameters:
+ *       - name: accessToken
+ *         in: query
+ *         schema:
+ *           type: string
+ *       - name: refreshToken
+ *         in: query
+ *         schema:
+ *           type: string
+ *     responses:
+ *       302:
+ *         description: Redirect naar test UI met tokens
+ */
+router.get('/auth-callback', (req, res) => {
+  // Redirect OAuth tokens naar root test UI
+  const { accessToken, refreshToken } = req.query;
+  console.log('[AUTH-CALLBACK] OAuth callback ontvangen, redirect naar test UI');
+  res.redirect(`/?accessToken=${accessToken}&refreshToken=${refreshToken}`);
+});
+
+/**
+ * @swagger
  * /health:
  *   get:
  *     tags:

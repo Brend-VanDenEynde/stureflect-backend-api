@@ -47,7 +47,7 @@ async function loginUser(req, res) {
       }
     });
   } catch (error) {
-    console.error('Fout bij inloggen:', error);
+    console.error('[API] Login error:', error.message);
     res.status(500).json({ error: 'Interne serverfout bij login.' });
   }
 }
@@ -77,7 +77,7 @@ async function registerUser(req, res) {
     const { password_hash: _, ...userWithoutPassword } = user;
     res.status(201).json(userWithoutPassword);
   } catch (error) {
-    console.error('Fout bij registratie:', error);
+    console.error('[API] Registration error:', error.message);
     res.status(500).json({ error: 'Interne serverfout bij registratie.' });
   }
 }
@@ -130,7 +130,7 @@ async function refreshAccessToken(req, res) {
       return res.status(403).json({ error: 'Ongeldig refresh token.' });
     }
   } catch (error) {
-    console.error('Fout bij token vernieuwen:', error);
+    console.error('[API] Token refresh error:', error.message);
     res.status(500).json({ error: 'Interne serverfout bij token vernieuwen.' });
   }
 }
@@ -147,7 +147,7 @@ async function logoutUser(req, res) {
     await userModel.revokeRefreshToken(refreshToken);
     res.json({ message: 'Succesvol uitgelogd.' });
   } catch (error) {
-    console.error('Fout bij uitloggen:', error);
+    console.error('[API] Logout error:', error.message);
     res.status(500).json({ error: 'Interne serverfout bij uitloggen.' });
   }
 }

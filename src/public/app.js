@@ -11,10 +11,93 @@ const refreshBtn = document.getElementById('refreshBtn');
 const feedbackModal = document.getElementById('feedbackModal');
 const feedbackContent = document.getElementById('feedbackContent');
 
+// Auth state
+let currentUser = null;
+
 // Load submissions on page load
 document.addEventListener('DOMContentLoaded', () => {
+  handleOAuthCallback();
+  checkAuthStatus();
   loadSubmissions();
 });
+
+// Handle OAuth callback - check URL for tokens
+function handleOAuthCallback() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const accessToken = urlParams.get('accessToken');
+  const refreshToken = urlParams.get('refreshToken');
+
+  if (accessToken && refreshToken) {
+    // Store tokens
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+
+    // Parse user info from JWT
+    try {
+      const payload = JSON.parse(atob(accessToken.split('.')[1]));
+      currentUser = {
+        id: payload.id,
+        email: payload.email,
+        role: payload.role
+      };
+      localStorage.setItem('user', JSON.stringify(currentUser));
+    } catch (e) {
+      console.error('Failed to parse JWT:', e);
+    }
+
+    // Clean URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
+// Check if user is logged in
+function checkAuthStatus() {
+  const accessToken = localStorage.getItem('accessToken');
+  const userStr = localStorage.getItem('user');
+
+  if (accessToken && userStr) {
+    try {
+      currentUser = JSON.parse(userStr);
+      showLoggedInState();
+    } catch (e) {
+      logout();
+    }
+  } else {
+    showLoggedOutState();
+  }
+}
+
+// Show logged in UI
+function showLoggedInState() {
+  document.getElementById('notLoggedIn').style.display = 'none';
+  document.getElementById('loggedIn').style.display = 'flex';
+  document.getElementById('userEmail').textContent = currentUser.email || '';
+  document.getElementById('userId').textContent = `(ID: ${currentUser.id})`;
+
+  // Auto-fill studentId
+  document.getElementById('studentId').value = currentUser.id;
+
+  // Enable submission section
+  document.getElementById('submissionSection').style.opacity = '1';
+}
+
+// Show logged out UI
+function showLoggedOutState() {
+  document.getElementById('notLoggedIn').style.display = 'block';
+  document.getElementById('loggedIn').style.display = 'none';
+
+  // Dim submission section
+  document.getElementById('submissionSection').style.opacity = '0.6';
+}
+
+// Logout function
+function logout() {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  currentUser = null;
+  showLoggedOutState();
+}
 
 // Refresh button
 refreshBtn.addEventListener('click', loadSubmissions);
@@ -107,12 +190,22 @@ submissionForm.addEventListener('submit', async (e) => {
     const data = await response.json();
 
     if (data.success) {
+      const webhook = data.data.webhook || {};
       submitResult.className = 'result-message success';
       submitResult.innerHTML = `
         <strong>Submission aangemaakt!</strong><br>
         ID: ${data.data.id}<br>
-        Status: ${data.data.status}<br>
-        ${data.data.webhook_registered ? 'Webhook geregistreerd op GitHub' : 'Let op: Webhook moet handmatig worden ingesteld'}
+        Repository: ${data.data.repository?.owner}/${data.data.repository?.repo}<br>
+        Bestanden: ${data.data.files_count} code bestanden gevonden<br>
+        <hr style="margin: 8px 0;">
+        <strong>Webhook Status:</strong> ${webhook.registered
+          ? `<span style="color: #16a34a;">✓ Automatisch geregistreerd (ID: ${webhook.webhookId})</span>`
+          : `<span style="color: #dc2626;">✗ Niet geregistreerd - ${webhook.error || 'Log eerst in met GitHub'}</span>`
+        }<br>
+        ${webhook.registered
+          ? '<em>Push nu naar je repo om AI analyse te triggeren!</em>'
+          : '<em>Webhook moet handmatig worden ingesteld op GitHub.</em>'
+        }
       `;
       document.getElementById('githubUrl').value = '';
       loadSubmissions();

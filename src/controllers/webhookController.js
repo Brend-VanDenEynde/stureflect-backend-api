@@ -86,7 +86,7 @@ async function findSubmissionByRepo(repoFullName, branch = null) {
 
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('Fout bij zoeken submission:', error);
+    console.error('[API] Error searching submission:', error.message);
     throw error;
   }
 }
@@ -122,7 +122,7 @@ async function getSubmissionsByRepo(repoFullName) {
 
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen submissions voor repo:', error);
+    console.error('[API] Error fetching submissions for repo:', error.message);
     throw error;
   }
 }
@@ -184,28 +184,64 @@ async function updateSubmissionStatus(submissionId, commitSha, status, branch = 
 
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij updaten submission:', error);
+    console.error('[API] Error updating submission:', error.message);
     throw error;
   }
 }
 
 /**
- * Haal course settings op (rubric, guidelines)
- * @param {number} courseId - Course ID
+ * Atomisch proberen om processing te starten (race condition preventie)
+ * Alleen succesvol als submission NIET al in 'processing' status is
+ * @param {number} submissionId - Submission ID
+ * @param {string} commitSha - Nieuwe commit SHA
+ * @param {string} branch - Branch naam (optioneel)
+ * @returns {Promise<{success: boolean, submission?: object, alreadyProcessing?: boolean}>}
+ */
+async function tryStartProcessing(submissionId, commitSha, branch = null) {
+  try {
+    // Atomic check-and-set: alleen updaten als status NIET 'processing' is
+    const result = await db.query(
+      `UPDATE submission
+       SET commit_sha = $1, status = 'processing', updated_at = NOW()
+       WHERE id = $2 AND status != 'processing'
+       RETURNING id, commit_sha, status, updated_at`,
+      [commitSha, submissionId]
+    );
+
+    if (result.rows.length === 0) {
+      // Geen rows geüpdatet = submission is al in processing
+      return { success: false, alreadyProcessing: true };
+    }
+
+    const submission = result.rows[0];
+    if (branch) {
+      submission.branch = branch;
+    }
+
+    return { success: true, submission };
+  } catch (error) {
+    console.error('[API] Error trying to start processing:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Haal assignment settings op (rubric, guidelines)
+ * @param {number} assignmentId - Assignment ID
  * @returns {Promise<object|null>}
  */
-async function getCourseSettings(courseId) {
+async function getAssignmentSettings(assignmentId) {
   try {
     const result = await db.query(
       `SELECT rubric, ai_guidelines
-       FROM course_settings
-       WHERE course_id = $1`,
-      [courseId]
+       FROM assignment
+       WHERE id = $1`,
+      [assignmentId]
     );
 
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('Fout bij ophalen course settings:', error);
+    console.error('[API] Error fetching assignment settings:', error.message);
     throw error;
   }
 }
@@ -232,7 +268,7 @@ async function createOrUpdateSubmission(assignmentId, userId, githubUrl, commitS
 
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij aanmaken/updaten submission:', error);
+    console.error('[API] Error creating/updating submission:', error.message);
     throw error;
   }
 }
@@ -246,7 +282,7 @@ async function createOrUpdateSubmission(assignmentId, userId, githubUrl, commitS
  */
 function logWebhookEvent(event, repoFullName, status, message) {
   const timestamp = new Date().toISOString();
-  console.log(`[WEBHOOK ${timestamp}] ${event} | ${repoFullName} | ${status} | ${message}`);
+  console.log(`[API] WEBHOOK ${timestamp} | ${event} | ${repoFullName} | ${status} | ${message}`);
 }
 
 /**
@@ -262,7 +298,7 @@ async function deletePreviousFeedback(submissionId) {
     );
     return result.rowCount;
   } catch (error) {
-    console.error('Fout bij verwijderen oude feedback:', error);
+    console.error('[API] Error deleting old feedback:', error.message);
     throw error;
   }
 }
@@ -350,7 +386,7 @@ async function saveFeedback(submissionId, feedbackItems) {
 
     return savedItems;
   } catch (error) {
-    console.error('Fout bij opslaan feedback:', error);
+    console.error('[API] Error saving feedback:', error.message);
     throw error;
   }
 }
@@ -410,7 +446,7 @@ async function updateSubmissionWithScore(submissionId, commitSha, aiScore, statu
 
     return submission;
   } catch (error) {
-    console.error('Fout bij updaten submission met score:', error);
+    console.error('[API] Error updating submission with score:', error.message);
     throw error;
   }
 }
@@ -453,7 +489,7 @@ async function getFeedbackBySubmission(submissionId, filters = {}) {
     const result = await db.query(query, params);
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen feedback:', error);
+    console.error('[API] Error fetching feedback:', error.message);
     throw error;
   }
 }
@@ -481,11 +517,11 @@ async function markSubmissionFailed(submissionId, commitSha, errorMessage, error
     );
 
     // Log de error voor debugging
-    console.error(`[SUBMISSION ${submissionId}] Failed: ${errorCode} - ${errorMessage}`);
+    console.error(`[API] Submission ${submissionId} failed: ${errorCode} - ${errorMessage}`);
 
     return result.rows[0];
   } catch (error) {
-    console.error('Fout bij markeren submission als failed:', error);
+    console.error('[API] Error marking submission as failed:', error.message);
     throw error;
   }
 }
@@ -521,7 +557,7 @@ async function getFailedSubmissions(maxAge = 24) {
 
     return result.rows;
   } catch (error) {
-    console.error('Fout bij ophalen failed submissions:', error);
+    console.error('[API] Error fetching failed submissions:', error.message);
     throw error;
   }
 }
@@ -551,7 +587,7 @@ async function getSubmissionForRetry(submissionId) {
 
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('Fout bij ophalen submission voor retry:', error);
+    console.error('[API] Error fetching submission for retry:', error.message);
     throw error;
   }
 }
@@ -561,7 +597,8 @@ module.exports = {
   findSubmissionByRepo,
   getSubmissionsByRepo,
   updateSubmissionStatus,
-  getCourseSettings,
+  tryStartProcessing,
+  getAssignmentSettings,
   createOrUpdateSubmission,
   logWebhookEvent,
   saveFeedback,

@@ -141,23 +141,79 @@ const options = {
               type: 'integer',
               description: 'ID van de opdracht'
             },
-            student_id: {
+            user_id: {
               type: 'integer',
               description: 'ID van de student'
             },
-            github_repo: {
+            github_url: {
               type: 'string',
               description: 'GitHub repository URL'
             },
-            submitted_at: {
+            commit_sha: {
               type: 'string',
-              format: 'date-time',
-              description: 'Tijdstip van inlevering'
+              description: 'SHA van de laatste commit'
             },
             status: {
               type: 'string',
-              enum: ['submitted', 'graded', 'pending'],
+              enum: ['pending', 'processing', 'analyzed', 'completed', 'failed'],
               description: 'Status van de inzending'
+            },
+            ai_score: {
+              type: 'integer',
+              description: 'AI score (0-100)',
+              minimum: 0,
+              maximum: 100
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Tijdstip van inlevering'
+            }
+          }
+        },
+        Feedback: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Unieke feedback-ID'
+            },
+            submission_id: {
+              type: 'integer',
+              description: 'ID van de submission'
+            },
+            content: {
+              type: 'string',
+              description: 'Feedback bericht'
+            },
+            reviewer: {
+              type: 'string',
+              enum: ['ai', 'teacher'],
+              description: 'Type reviewer'
+            },
+            severity: {
+              type: 'string',
+              enum: ['critical', 'high', 'medium', 'low'],
+              description: 'Ernst van het probleem'
+            },
+            type: {
+              type: 'string',
+              enum: ['code_quality', 'best_practices', 'security', 'performance', 'maintainability', 'documentation', 'error_handling', 'naming', 'structure'],
+              description: 'Type feedback'
+            },
+            line_number: {
+              type: 'integer',
+              description: 'Regelnummer in het bestand',
+              nullable: true
+            },
+            suggestion: {
+              type: 'string',
+              description: 'Suggestie voor verbetering',
+              nullable: true
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time'
             }
           }
         }
@@ -189,8 +245,24 @@ const options = {
         description: 'Endpoints voor docenten om cursussen en studenten te beheren'
       },
       {
-        name: 'Admin',
-        description: 'Endpoints voor administratieve taken (alleen voor admins)'
+        name: 'Admin - Students',
+        description: 'Admin endpoints voor studentenbeheer: accounts aanpassen, verwijderen en statistieken bekijken'
+      },
+      {
+        name: 'Admin - Teachers',
+        description: 'Admin endpoints voor docentenbeheer: accounts beheren en rollen wijzigen'
+      },
+      {
+        name: 'Admin - Courses',
+        description: 'Admin endpoints voor vakbeheer: vakken aanmaken, wijzigen en verwijderen'
+      },
+      {
+        name: 'Admin - System',
+        description: 'Admin endpoints voor systeembeheer: admin accounts en algemene instellingen'
+      },
+      {
+        name: 'Webhooks',
+        description: 'Endpoints voor GitHub webhooks en AI code analyse'
       }
     ]
   },

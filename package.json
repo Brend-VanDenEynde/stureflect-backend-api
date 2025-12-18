@@ -4,10 +4,26 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --coverage",
+    "test:unit": "jest --testPathPattern=__tests__/unit",
+    "test:watch": "jest --watch",
+    "test:integration": "node test-integration.js",
     "dev": "nodemon server.js",
     "build": "echo \"Build complete - Express app is ready\"",
     "start": "node server.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/public/**",
+      "!src/docs/**"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ],
+    "verbose": true
   },
   "repository": {
     "type": "git",
@@ -36,6 +52,8 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.11",
+    "supertest": "^7.1.4"
   }
 }
