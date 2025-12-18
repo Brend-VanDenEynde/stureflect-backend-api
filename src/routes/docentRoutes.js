@@ -14,7 +14,8 @@ const {
 	streamCourseStatistics,
 	getDocentAssignments,
 	getDocentCourseAssignments,
-	createAssignment
+	createAssignment,
+	getAssignmentDetail
 } = require('../controllers/docentController');
 
 /**
@@ -201,6 +202,125 @@ router.get('/courses', getDocentCourses);
  *         description: Interne serverfout
  */
 router.get('/assignments', getDocentAssignments);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal details van specifieke opdracht op
+ *     description: Haalt gedetailleerde informatie op van een specifieke opdracht, inclusief statistieken en alle studentinzendingen
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: Opdracht details met statistieken en inzendingen
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     courseId:
+ *                       type: integer
+ *                     dueDate:
+ *                       type: string
+ *                       format: date-time
+ *                     rubric:
+ *                       type: string
+ *                     aiGuidelines:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                 course:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                 statistics:
+ *                   type: object
+ *                   properties:
+ *                     totalSubmissions:
+ *                       type: integer
+ *                     studentsSubmitted:
+ *                       type: integer
+ *                     completedCount:
+ *                       type: integer
+ *                     gradedCount:
+ *                       type: integer
+ *                     avgScore:
+ *                       type: number
+ *                       nullable: true
+ *                 submissions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       studentId:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       submissionId:
+ *                         type: integer
+ *                         nullable: true
+ *                       status:
+ *                         type: string
+ *                         nullable: true
+ *                       submissionDate:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       aiScore:
+ *                         type: number
+ *                         nullable: true
+ *                       manualScore:
+ *                         type: number
+ *                         nullable: true
+ *                       repoUrl:
+ *                         type: string
+ *                         nullable: true
+ *                       branch:
+ *                         type: string
+ *                         nullable: true
+ *                       feedbackCount:
+ *                         type: integer
+ *                       feedbackSeverityAvg:
+ *                         type: number
+ *                         nullable: true
+ *       400:
+ *         description: Ongeldige opdracht ID
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       404:
+ *         description: Opdracht niet gevonden of geen toegang
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId', getAssignmentDetail);
 
 /**
  * @swagger

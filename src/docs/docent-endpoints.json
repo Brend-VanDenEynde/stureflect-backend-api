@@ -233,6 +233,289 @@
             }
         }
     },
+    "/api/docent/assignments/{assignmentId}": {
+        "get": {
+            "summary": "Haal details van specifieke opdracht op",
+            "description": "Haalt gedetailleerde informatie op van een specifieke opdracht, inclusief opdracht details, cursuscontext, statistieken over inzendingen, en een lijst van alle studentinzendingen met hun status en scores.",
+            "operationId": "getAssignmentDetail",
+            "tags": [
+                "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "assignmentId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    },
+                    "description": "ID van de opdracht"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Opdracht details met statistieken en studentinzendingen",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "assignment": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer",
+                                                "description": "Unieke ID van de opdracht"
+                                            },
+                                            "title": {
+                                                "type": "string",
+                                                "description": "Titel van de opdracht"
+                                            },
+                                            "description": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "Beschrijving van de opdracht"
+                                            },
+                                            "courseId": {
+                                                "type": "integer",
+                                                "description": "ID van het bijbehorende vak"
+                                            },
+                                            "dueDate": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "nullable": true,
+                                                "description": "Inleverdatum"
+                                            },
+                                            "rubric": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "Beoordelingsrichtlijnen"
+                                            },
+                                            "aiGuidelines": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "AI beoordelingsrichtlijnen"
+                                            },
+                                            "createdAt": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "description": "Aanmaakdatum"
+                                            },
+                                            "updatedAt": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "description": "Laatste wijzigingsdatum"
+                                            }
+                                        }
+                                    },
+                                    "course": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer",
+                                                "description": "ID van het vak"
+                                            },
+                                            "title": {
+                                                "type": "string",
+                                                "description": "Titel van het vak"
+                                            }
+                                        }
+                                    },
+                                    "statistics": {
+                                        "type": "object",
+                                        "properties": {
+                                            "totalSubmissions": {
+                                                "type": "integer",
+                                                "description": "Totaal aantal inzendingen"
+                                            },
+                                            "studentsSubmitted": {
+                                                "type": "integer",
+                                                "description": "Aantal unieke studenten die hebben ingeleverd"
+                                            },
+                                            "completedCount": {
+                                                "type": "integer",
+                                                "description": "Aantal voltooide inzendingen"
+                                            },
+                                            "gradedCount": {
+                                                "type": "integer",
+                                                "description": "Aantal beoordeelde inzendingen"
+                                            },
+                                            "avgScore": {
+                                                "type": "number",
+                                                "nullable": true,
+                                                "description": "Gemiddelde score (manual_score of ai_score)"
+                                            }
+                                        }
+                                    },
+                                    "submissions": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "studentId": {
+                                                    "type": "integer",
+                                                    "description": "ID van de student"
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "Naam van de student"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "description": "E-mail van de student"
+                                                },
+                                                "submissionId": {
+                                                    "type": "integer",
+                                                    "nullable": true,
+                                                    "description": "ID van de laatste inzending (null als nog niet ingeleverd)"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "Status van de inzending (pending, completed, graded, etc.)"
+                                                },
+                                                "submissionDate": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "nullable": true,
+                                                    "description": "Datum van de laatste inzending"
+                                                },
+                                                "aiScore": {
+                                                    "type": "number",
+                                                    "nullable": true,
+                                                    "description": "AI gegenereerde score"
+                                                },
+                                                "manualScore": {
+                                                    "type": "number",
+                                                    "nullable": true,
+                                                    "description": "Handmatig toegekende score"
+                                                },
+                                                "githubUrl": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "GitHub repository URL"
+                                                },
+                                                "branch": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "Branch naam"
+                                                },
+                                                "feedbackCount": {
+                                                    "type": "integer",
+                                                    "description": "Aantal feedback items"
+                                                },
+                                                "feedbackSeverityAvg": {
+                                                    "type": "number",
+                                                    "nullable": true,
+                                                    "description": "Gemiddelde ernst van feedback (1=suggestion, 2=minor, 3=major, 4=critical)"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "example": {
+                                "assignment": {
+                                    "id": 5,
+                                    "title": "REST API Implementation",
+                                    "description": "Build a RESTful API with Node.js and Express",
+                                    "courseId": 1,
+                                    "dueDate": "2025-12-31T23:59:59Z",
+                                    "rubric": "Functionality (40%), Code quality (30%), Documentation (30%)",
+                                    "aiGuidelines": "Check for RESTful best practices and error handling",
+                                    "createdAt": "2025-12-18T10:00:00Z",
+                                    "updatedAt": "2025-12-18T10:00:00Z"
+                                },
+                                "course": {
+                                    "id": 1,
+                                    "title": "Web Development"
+                                },
+                                "statistics": {
+                                    "totalSubmissions": 15,
+                                    "studentsSubmitted": 15,
+                                    "completedCount": 12,
+                                    "gradedCount": 8,
+                                    "avgScore": 7.5
+                                },
+                                "submissions": [
+                                    {
+                                        "studentId": 2,
+                                        "name": "Jane Smith",
+                                        "email": "jane.smith@example.com",
+                                        "submissionId": 42,
+                                        "status": "graded",
+                                        "submissionDate": "2025-12-15T14:30:00Z",
+                                        "aiScore": 8.5,
+                                        "manualScore": 8.0,
+                                        "githubUrl": "https://github.com/janesmith/rest-api",
+                                        "branch": "main",
+                                        "feedbackCount": 3,
+                                        "feedbackSeverityAvg": 1.67
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ongeldige opdracht ID",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Invalid assignment ID"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd"
+                },
+                "404": {
+                    "description": "Opdracht niet gevonden of geen toegang tot het vak",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Assignment not found"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "500": {
+                    "description": "Interne serverfout",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Internal server error"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
     "/api/docent/courses/{courseId}/assignments": {
         "get": {
             "summary": "Haal opdrachten van een specifiek vak op",
