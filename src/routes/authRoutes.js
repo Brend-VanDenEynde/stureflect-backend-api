@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const userController = require('../controllers/userController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
 /**
  * @swagger
@@ -164,7 +164,7 @@ router.post('/logout', userController.logoutUser);
  *         description: Niet geauthenticeerd
  */
 // Protected routes
-router.get('/profile', authMiddleware, userController.getProfile);
+router.get('/profile', authenticateToken, userController.getProfile);
 
 /**
  * @swagger

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const authenticateToken = require('../middleware/authMiddleware');
+const { requireAdmin } = require('../middleware/authMiddleware');
 const db = require('../config/db');
 
 /**
@@ -34,34 +34,13 @@ const db = require('../config/db');
  *       403:
  *         description: Geen admin rechten
  */
-router.get('/admin/students', authenticateToken, async (req, res) => {
-  // Development: query param fallback, Productie: alleen req.user.id
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/students', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
 
   // Audit log: request ontvangen
-  console.log(`[API] Admin ${adminId || 'unknown'} requested all students at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested all students at ${new Date().toISOString()}`);
 
   try {
-    // Autorisatie: controleer of gebruiker admin is
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
-      });
-    }
-
     const students = await adminController.getAllStudents();
 
     // Audit log: succesvolle request
@@ -151,11 +130,11 @@ router.get('/admin/students', authenticateToken, async (req, res) => {
  *       404:
  *         description: Student niet gevonden
  */
-router.get('/admin/students/:studentId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/students/:studentId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const studentId = parseInt(req.params.studentId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested student ${studentId} at ${new Date().toISOString()}`);
+  console.log(`[AUDIT] Admin ${adminId} requested student ${studentId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer student ID
@@ -165,26 +144,6 @@ router.get('/admin/students/:studentId', authenticateToken, async (req, res) => 
         success: false,
         message: 'Ongeldig student ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -290,12 +249,12 @@ router.get('/admin/students/:studentId', authenticateToken, async (req, res) => 
  *       409:
  *         description: Email al in gebruik door een andere gebruiker
  */
-router.put('/admin/students/:studentId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.put('/admin/students/:studentId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const studentId = parseInt(req.params.studentId);
   const { email, name, github_id } = req.body;
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} attempting to update student ${studentId} at ${new Date().toISOString()}`);
+  console.log(`[AUDIT] Admin ${adminId} attempting to update student ${studentId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer student ID
@@ -305,26 +264,6 @@ router.put('/admin/students/:studentId', authenticateToken, async (req, res) => 
         success: false,
         message: 'Ongeldig student ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -476,11 +415,11 @@ router.put('/admin/students/:studentId', authenticateToken, async (req, res) => 
  *       404:
  *         description: Student niet gevonden
  */
-router.delete('/admin/students/:studentId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.delete('/admin/students/:studentId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const studentId = parseInt(req.params.studentId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} attempting to delete student ${studentId} at ${new Date().toISOString()}`);
+  console.log(`[AUDIT] Admin ${adminId} attempting to delete student ${studentId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer student ID
@@ -490,26 +429,6 @@ router.delete('/admin/students/:studentId', authenticateToken, async (req, res) 
         success: false,
         message: 'Ongeldig student ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -611,11 +530,11 @@ router.delete('/admin/students/:studentId', authenticateToken, async (req, res) 
  *       404:
  *         description: Student niet gevonden
  */
-router.get('/admin/students/:studentId/courses', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/students/:studentId/courses', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const studentId = parseInt(req.params.studentId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested enrollments for student ${studentId} at ${new Date().toISOString()}`);
+  console.log(`[AUDIT] Admin ${adminId} requested enrollments for student ${studentId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer student ID
@@ -625,26 +544,6 @@ router.get('/admin/students/:studentId/courses', authenticateToken, async (req, 
         success: false,
         message: 'Ongeldig student ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -739,11 +638,11 @@ router.get('/admin/students/:studentId/courses', authenticateToken, async (req, 
  *       404:
  *         description: Student niet gevonden
  */
-router.get('/admin/students/:studentId/submissions', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/students/:studentId/submissions', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const studentId = parseInt(req.params.studentId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} requested submissions for student ${studentId} at ${new Date().toISOString()}`);
+  console.log(`[AUDIT] Admin ${adminId} requested submissions for student ${studentId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer student ID
@@ -753,26 +652,6 @@ router.get('/admin/students/:studentId/submissions', authenticateToken, async (r
         success: false,
         message: 'Ongeldig student ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -837,30 +716,12 @@ router.get('/admin/students/:studentId/submissions', authenticateToken, async (r
  *       403:
  *         description: Geen admin rechten
  */
-router.get('/admin/admins', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/admins', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested all admins at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested all admins at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
-      });
-    }
 
     const admins = await adminController.getAllAdmins();
 
@@ -921,33 +782,14 @@ router.get('/admin/admins', authenticateToken, async (req, res) => {
  *       403:
  *         description: Geen admin rechten
  */
-router.get('/admin/teachers', authenticateToken, async (req, res) => {
+router.get('/admin/teachers', requireAdmin, async (req, res) => {
   // Development: query param fallback, Productie: alleen req.user.id
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const adminId = req.user.id;
 
   // Audit log: request ontvangen
-  console.log(`[API] Admin ${adminId || 'unknown'} requested all teachers at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested all teachers at ${new Date().toISOString()}`);
 
   try {
-    // Autorisatie: controleer of gebruiker admin is
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
-      });
-    }
 
     const teachers = await adminController.getAllTeachers();
 
@@ -1050,33 +892,14 @@ router.get('/admin/teachers', authenticateToken, async (req, res) => {
  *       404:
  *         description: Docent niet gevonden
  */
-router.get('/admin/teachers/:teacherId/courses', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/teachers/:teacherId/courses', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const teacherId = parseInt(req.params.teacherId);
 
   // Audit log: request ontvangen
-  console.log(`[API] Admin ${adminId || 'unknown'} requested courses for teacher ${teacherId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested courses for teacher ${teacherId} at ${new Date().toISOString()}`);
 
   try {
-    // Autorisatie: controleer of gebruiker admin is
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
-      });
-    }
 
     // Validatie: controleer of de docent bestaat
     const teacher = await adminController.getUserById(teacherId);
@@ -1170,33 +993,14 @@ router.get('/admin/teachers/:teacherId/courses', authenticateToken, async (req, 
  *       404:
  *         description: Gebruiker niet gevonden
  */
-router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, res) => {
+router.put('/admin/users/:userId/role/teacher', requireAdmin, async (req, res) => {
   const adminId = req.user?.id;
   const targetUserId = parseInt(req.params.userId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to teacher at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to change user ${targetUserId} to teacher at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer admin ID
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID`);
-      return res.status(401).json({
-        success: false,
-        message: 'Authenticatie vereist',
-        error: 'UNAUTHORIZED'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins kunnen rollen wijzigen',
-        error: 'FORBIDDEN'
-      });
-    }
 
     // Validatie: controleer of target user bestaat
     const targetUser = await adminController.getUserById(targetUserId);
@@ -1285,33 +1089,14 @@ router.put('/admin/users/:userId/role/teacher', authenticateToken, async (req, r
  *       404:
  *         description: Gebruiker niet gevonden
  */
-router.put('/admin/users/:userId/role/student', authenticateToken, async (req, res) => {
+router.put('/admin/users/:userId/role/student', requireAdmin, async (req, res) => {
   const adminId = req.user?.id;
   const targetUserId = parseInt(req.params.userId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to student at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to change user ${targetUserId} to student at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer admin ID
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID`);
-      return res.status(401).json({
-        success: false,
-        message: 'Authenticatie vereist',
-        error: 'UNAUTHORIZED'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins kunnen rollen wijzigen',
-        error: 'FORBIDDEN'
-      });
-    }
 
     // Validatie: controleer of target user bestaat
     const targetUser = await adminController.getUserById(targetUserId);
@@ -1400,33 +1185,14 @@ router.put('/admin/users/:userId/role/student', authenticateToken, async (req, r
  *       404:
  *         description: Gebruiker niet gevonden
  */
-router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res) => {
+router.put('/admin/users/:userId/role/admin', requireAdmin, async (req, res) => {
   const adminId = req.user?.id;
   const targetUserId = parseInt(req.params.userId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to change user ${targetUserId} to admin at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to change user ${targetUserId} to admin at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer admin ID
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID`);
-      return res.status(401).json({
-        success: false,
-        message: 'Authenticatie vereist',
-        error: 'UNAUTHORIZED'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins kunnen rollen wijzigen',
-        error: 'FORBIDDEN'
-      });
-    }
 
     // Validatie: controleer of target user bestaat
     const targetUser = await adminController.getUserById(targetUserId);
@@ -1518,11 +1284,11 @@ router.put('/admin/users/:userId/role/admin', authenticateToken, async (req, res
  *       404:
  *         description: Gebruiker niet gevonden
  */
-router.delete('/admin/users/:userId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.delete('/admin/users/:userId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const userId = parseInt(req.params.userId);
 
-  console.log(`[AUDIT] Admin ${adminId || 'unknown'} attempting to delete user ${userId} at ${new Date().toISOString()}`);
+  console.log(`[AUDIT] Admin ${adminId} attempting to delete user ${userId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer gebruiker ID
@@ -1536,24 +1302,6 @@ router.delete('/admin/users/:userId', authenticateToken, async (req, res) => {
     }
 
     // Autorisatie: controleer of uitvoerende gebruiker admin is
-    if (!adminId) {
-      console.log(`[AUDIT] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[AUDIT] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins kunnen gebruikers verwijderen',
-        error: 'FORBIDDEN'
-      });
-    }
 
     // Validatie: voorkom dat admin zichzelf verwijdert
     if (adminId === userId) {
@@ -1651,30 +1399,12 @@ router.delete('/admin/users/:userId', authenticateToken, async (req, res) => {
  *       403:
  *         description: Geen admin rechten
  */
-router.get('/admin/courses', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/courses', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested all courses at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested all courses at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
-      });
-    }
 
     const courses = await adminController.getAllCourses();
 
@@ -1785,31 +1515,13 @@ router.get('/admin/courses', authenticateToken, async (req, res) => {
  *       409:
  *         description: Join code is al in gebruik
  */
-router.post('/admin/courses', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.post('/admin/courses', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const { title, description, join_code, teacher_id } = req.body;
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to create course at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to create course at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
-      });
-    }
 
     // Validatie: title is verplicht
     if (!title || title.trim().length === 0) {
@@ -1955,37 +1667,19 @@ router.post('/admin/courses', authenticateToken, async (req, res) => {
  *       404:
  *         description: Vak niet gevonden
  */
-router.get('/admin/courses/:courseId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/courses/:courseId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested details for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested details for course ${courseId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
         success: false,
         message: 'Ongeldig vak ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -2062,37 +1756,19 @@ router.get('/admin/courses/:courseId', authenticateToken, async (req, res) => {
  *       404:
  *         description: Vak niet gevonden
  */
-router.delete('/admin/courses/:courseId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.delete('/admin/courses/:courseId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to delete course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to delete course ${courseId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
         success: false,
         message: 'Ongeldig vak ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -2196,38 +1872,20 @@ router.delete('/admin/courses/:courseId', authenticateToken, async (req, res) =>
  *       409:
  *         description: Join code is al in gebruik
  */
-router.put('/admin/courses/:courseId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.put('/admin/courses/:courseId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
   const { title, description, join_code } = req.body;
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to update course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to update course ${courseId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
         success: false,
         message: 'Ongeldig vak ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -2350,22 +2008,14 @@ router.put('/admin/courses/:courseId', authenticateToken, async (req, res) => {
  *       404:
  *         description: Vak of docent niet gevonden
  */
-router.post('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.post('/admin/courses/:courseId/teachers/:teacherId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
   const teacherId = parseInt(req.params.teacherId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to add teacher ${teacherId} to course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to add teacher ${teacherId} to course ${courseId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
@@ -2380,16 +2030,6 @@ router.post('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, a
         success: false,
         message: 'Ongeldig docent ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -2507,22 +2147,14 @@ router.post('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, a
  *       404:
  *         description: Vak, docent of relatie niet gevonden
  */
-router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.delete('/admin/courses/:courseId/teachers/:teacherId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
   const teacherId = parseInt(req.params.teacherId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to remove teacher ${teacherId} from course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to remove teacher ${teacherId} from course ${courseId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
@@ -2537,16 +2169,6 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
         success: false,
         message: 'Ongeldig docent ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -2640,37 +2262,19 @@ router.delete('/admin/courses/:courseId/teachers/:teacherId', authenticateToken,
  *       404:
  *         description: Vak niet gevonden
  */
-router.get('/admin/courses/:courseId/students', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/courses/:courseId/students', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested students for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested students for course ${courseId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
         success: false,
         message: 'Ongeldig vak ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -2758,22 +2362,14 @@ router.get('/admin/courses/:courseId/students', authenticateToken, async (req, r
  *       404:
  *         description: Vak of student niet gevonden
  */
-router.post('/admin/courses/:courseId/students/:studentId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.post('/admin/courses/:courseId/students/:studentId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
   const studentId = parseInt(req.params.studentId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to enroll student ${studentId} in course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to enroll student ${studentId} in course ${courseId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
@@ -2788,16 +2384,6 @@ router.post('/admin/courses/:courseId/students/:studentId', authenticateToken, a
         success: false,
         message: 'Ongeldig student ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -2915,22 +2501,14 @@ router.post('/admin/courses/:courseId/students/:studentId', authenticateToken, a
  *       404:
  *         description: Student is niet ingeschreven voor dit vak
  */
-router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.delete('/admin/courses/:courseId/students/:studentId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
   const studentId = parseInt(req.params.studentId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to unenroll student ${studentId} from course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to unenroll student ${studentId} from course ${courseId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       return res.status(400).json({
@@ -2945,16 +2523,6 @@ router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken,
         success: false,
         message: 'Ongeldig student ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -3106,32 +2674,13 @@ router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken,
  *       404:
  *         description: Geen opdrachten gevonden
  */
-router.get('/admin/assignments', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/assignments', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested all assignments at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested all assignments at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer of admin ID aanwezig is
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
-      });
-    }
 
     // Haal alle opdrachten op
     const assignments = await adminController.getAllAssignments();
@@ -3156,7 +2705,7 @@ router.get('/admin/assignments', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[API] Admin ${adminId || 'unknown'} failed to retrieve assignments:`, error.message);
+    console.error(`[API] Admin ${adminId} failed to retrieve assignments:`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen opdrachten',
@@ -3239,32 +2788,13 @@ router.get('/admin/assignments', authenticateToken, async (req, res) => {
  *       404:
  *         description: Geen submissions gevonden
  */
-router.get('/admin/submissions', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/submissions', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested all submissions at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested all submissions at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer of admin ID aanwezig is
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
-      });
-    }
 
     // Haal alle submissions op
     const submissions = await adminController.getAllSubmissions();
@@ -3289,7 +2819,7 @@ router.get('/admin/submissions', authenticateToken, async (req, res) => {
       error: null
     });
   } catch (error) {
-    console.error(`[API] Admin ${adminId || 'unknown'} failed to retrieve submissions:`, error.message);
+    console.error(`[API] Admin ${adminId} failed to retrieve submissions:`, error.message);
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen ingediende opdrachten',
@@ -3373,22 +2903,14 @@ router.get('/admin/submissions', authenticateToken, async (req, res) => {
  *       404:
  *         description: Vak niet gevonden of geen submissions
  */
-router.get('/admin/courses/:courseId/submissions', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/courses/:courseId/submissions', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested submissions for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested submissions for course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer of admin ID en course ID aanwezig zijn
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!courseId || isNaN(courseId)) {
       console.log(`[API] Request denied: invalid course ID`);
@@ -3396,17 +2918,6 @@ router.get('/admin/courses/:courseId/submissions', authenticateToken, async (req
         success: false,
         message: 'Geldig vak ID is verplicht',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze data',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -3433,7 +2944,7 @@ router.get('/admin/courses/:courseId/submissions', authenticateToken, async (req
       error: null
     });
   } catch (error) {
-    console.error(`[API] Admin ${adminId || 'unknown'} failed to retrieve submissions for course ${courseId}:`, error.message);
+    console.error(`[API] Admin ${adminId} failed to retrieve submissions for course ${courseId}:`, error.message);
     
     // Specifieke error handling voor niet-bestaand vak
     if (error.message === 'COURSE_NOT_FOUND') {
@@ -3529,22 +3040,14 @@ router.get('/admin/courses/:courseId/submissions', authenticateToken, async (req
  *       404:
  *         description: Vak niet gevonden
  */
-router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.get('/admin/courses/:courseId/assignments', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested assignments for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested assignments for course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer of admin ID aanwezig is
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     // Validatie: controleer of vak ID geldig is
     if (!courseId || isNaN(courseId)) {
@@ -3552,17 +3055,6 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
         success: false,
         message: 'Ongeldig vak ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -3702,23 +3194,15 @@ router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req
  *       404:
  *         description: Vak niet gevonden
  */
-router.post('/admin/courses/:courseId/assignments', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.post('/admin/courses/:courseId/assignments', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const courseId = parseInt(req.params.courseId);
   const { title, description, due_date, rubric, ai_guidelines } = req.body;
 
-  console.log(`[API] Admin ${adminId || 'unknown'} creating assignment for course ${courseId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} creating assignment for course ${courseId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer of admin ID aanwezig is
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     // Validatie: controleer of vak ID geldig is
     if (!courseId || isNaN(courseId)) {
@@ -3726,17 +3210,6 @@ router.post('/admin/courses/:courseId/assignments', authenticateToken, async (re
         success: false,
         message: 'Ongeldig vak ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -3759,7 +3232,7 @@ router.post('/admin/courses/:courseId/assignments', authenticateToken, async (re
       error: null
     });
   } catch (error) {
-    console.error(`[API] Admin ${adminId || 'unknown'} failed to create assignment for course ${courseId}:`, error.message);
+    console.error(`[API] Admin ${adminId} failed to create assignment for course ${courseId}:`, error.message);
     
     // Specifieke error handling
     if (error.message === 'COURSE_NOT_FOUND') {
@@ -3850,37 +3323,19 @@ router.post('/admin/courses/:courseId/assignments', authenticateToken, async (re
  *       404:
  *         description: Opdracht niet gevonden
  */
-router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req, res) => {
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+router.delete('/admin/assignments/:assignmentId', requireAdmin, async (req, res) => {
+  const adminId = req.user.id;
   const assignmentId = parseInt(req.params.assignmentId);
 
-  console.log(`[API] Admin ${adminId || 'unknown'} requested to delete assignment ${assignmentId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} requested to delete assignment ${assignmentId} at ${new Date().toISOString()}`);
 
   try {
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     if (!assignmentId || isNaN(assignmentId)) {
       return res.status(400).json({
         success: false,
         message: 'Ongeldig opdracht ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
@@ -3939,12 +3394,12 @@ router.delete('/admin/assignments/:assignmentId', authenticateToken, async (req,
  *       404:
  *         description: Opdracht niet gevonden
  */
-router.get('/admin/assignments/:assignmentId/settings', authenticateToken, async (req, res) => {
+router.get('/admin/assignments/:assignmentId/settings', requireAdmin, async (req, res) => {
   const logger = require('../utils/logger');
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const adminId = req.user.id;
   const assignmentId = parseInt(req.params.assignmentId);
 
-  logger.info('Admin-AssignmentSettings', `Admin ${adminId || 'unknown'} requesting settings for assignment ${assignmentId}`);
+  logger.info('Admin-AssignmentSettings', `Admin ${adminId} requesting settings for assignment ${assignmentId}`);
 
   try {
     if (!adminId) {
@@ -3960,25 +3415,6 @@ router.get('/admin/assignments/:assignmentId/settings', authenticateToken, async
         success: false,
         message: 'Ongeldig opdracht ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
-      });
-    }
-
-    const settings = await adminController.getAssignmentSettings(assignmentId);
-
-    if (!settings) {
-      return res.status(404).json({
-        success: false,
-        message: 'Opdracht niet gevonden',
-        error: 'NOT_FOUND'
       });
     }
 
@@ -4040,13 +3476,13 @@ router.get('/admin/assignments/:assignmentId/settings', authenticateToken, async
  *       404:
  *         description: Opdracht niet gevonden
  */
-router.put('/admin/assignments/:assignmentId/settings', authenticateToken, async (req, res) => {
+router.put('/admin/assignments/:assignmentId/settings', requireAdmin, async (req, res) => {
   const logger = require('../utils/logger');
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const adminId = req.user.id;
   const assignmentId = parseInt(req.params.assignmentId);
   const { rubric, ai_guidelines } = req.body;
 
-  logger.info('Admin-AssignmentSettings', `Admin ${adminId || 'unknown'} updating settings for assignment ${assignmentId}`);
+  logger.info('Admin-AssignmentSettings', `Admin ${adminId} updating settings for assignment ${assignmentId}`);
 
   try {
     if (!adminId) {
@@ -4061,23 +3497,6 @@ router.put('/admin/assignments/:assignmentId/settings', authenticateToken, async
       return res.status(400).json({
         success: false,
         message: 'Ongeldig opdracht ID',
-        error: 'BAD_REQUEST'
-      });
-    }
-
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
-      });
-    }
-
-    if (rubric === undefined && ai_guidelines === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'Minimaal één veld (rubric, ai_guidelines) moet worden opgegeven',
         error: 'BAD_REQUEST'
       });
     }
@@ -4215,24 +3634,16 @@ router.put('/admin/assignments/:assignmentId/settings', authenticateToken, async
  *       404:
  *         description: Opdracht niet gevonden
  */
-router.put('/admin/assignments/:assignmentId', authenticateToken, async (req, res) => {
+router.put('/admin/assignments/:assignmentId', requireAdmin, async (req, res) => {
   const logger = require('../utils/logger');
-  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const adminId = req.user.id;
   const assignmentId = parseInt(req.params.assignmentId);
   const { title, description, due_date, rubric, ai_guidelines } = req.body;
 
-  console.log(`[API] Admin ${adminId || 'unknown'} updating assignment ${assignmentId} at ${new Date().toISOString()}`);
+  console.log(`[API] Admin ${adminId} updating assignment ${assignmentId} at ${new Date().toISOString()}`);
 
   try {
     // Validatie: controleer of admin ID aanwezig is
-    if (!adminId) {
-      console.log(`[API] Request denied: no admin ID provided`);
-      return res.status(400).json({
-        success: false,
-        message: 'Admin ID is verplicht',
-        error: 'BAD_REQUEST'
-      });
-    }
 
     // Validatie: controleer of opdracht ID geldig is
     if (!assignmentId || isNaN(assignmentId)) {
@@ -4240,17 +3651,6 @@ router.put('/admin/assignments/:assignmentId', authenticateToken, async (req, re
         success: false,
         message: 'Ongeldig opdracht ID',
         error: 'BAD_REQUEST'
-      });
-    }
-
-    // Autorisatie: controleer of gebruiker admin is
-    const isAdmin = await adminController.isUserAdmin(adminId);
-    if (!isAdmin) {
-      console.log(`[API] Access denied for user ${adminId}: not an admin`);
-      return res.status(403).json({
-        success: false,
-        message: 'Alleen admins hebben toegang tot deze functie',
-        error: 'FORBIDDEN'
       });
     }
 
