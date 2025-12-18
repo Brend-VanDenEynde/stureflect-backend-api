@@ -233,6 +233,177 @@
             }
         }
     },
+    "/api/docent/courses/{courseId}": {
+        "put": {
+            "summary": "Vak bewerken",
+            "description": "Bewerkt de details van een bestaand vak (titel, beschrijving, join_code). Alleen docenten die les geven aan dit vak kunnen het bewerken.",
+            "operationId": "updateCourse",
+            "tags": [
+                "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    },
+                    "description": "ID van het vak dat bewerkt wordt"
+                }
+            ],
+            "requestBody": {
+                "required": true,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["title"],
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                    "description": "Nieuwe titel van het vak (verplicht)",
+                                    "example": "Algoritmen en Datastructuren - Gevorderden"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Nieuwe beschrijving van het vak (optioneel)",
+                                    "example": "Een gevorderde cursus over algoritmen en datastructuren"
+                                },
+                                "join_code": {
+                                    "type": "string",
+                                    "description": "Nieuwe unieke inschrijfcode voor het vak (optioneel)",
+                                    "example": "ALG2024-ADV"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "Vak succesvol bewerkt",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "course": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer",
+                                                "example": 42
+                                            },
+                                            "title": {
+                                                "type": "string",
+                                                "example": "Algoritmen en Datastructuren - Gevorderden"
+                                            },
+                                            "description": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "Een gevorderde cursus over algoritmen en datastructuren"
+                                            },
+                                            "join_code": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "ALG2024-ADV"
+                                            },
+                                            "createdAt": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "example": "2024-01-15T10:30:00Z"
+                                            },
+                                            "updatedAt": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "example": "2024-01-20T14:45:00Z"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ongeldige invoer (titel ontbreekt of is leeg)",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Title is required and cannot be empty"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd"
+                },
+                "403": {
+                    "description": "Geen toestemming (gebruiker is geen docent van dit vak)",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Forbidden: You do not have permission to edit this course"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "404": {
+                    "description": "Vak niet gevonden",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Course not found"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "409": {
+                    "description": "Inschrijfcode bestaat al",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Join code already exists"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
+        }
+    },
     "/api/docent/courses/{courseId}/students": {
         "get": {
             "summary": "Haal ingeschreven studenten op",
