@@ -613,6 +613,37 @@ async function getStudentSubmissions(studentId) {
 }
 
 /**
+ * Haalt alle opdrachten op uit de database, ongeacht het vak
+ * @returns {Promise<Array>} Array met opdracht gegevens inclusief vakinformatie
+ */
+async function getAllAssignments() {
+  const result = await db.query(
+    `SELECT 
+      a.id,
+      a.title,
+      a.description,
+      a.due_date,
+      a.rubric,
+      a.ai_guidelines,
+      a.created_at,
+      a.updated_at,
+      c.id as course_id,
+      c.title as course_title,
+      c.description as course_description,
+      CAST(COUNT(DISTINCT s.id) AS INTEGER) as submission_count,
+      CAST(COUNT(DISTINCT e.user_id) AS INTEGER) as enrolled_students_count
+     FROM assignment a
+     JOIN course c ON a.course_id = c.id
+     LEFT JOIN submission s ON a.id = s.assignment_id
+     LEFT JOIN enrollment e ON c.id = e.course_id
+     GROUP BY a.id, a.title, a.description, a.due_date, a.rubric, a.ai_guidelines, 
+              a.created_at, a.updated_at, c.id, c.title, c.description
+     ORDER BY a.due_date DESC NULLS LAST, a.created_at DESC`
+  );
+  return result.rows;
+}
+
+/**
  * Haalt de instellingen van een opdracht op
  * @param {number} assignmentId - ID van de opdracht
  * @returns {Promise<Object|null>} Object met instellingen of null als niet gevonden
@@ -701,6 +732,7 @@ module.exports = {
   enrollStudent,
   unenrollStudent,
   getCourseAssignments,
+  getAllAssignments,
   deleteAssignment,
   getStudentById,
   updateStudent,

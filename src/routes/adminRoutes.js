@@ -3218,6 +3218,127 @@ router.delete('/admin/courses/:courseId/students/:studentId', authenticateToken,
  *       404:
  *         description: Vak niet gevonden
  */
+/**
+ * @swagger
+ * /api/admin/assignments:
+ *   get:
+ *     tags:
+ *       - Admin - Courses
+ *     summary: Haal alle opdrachten op
+ *     description: Verkrijg een lijst van alle opdrachten ongeacht vak, inclusief vakinformatie (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lijst van alle opdrachten met vakinformatie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       due_date:
+ *                         type: string
+ *                         format: date-time
+ *                       rubric:
+ *                         type: string
+ *                       ai_guidelines:
+ *                         type: string
+ *                       course_id:
+ *                         type: integer
+ *                       course_title:
+ *                         type: string
+ *                       course_description:
+ *                         type: string
+ *                       submission_count:
+ *                         type: integer
+ *                       enrolled_students_count:
+ *                         type: integer
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *                 message:
+ *                   type: string
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Geen opdrachten gevonden
+ */
+router.get('/admin/assignments', authenticateToken, async (req, res) => {
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+
+  console.log(`[API] Admin ${adminId || 'unknown'} requested all assignments at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer of admin ID aanwezig is
+    if (!adminId) {
+      console.log(`[API] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze data',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Haal alle opdrachten op
+    const assignments = await adminController.getAllAssignments();
+
+    // Audit log: succesvolle request
+    console.log(`[API] Admin ${adminId} retrieved ${assignments.length} assignments`);
+
+    // Validatie: controleer of er opdrachten bestaan
+    if (assignments.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: 'Geen opdrachten gevonden',
+        error: null
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: assignments,
+      message: `${assignments.length} opdrachten gevonden`,
+      error: null
+    });
+  } catch (error) {
+    console.error(`[API] Admin ${adminId || 'unknown'} failed to retrieve assignments:`, error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij ophalen opdrachten',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
 router.get('/admin/courses/:courseId/assignments', authenticateToken, async (req, res) => {
   const adminId = req.user?.id || parseInt(req.query.adminId);
   const courseId = parseInt(req.params.courseId);
