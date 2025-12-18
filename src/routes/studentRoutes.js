@@ -6,6 +6,7 @@ const studentController = require('../controllers/studentController');
 const githubService = require('../services/githubService');
 const { getFeedbackBySubmission } = require('../controllers/webhookController');
 const { getUserById } = require('../models/user');
+const sseManager = require('../services/sseManager');
 
 // Authenticatie alleen in productie
 if (process.env.NODE_ENV === 'production') {
@@ -1339,6 +1340,135 @@ router.get('/me/assignments/:assignmentId', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Fout bij ophalen assignment',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/students/me/assignments/{assignmentId}/events:
+ *   get:
+ *     tags:
+ *       - Studenten
+ *     summary: SSE stream voor real-time feedback notificaties
+ *     description: |
+ *       Server-Sent Events endpoint voor real-time notificaties wanneer nieuwe feedback beschikbaar is.
+ *       De client ontvangt een `feedback_updated` event wanneer er nieuwe AI feedback is.
+ *
+ *       **Gebruik in frontend:**
+ *       ```javascript
+ *       const eventSource = new EventSource('/api/students/me/assignments/123/events?studentId=1');
+ *       eventSource.addEventListener('feedback_updated', (e) => {
+ *         // Re-fetch assignment data
+ *         fetchAssignmentDetail(assignmentId);
+ *       });
+ *       ```
+ *
+ *       **Development mode:** Gebruik `studentId` query parameter.
+ *       **Productie:** User ID wordt uit JWT token gehaald.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: studentId
+ *         schema:
+ *           type: integer
+ *         description: Student ID (verplicht in development mode)
+ *         example: 1
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de assignment
+ *     responses:
+ *       200:
+ *         description: SSE stream gestart
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ *               example: |
+ *                 event: feedback_updated
+ *                 data: {"submissionId": 42, "timestamp": "2025-12-18T14:30:00Z"}
+ *       400:
+ *         description: Ongeldig assignment ID
+ *       404:
+ *         description: Geen submission gevonden voor deze assignment
+ *       500:
+ *         description: Server error
+ */
+router.get('/me/assignments/:assignmentId/events', async (req, res) => {
+  try {
+    const studentId = req.user?.id ||
+      (process.env.NODE_ENV !== 'production' && req.query.studentId
+        ? parseInt(req.query.studentId, 10)
+        : null);
+
+    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
+      const isProduction = process.env.NODE_ENV === 'production';
+      return res.status(isProduction ? 401 : 400).json({
+        success: false,
+        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
+        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+      });
+    }
+
+    const assignmentId = parseInt(req.params.assignmentId);
+
+    // Valideer assignmentId
+    if (isNaN(assignmentId) || assignmentId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig assignment ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Zoek submission voor deze assignment + student
+    const submissionResult = await studentController.getExistingSubmission(studentId, assignmentId);
+
+    if (!submissionResult.success) {
+      return res.status(404).json({
+        success: false,
+        message: 'Geen submission gevonden voor deze assignment. Dien eerst een repository in.',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    const submissionId = submissionResult.data.id;
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders();
+
+    // Register connection with SSE manager
+    sseManager.subscribe(submissionId, res);
+
+    // Send initial connection confirmation
+    res.write(`event: connected\ndata: ${JSON.stringify({ submissionId, timestamp: new Date().toISOString() })}\n\n`);
+
+    // Set up heartbeat interval (30 seconds)
+    const heartbeatInterval = setInterval(() => {
+      sseManager.sendHeartbeat(res);
+    }, 30000);
+
+    // Cleanup on connection close
+    req.on('close', () => {
+      clearInterval(heartbeatInterval);
+      sseManager.unsubscribe(submissionId, res);
+      console.log(`[SSE] Client disconnected from submission ${submissionId}`);
+    });
+
+  } catch (error) {
+    console.error('Fout bij opzetten SSE connectie:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij opzetten real-time connectie',
       error: 'INTERNAL_SERVER_ERROR'
     });
   }
