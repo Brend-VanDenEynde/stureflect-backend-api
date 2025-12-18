@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { invalidateAssignmentCache, invalidateCourseCache } = require('../services/cachingService');
 
 /**
  * Bepaal status tekst op basis van feedback severity
@@ -393,6 +394,21 @@ async function createSubmission({ assignmentId, userId, githubUrl, commitSha }) 
        RETURNING id, assignment_id, user_id, github_url, commit_sha, status, created_at`,
       [assignmentId, userId, githubUrl, commitSha]
     );
+    
+    // Invalidate cache for assignment statistics
+    if (assignmentId) {
+      invalidateAssignmentCache(assignmentId);
+      
+      // Get course ID and invalidate course cache too
+      const courseResult = await db.query(
+        'SELECT course_id FROM assignment WHERE id = $1',
+        [assignmentId]
+      );
+      if (courseResult.rows.length > 0) {
+        invalidateCourseCache(courseResult.rows[0].course_id);
+      }
+    }
+    
     return result.rows[0];
   } catch (error) {
     console.error('[API] Error creating submission:', error.message);
@@ -526,9 +542,25 @@ async function updateSubmission(submissionId, studentId, githubUrl, commitSha) {
       [githubUrl, commitSha, submissionId]
     );
 
+    const submission = updateResult.rows[0];
+    
+    // Invalidate cache for assignment statistics
+    if (submission.assignment_id) {
+      invalidateAssignmentCache(submission.assignment_id);
+      
+      // Get course ID and invalidate course cache too
+      const courseResult = await db.query(
+        'SELECT course_id FROM assignment WHERE id = $1',
+        [submission.assignment_id]
+      );
+      if (courseResult.rows.length > 0) {
+        invalidateCourseCache(courseResult.rows[0].course_id);
+      }
+    }
+
     return {
       success: true,
-      submission: updateResult.rows[0],
+      submission,
       oldWebhookInfo
     };
   } catch (error) {

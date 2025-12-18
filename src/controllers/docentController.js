@@ -1,60 +1,12 @@
 const pool = require('../config/db');
 const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
-
-// In-memory cache for expensive statistics queries
-// Structure: { cacheKey: { data: any, timestamp: number } }
-const statsCache = new Map();
-const CACHE_TTL = 30000; // 30 seconds
-
-/**
- * Get data from cache if still valid
- * @param {string} key - Cache key
- * @returns {any|null} Cached data or null if expired/missing
- */
-function getCachedData(key) {
-  const cached = statsCache.get(key);
-  if (!cached) return null;
-  
-  const age = Date.now() - cached.timestamp;
-  if (age > CACHE_TTL) {
-    statsCache.delete(key);
-    return null;
-  }
-  
-  console.log(`✅ Cache HIT for ${key} (age: ${Math.round(age/1000)}s)`);
-  return cached.data;
-}
-
-/**
- * Store data in cache
- * @param {string} key - Cache key
- * @param {any} data - Data to cache
- */
-function setCachedData(key, data) {
-  statsCache.set(key, {
-    data,
-    timestamp: Date.now()
-  });
-  console.log(`💾 Cache SET for ${key}`);
-}
-
-/**
- * Invalidate all cache entries for a specific course
- * @param {number} courseId - Course ID
- */
-function invalidateCourseCache(courseId) {
-  let deletedCount = 0;
-  for (const key of statsCache.keys()) {
-    if (key.startsWith(`course:${courseId}:`)) {
-      statsCache.delete(key);
-      deletedCount++;
-    }
-  }
-  if (deletedCount > 0) {
-    console.log(`🗑️  Invalidated ${deletedCount} cache entries for course ${courseId}`);
-  }
-}
+const {
+  getCachedData,
+  setCachedData,
+  invalidateCourseCache,
+  invalidateAssignmentCache
+} = require('../services/cachingService');
 
 const getEnrolledStudents = async (req, res) => {
   try {
@@ -1714,8 +1666,9 @@ const updateAssignment = async (req, res) => {
     const result = await pool.query(updateQuery, queryParams);
     const updatedAssignment = result.rows[0];
 
-    // Invalidate cache for this course
+    // Invalidate cache for this course and assignment
     invalidateCourseCache(courseId);
+    invalidateAssignmentCache(assignmentIdNum);
 
     console.log(`✅ Assignment updated: ${assignmentIdNum} by user ${userId}`);
     res.json({ assignment: updatedAssignment });
@@ -1802,8 +1755,9 @@ const deleteAssignment = async (req, res) => {
       }
     });
 
-    // Invalidate cache for this course
+    // Invalidate cache for this course and assignment
     invalidateCourseCache(courseId);
+    invalidateAssignmentCache(assignmentIdNum);
 
     console.log(`✅ Assignment deleted: ${assignmentIdNum} from course ${courseId} by user ${userId}`);
     res.json({
@@ -1828,6 +1782,152 @@ const deleteAssignment = async (req, res) => {
   }
 };
 
+/**
+ * Get live statistics for a specific assignment
+ * @route GET /api/docent/assignments/:assignmentId/statistics
+ */
+const getAssignmentStatistics = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Validate assignment ID
+    const assignmentIdNum = parseInt(assignmentId, 10);
+    if (isNaN(assignmentIdNum)) {
+      return res.status(400).json({ error: 'Invalid assignment ID' });
+    }
+
+    // Generate cache key
+    const cacheKey = `assignment:${assignmentIdNum}:statistics`;
+    
+    // Try to get from cache
+    const cachedResult = getCachedData(cacheKey);
+    if (cachedResult) {
+      return res.json(cachedResult);
+    }
+
+    // Get assignment details with course info and verify authorization in one query
+    const assignmentQuery = `
+      SELECT 
+        a.id,
+        a.title,
+        a.course_id,
+        c.title as course_title,
+        CASE 
+          WHEN $3 = 'admin' THEN TRUE
+          WHEN ct.user_id IS NOT NULL THEN TRUE
+          ELSE FALSE
+        END as has_access
+      FROM assignment a
+      JOIN course c ON a.course_id = c.id
+      LEFT JOIN course_teacher ct ON ct.course_id = c.id AND ct.user_id = $2
+      WHERE a.id = $1
+    `;
+
+    const assignmentResult = await pool.query(assignmentQuery, [assignmentIdNum, userId, userRole]);
+
+    if (assignmentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const assignmentData = assignmentResult.rows[0];
+
+    // Check authorization
+    if (!assignmentData.has_access) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const courseId = assignmentData.course_id;
+
+    // Get comprehensive statistics
+    const statsQuery = `
+      WITH enrollment_stats AS (
+        SELECT COUNT(DISTINCT e.user_id) as total_students
+        FROM enrollment e
+        WHERE e.course_id = $2
+      ),
+      submission_stats AS (
+        SELECT
+          COUNT(DISTINCT s.id) as total_submissions,
+          COUNT(DISTINCT s.user_id) as students_submitted,
+          COUNT(DISTINCT CASE WHEN s.status = 'pending' THEN s.user_id END) as students_pending,
+          COUNT(DISTINCT CASE WHEN s.status = 'completed' THEN s.user_id END) as students_completed,
+          COUNT(DISTINCT CASE WHEN s.status = 'graded' THEN s.user_id END) as students_graded,
+          ROUND(AVG(COALESCE(s.manual_score, s.ai_score))::numeric, 2) as avg_score,
+          MIN(COALESCE(s.manual_score, s.ai_score)) as min_score,
+          MAX(COALESCE(s.manual_score, s.ai_score)) as max_score
+        FROM submission s
+        WHERE s.assignment_id = $1
+      )
+      SELECT
+        es.total_students,
+        COALESCE(ss.total_submissions, 0) as total_submissions,
+        COALESCE(ss.students_submitted, 0) as students_submitted,
+        COALESCE(ss.students_pending, 0) as students_pending,
+        COALESCE(ss.students_completed, 0) as students_completed,
+        COALESCE(ss.students_graded, 0) as students_graded,
+        ss.avg_score,
+        ss.min_score,
+        ss.max_score,
+        ROUND(
+          (COALESCE(ss.students_submitted, 0)::float / NULLIF(es.total_students, 0) * 100)::numeric, 2
+        ) as submission_percentage
+      FROM enrollment_stats es
+      CROSS JOIN submission_stats ss
+    `;
+
+    const statsResult = await pool.query(statsQuery, [assignmentIdNum, courseId]);
+    const stats = statsResult.rows[0];
+
+    // Calculate students with no submission
+    const totalStudents = parseInt(stats.total_students) || 0;
+    const studentsSubmitted = parseInt(stats.students_submitted) || 0;
+    const studentsNoSubmission = totalStudents - studentsSubmitted;
+
+    // Format response with camelCase
+    const responseData = {
+      assignment: {
+        id: assignmentData.id,
+        title: assignmentData.title,
+        courseId: assignmentData.course_id,
+        courseTitle: assignmentData.course_title
+      },
+      statistics: {
+        totalStudents,
+        totalSubmissions: parseInt(stats.total_submissions) || 0,
+        studentsSubmitted,
+        studentsNoSubmission,
+        submissionPercentage: stats.submission_percentage ? parseFloat(stats.submission_percentage) : 0,
+        statusDistribution: {
+          noSubmission: studentsNoSubmission,
+          pending: parseInt(stats.students_pending) || 0,
+          completed: parseInt(stats.students_completed) || 0,
+          graded: parseInt(stats.students_graded) || 0
+        },
+        scores: {
+          average: stats.avg_score ? parseFloat(stats.avg_score) : null,
+          minimum: stats.min_score ? parseFloat(stats.min_score) : null,
+          maximum: stats.max_score ? parseFloat(stats.max_score) : null
+        }
+      }
+    };
+
+    // Store in cache
+    setCachedData(cacheKey, responseData);
+
+    console.log(`✅ Assignment statistics fetched: ${assignmentIdNum} by user ${userId}`);
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('❌ Error fetching assignment statistics:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1844,6 +1944,7 @@ module.exports = {
   createAssignment,
   getAssignmentDetail,
   updateAssignment,
-  deleteAssignment
+  deleteAssignment,
+  getAssignmentStatistics
 };
 
