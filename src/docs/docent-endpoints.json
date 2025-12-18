@@ -402,6 +402,125 @@
                     "description": "Interne serverfout"
                 }
             }
+        },
+        "delete": {
+            "summary": "Vak verwijderen",
+            "description": "Verwijdert een vak permanent. Deze actie kan niet ongedaan worden gemaakt. Alle gerelateerde data (inschrijvingen, opdrachten, inleveringen, feedback) wordt automatisch verwijderd door database CASCADE.",
+            "operationId": "deleteCourse",
+            "tags": [
+                "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    },
+                    "description": "ID van het te verwijderen vak"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Vak succesvol verwijderd",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "message": {
+                                        "type": "string",
+                                        "example": "Course successfully deleted"
+                                    },
+                                    "course": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer",
+                                                "example": 42
+                                            },
+                                            "title": {
+                                                "type": "string",
+                                                "example": "Algoritmen en Datastructuren"
+                                            },
+                                            "description": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "Een cursus over algoritmen en datastructuren"
+                                            },
+                                            "join_code": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "ALG2024"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ongeldige invoer (courseId ontbreekt)",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "courseId is required"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd"
+                },
+                "403": {
+                    "description": "Geen toestemming (gebruiker is geen docent van dit vak)",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Forbidden: You do not have permission to delete this course"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "404": {
+                    "description": "Vak niet gevonden",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Course not found"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "500": {
+                    "description": "Interne serverfout"
+                }
+            }
         }
     },
     "/api/docent/courses/{courseId}/students": {
