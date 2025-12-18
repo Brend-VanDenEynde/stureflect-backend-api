@@ -168,7 +168,7 @@ async function analyzeFile(filePath, content, language, courseSettings) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_completion_tokens: 2000
+        max_completion_tokens: 16000  // GPT-5 mini gebruikt reasoning tokens, dus we hebben meer nodig
       },
       {
         headers: getOpenAIHeaders(),
