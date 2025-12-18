@@ -1345,6 +1345,96 @@ const getDocentCourseAssignments = async (req, res) => {
   }
 };
 
+const createAssignment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { title, description, course_id, due_date, rubric, ai_guidelines } = req.body;
+
+    // Authorization check: verify user is teacher or admin
+    if (userRole !== 'teacher' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Only teachers and admins can create assignments' });
+    }
+
+    // Validation: title required
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Title is required and cannot be empty' });
+    }
+
+    // Validation: title max length
+    if (title.trim().length > 255) {
+      return res.status(400).json({ error: 'Title cannot exceed 255 characters' });
+    }
+
+    // Validation: course_id required
+    if (!course_id) {
+      return res.status(400).json({ error: 'course_id is required' });
+    }
+
+    // Validation: course_id must be a valid integer
+    const courseIdNum = parseInt(course_id, 10);
+    if (isNaN(courseIdNum)) {
+      return res.status(400).json({ error: 'Invalid course_id: must be an integer' });
+    }
+
+    // Validation: due_date format (if provided)
+    let dueDateValue = null;
+    if (due_date) {
+      const parsedDate = new Date(due_date);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid due_date format: must be a valid ISO8601 date' });
+      }
+      dueDateValue = due_date;
+    }
+
+    // Check if course exists
+    const courseCheck = await pool.query(
+      'SELECT id FROM course WHERE id = $1',
+      [courseIdNum]
+    );
+
+    if (courseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Authorization check: verify user is a teacher of this course (admins bypass this)
+    if (userRole !== 'admin') {
+      const accessCheck = await pool.query(
+        'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+        [courseIdNum, userId]
+      );
+
+      if (accessCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Forbidden: You are not a teacher of this course' });
+      }
+    }
+
+    // Insert assignment
+    const assignmentResult = await pool.query(
+      `INSERT INTO assignment (title, description, course_id, due_date, rubric, ai_guidelines, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+       RETURNING id, title, description, course_id as "courseId", due_date as "dueDate", rubric, ai_guidelines as "aiGuidelines", created_at as "createdAt", updated_at as "updatedAt"`,
+      [title.trim(), description || null, courseIdNum, dueDateValue, rubric || null, ai_guidelines || null]
+    );
+
+    const newAssignment = assignmentResult.rows[0];
+
+    // Invalidate cache for this course
+    invalidateCourseCache(courseIdNum);
+
+    console.log(`✅ Assignment created: ${newAssignment.id} for course ${courseIdNum} by user ${userId}`);
+    res.status(201).json({ assignment: newAssignment });
+
+  } catch (error) {
+    console.error('❌ Error creating assignment:', error.message);
+
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1357,6 +1447,7 @@ module.exports = {
   deleteCourse,
   streamCourseStatistics,
   getDocentAssignments,
-  getDocentCourseAssignments
+  getDocentCourseAssignments,
+  createAssignment
 };
 
