@@ -613,6 +613,125 @@ async function getStudentSubmissions(studentId) {
 }
 
 /**
+ * Haalt alle opdrachten op uit de database, ongeacht het vak
+ * @returns {Promise<Array>} Array met opdracht gegevens inclusief vakinformatie
+ */
+async function getAllAssignments() {
+  const result = await db.query(
+    `SELECT 
+      a.id,
+      a.title,
+      a.description,
+      a.due_date,
+      a.rubric,
+      a.ai_guidelines,
+      a.created_at,
+      a.updated_at,
+      c.id as course_id,
+      c.title as course_title,
+      c.description as course_description,
+      CAST(COUNT(DISTINCT s.id) AS INTEGER) as submission_count,
+      CAST(COUNT(DISTINCT e.user_id) AS INTEGER) as enrolled_students_count
+     FROM assignment a
+     JOIN course c ON a.course_id = c.id
+     LEFT JOIN submission s ON a.id = s.assignment_id
+     LEFT JOIN enrollment e ON c.id = e.course_id
+     GROUP BY a.id, a.title, a.description, a.due_date, a.rubric, a.ai_guidelines, 
+              a.created_at, a.updated_at, c.id, c.title, c.description
+     ORDER BY a.due_date DESC NULLS LAST, a.created_at DESC`
+  );
+  return result.rows;
+}
+
+/**
+ * Haalt alle ingediende opdrachten (submissions) op uit de database, ongeacht vak
+ * @returns {Promise<Array>} Array met submission gegevens inclusief vak, opdracht en studentinformatie
+ */
+async function getAllSubmissions() {
+  const result = await db.query(
+    `SELECT 
+      s.id,
+      s.github_url,
+      s.commit_sha,
+      s.status,
+      s.ai_score,
+      s.manual_score,
+      s.created_at,
+      s.updated_at,
+      a.id as assignment_id,
+      a.title as assignment_title,
+      a.description as assignment_description,
+      a.due_date as assignment_due_date,
+      c.id as course_id,
+      c.title as course_title,
+      c.description as course_description,
+      u.id as student_id,
+      u.name as student_name,
+      u.email as student_email,
+      CAST(COUNT(DISTINCT f.id) AS INTEGER) as feedback_count
+     FROM submission s
+     JOIN assignment a ON s.assignment_id = a.id
+     JOIN course c ON a.course_id = c.id
+     JOIN "user" u ON s.user_id = u.id
+     LEFT JOIN feedback f ON s.id = f.submission_id
+     GROUP BY s.id, s.github_url, s.commit_sha, s.status, s.ai_score, s.manual_score,
+              s.created_at, s.updated_at, a.id, a.title, a.description, a.due_date,
+              c.id, c.title, c.description, u.id, u.name, u.email
+     ORDER BY s.created_at DESC`
+  );
+  return result.rows;
+}
+
+/**
+ * Haalt alle ingediende opdrachten (submissions) voor een specifiek vak op
+ * @param {number} courseId - ID van het vak
+ * @returns {Promise<Array>} Array met submission gegevens inclusief opdracht en studentinformatie
+ */
+async function getSubmissionsByCourse(courseId) {
+  // Controleer eerst of het vak bestaat
+  const courseCheck = await db.query(
+    `SELECT id FROM course WHERE id = $1`,
+    [courseId]
+  );
+
+  if (courseCheck.rows.length === 0) {
+    throw new Error('COURSE_NOT_FOUND');
+  }
+
+  const result = await db.query(
+    `SELECT 
+      s.id,
+      s.github_url,
+      s.commit_sha,
+      s.status,
+      s.ai_score,
+      s.manual_score,
+      s.created_at,
+      s.updated_at,
+      a.id as assignment_id,
+      a.title as assignment_title,
+      a.description as assignment_description,
+      a.due_date as assignment_due_date,
+      u.id as student_id,
+      u.name as student_name,
+      u.email as student_email,
+      CAST(COUNT(DISTINCT f.id) AS INTEGER) as feedback_count
+     FROM submission s
+     JOIN assignment a ON s.assignment_id = a.id
+     JOIN course c ON a.course_id = c.id
+     JOIN "user" u ON s.user_id = u.id
+     LEFT JOIN feedback f ON s.id = f.submission_id
+     WHERE c.id = $1
+     GROUP BY s.id, s.github_url, s.commit_sha, s.status, s.ai_score, s.manual_score,
+              s.created_at, s.updated_at, a.id, a.title, a.description, a.due_date,
+              u.id, u.name, u.email
+     ORDER BY s.created_at DESC`,
+    [courseId]
+  );
+  return result.rows;
+}
+
+/**
  * Haalt de instellingen van een opdracht op
  * @param {number} assignmentId - ID van de opdracht
  * @returns {Promise<Object|null>} Object met instellingen of null als niet gevonden
@@ -682,6 +801,65 @@ async function updateAssignmentSettings(assignmentId, settingsData) {
   return result.rows[0];
 }
 
+/**
+ * Maakt een nieuwe opdracht aan voor een specifiek vak
+ * @param {number} courseId - ID van het vak
+ * @param {Object} assignmentData - Object met opdracht gegevens
+ * @param {string} assignmentData.title - Titel van de opdracht
+ * @param {string} assignmentData.description - Beschrijving van de opdracht
+ * @param {string} [assignmentData.due_date] - Deadline van de opdracht (ISO string)
+ * @param {string} [assignmentData.rubric] - Rubric voor de opdracht
+ * @param {string} [assignmentData.ai_guidelines] - AI richtlijnen voor feedback
+ * @returns {Promise<Object>} Nieuw aangemaakte opdracht
+ */
+async function createAssignment(courseId, assignmentData) {
+  const { title, description, due_date, rubric, ai_guidelines } = assignmentData;
+
+  // Validatie: controleer of vak bestaat
+  const courseCheck = await db.query(
+    `SELECT id FROM course WHERE id = $1`,
+    [courseId]
+  );
+
+  if (courseCheck.rows.length === 0) {
+    throw new Error('COURSE_NOT_FOUND');
+  }
+
+  // Validatie: verplichte velden
+  if (!title || title.trim().length === 0) {
+    throw new Error('TITLE_REQUIRED');
+  }
+
+  if (!description || description.trim().length === 0) {
+    throw new Error('DESCRIPTION_REQUIRED');
+  }
+
+  // Validatie: due_date moet valide datum zijn (optioneel)
+  if (due_date) {
+    const parsedDate = new Date(due_date);
+    if (isNaN(parsedDate.getTime())) {
+      throw new Error('INVALID_DUE_DATE');
+    }
+  }
+
+  // Maak de opdracht aan
+  const result = await db.query(
+    `INSERT INTO assignment (title, description, course_id, due_date, rubric, ai_guidelines)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, title, description, course_id, due_date, rubric, ai_guidelines, created_at, updated_at`,
+    [
+      title.trim(),
+      description.trim(),
+      courseId,
+      due_date || null,
+      rubric || null,
+      ai_guidelines || null
+    ]
+  );
+
+  return result.rows[0];
+}
+
 module.exports = {
   getAllStudents,
   getAllTeachers,
@@ -701,7 +879,11 @@ module.exports = {
   enrollStudent,
   unenrollStudent,
   getCourseAssignments,
+  getAllAssignments,
+  getAllSubmissions,
+  getSubmissionsByCourse,
   deleteAssignment,
+  createAssignment,
   getStudentById,
   updateStudent,
   deleteStudent,

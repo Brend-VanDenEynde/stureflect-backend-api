@@ -49,6 +49,99 @@
         }
       }
     },
+    "/api/admin/assignments": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Haal alle opdrachten op",
+        "description": "Verkrijg een lijst van alle opdrachten ongeacht vak, inclusief vakinformatie (alleen voor admins)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lijst van alle opdrachten met vakinformatie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "due_date": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "rubric": {
+                            "type": "string"
+                          },
+                          "ai_guidelines": {
+                            "type": "string"
+                          },
+                          "course_id": {
+                            "type": "integer"
+                          },
+                          "course_title": {
+                            "type": "string"
+                          },
+                          "course_description": {
+                            "type": "string"
+                          },
+                          "submission_count": {
+                            "type": "integer"
+                          },
+                          "enrolled_students_count": {
+                            "type": "integer"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geen admin rechten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/teachers": {
       "get": {
         "tags": ["Admin"],
@@ -250,57 +343,6 @@
                     "message": {
                       "type": "string",
                       "example": "Gebruiker succesvol gepromoveerd naar admin"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Geen admin rechten"
-          },
-          "404": {
-            "description": "Gebruiker niet gevonden"
-          }
-        }
-      }
-    },
-    "/api/admin/users/{userId}/demote": {
-      "put": {
-        "tags": ["Admin"],
-        "summary": "Degradeer gebruiker",
-        "description": "Verwijder speciale rechten van een gebruiker (alleen voor admins)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "ID van de gebruiker"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Gebruiker succesvol gedegradeerd",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Gebruiker succesvol gedegradeerd"
                     }
                   }
                 }
