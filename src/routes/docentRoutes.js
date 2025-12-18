@@ -27,7 +27,17 @@ const {
  *     tags:
  *       - Docenten
  *     summary: Real-time statistieken stream (SSE)
- *     description: Server-Sent Events stream voor live updates van cursusstatistieken. Authenticatie via query parameter token= voor EventSource compatibiliteit.
+ *     description: |
+ *       Server-Sent Events (SSE) stream voor live updates van cursusstatistieken.
+ *       
+ *       Deze endpoint stuurt real-time updates wanneer studenten:
+ *       - Opdrachten inleveren
+ *       - Submissions updaten
+ *       - Zich inschrijven voor de cursus
+ *       
+ *       **Authenticatie**: Via query parameter `token=` omdat EventSource geen custom headers ondersteunt.
+ *       
+ *       **Event format**: Elk event bevat JSON data met volledige cursusstatistieken.
  *     parameters:
  *       - in: path
  *         name: courseId
@@ -41,19 +51,27 @@ const {
  *         schema:
  *           type: string
  *         description: JWT access token (omdat EventSource geen headers ondersteunt)
+ *         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
  *     responses:
  *       200:
- *         description: SSE stream gestart
+ *         description: SSE stream gestart. Events worden verstuurd als JSON met cursusstatistieken.
  *         content:
  *           text/event-stream:
  *             schema:
  *               type: string
+ *               description: Server-Sent Events stream
+ *             example: |
+ *               data: {"courseId":1,"totalStudents":25,"totalAssignments":10,"completedSubmissions":180,"pendingSubmissions":70,"averageProgress":72,"recentActivity":[{"type":"submission","studentName":"Jan Janssen","assignmentTitle":"React Components","timestamp":"2024-01-20T14:30:00Z"}]}
+ *               
+ *               data: {"courseId":1,"totalStudents":26,"totalAssignments":10,"completedSubmissions":181,"pendingSubmissions":69,"averageProgress":73,"recentActivity":[{"type":"submission","studentName":"Marie Peeters","assignmentTitle":"JavaScript Basics","timestamp":"2024-01-20T14:35:00Z"}]}
  *       400:
  *         description: Ontbrekende cursus ID
  *       401:
  *         description: Ongeldige of ontbrekende token
  *       403:
  *         description: Geen toegang tot deze cursus
+ *       500:
+ *         description: Interne serverfout
  */
 // ✅ SSE route VOOR authenticatie middleware (gebruikt query token in plaats van header)
 router.get('/courses/:courseId/statistics/stream', streamCourseStatistics);
@@ -693,7 +711,7 @@ router.get('/courses/:courseId/students', getEnrolledStudents);
  *     tags:
  *       - Docenten
  *     summary: Haal student status per cursus op
- *     description: Haalt de status op van alle studenten voor een specifieke cursus
+ *     description: Haalt de status op van alle studenten voor een specifieke cursus, inclusief voortgang per opdracht
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -713,12 +731,79 @@ router.get('/courses/:courseId/students', getEnrolledStudents);
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: array
  *                   items:
  *                     type: object
+ *                     properties:
+ *                       studentId:
+ *                         type: integer
+ *                         description: ID van de student
+ *                       studentName:
+ *                         type: string
+ *                         description: Naam van de student
+ *                       email:
+ *                         type: string
+ *                         description: E-mailadres van de student
+ *                       assignments:
+ *                         type: array
+ *                         description: Status per opdracht
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             assignmentId:
+ *                               type: integer
+ *                             assignmentTitle:
+ *                               type: string
+ *                             status:
+ *                               type: string
+ *                               enum: [not_started, in_progress, completed]
+ *                             submittedAt:
+ *                               type: string
+ *                               format: date-time
+ *                               nullable: true
+ *             example:
+ *               success: true
+ *               data:
+ *                 - studentId: 1
+ *                   studentName: Jan Janssen
+ *                   email: jan@example.com
+ *                   assignments:
+ *                     - assignmentId: 1
+ *                       assignmentTitle: JavaScript Basics
+ *                       status: completed
+ *                       submittedAt: "2024-01-15T10:30:00Z"
+ *                     - assignmentId: 2
+ *                       assignmentTitle: React Components
+ *                       status: in_progress
+ *                       submittedAt: "2024-01-20T14:20:00Z"
+ *                     - assignmentId: 3
+ *                       assignmentTitle: Final Project
+ *                       status: not_started
+ *                       submittedAt: null
+ *                 - studentId: 2
+ *                   studentName: Marie Peeters
+ *                   email: marie@example.com
+ *                   assignments:
+ *                     - assignmentId: 1
+ *                       assignmentTitle: JavaScript Basics
+ *                       status: completed
+ *                       submittedAt: "2024-01-14T09:15:00Z"
+ *                     - assignmentId: 2
+ *                       assignmentTitle: React Components
+ *                       status: completed
+ *                       submittedAt: "2024-01-19T16:45:00Z"
+ *                     - assignmentId: 3
+ *                       assignmentTitle: Final Project
+ *                       status: in_progress
+ *                       submittedAt: "2024-01-22T11:30:00Z"
  *       400:
  *         description: Ontbrekende cursus ID
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toegang tot deze cursus
  *       500:
  *         description: Interne serverfout
  */
@@ -731,7 +816,7 @@ router.get('/courses/:courseId/student-status', getStudentStatusByCourse);
  *     tags:
  *       - Docenten
  *     summary: Haal status voor specifieke student op
- *     description: Haalt gedetailleerde statusinformatie op voor een specifieke student in een cursus
+ *     description: Haalt gedetailleerde statusinformatie op voor een specifieke student in een cursus, inclusief alle opdrachten en voortgang
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -757,10 +842,86 @@ router.get('/courses/:courseId/student-status', getStudentStatusByCourse);
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: object
+ *                   properties:
+ *                     studentId:
+ *                       type: integer
+ *                       description: ID van de student
+ *                     studentName:
+ *                       type: string
+ *                       description: Naam van de student
+ *                     email:
+ *                       type: string
+ *                       description: E-mailadres van de student
+ *                     courseId:
+ *                       type: integer
+ *                       description: ID van de cursus
+ *                     courseTitle:
+ *                       type: string
+ *                       description: Titel van de cursus
+ *                     assignments:
+ *                       type: array
+ *                       description: Alle opdrachten met status
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           assignmentId:
+ *                             type: integer
+ *                           assignmentTitle:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           status:
+ *                             type: string
+ *                             enum: [not_started, in_progress, completed]
+ *                           submittedAt:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *                           githubUrl:
+ *                             type: string
+ *                             nullable: true
+ *                           branch:
+ *                             type: string
+ *                             nullable: true
+ *             example:
+ *               success: true
+ *               data:
+ *                 studentId: 1
+ *                 studentName: Jan Janssen
+ *                 email: jan@example.com
+ *                 courseId: 1
+ *                 courseTitle: Web Development
+ *                 assignments:
+ *                   - assignmentId: 1
+ *                     assignmentTitle: JavaScript Basics
+ *                     description: Leer de basis van JavaScript programmeren
+ *                     status: completed
+ *                     submittedAt: "2024-01-15T10:30:00Z"
+ *                     githubUrl: "https://github.com/jan/javascript-basics"
+ *                     branch: "main"
+ *                   - assignmentId: 2
+ *                     assignmentTitle: React Components
+ *                     description: Bouw herbruikbare React componenten
+ *                     status: in_progress
+ *                     submittedAt: "2024-01-20T14:20:00Z"
+ *                     githubUrl: "https://github.com/jan/react-components"
+ *                     branch: "feature/header"
+ *                   - assignmentId: 3
+ *                     assignmentTitle: Final Project
+ *                     description: Ontwikkel een volledige web applicatie
+ *                     status: not_started
+ *                     submittedAt: null
+ *                     githubUrl: null
+ *                     branch: null
  *       400:
  *         description: Ontbrekende parameters
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toegang tot deze cursus
  *       404:
  *         description: Student of cursus niet gevonden
  *       500:

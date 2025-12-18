@@ -17,7 +17,7 @@ router.get('/profile', authenticateToken, userController.getProfile);
  * /api/user/profile:
  *   put:
  *     tags:
- *       - Gebruiker
+ *       - Authenticatie
  *     summary: Update gebruikersprofiel
  *     description: |
  *       Werk naam en/of e-mailadres van de ingelogde gebruiker bij.
@@ -71,7 +71,7 @@ router.put('/profile', authenticateToken, userController.updateProfile);
  * /api/user/password:
  *   put:
  *     tags:
- *       - Gebruiker
+ *       - Authenticatie
  *     summary: Stel wachtwoord in of wijzig wachtwoord
  *     description: |
  *       Gebruikers kunnen hun wachtwoord instellen of wijzigen.
