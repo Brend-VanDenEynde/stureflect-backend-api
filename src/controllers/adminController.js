@@ -683,6 +683,55 @@ async function getAllSubmissions() {
 }
 
 /**
+ * Haalt alle ingediende opdrachten (submissions) voor een specifiek vak op
+ * @param {number} courseId - ID van het vak
+ * @returns {Promise<Array>} Array met submission gegevens inclusief opdracht en studentinformatie
+ */
+async function getSubmissionsByCourse(courseId) {
+  // Controleer eerst of het vak bestaat
+  const courseCheck = await db.query(
+    `SELECT id FROM course WHERE id = $1`,
+    [courseId]
+  );
+
+  if (courseCheck.rows.length === 0) {
+    throw new Error('COURSE_NOT_FOUND');
+  }
+
+  const result = await db.query(
+    `SELECT 
+      s.id,
+      s.github_url,
+      s.commit_sha,
+      s.status,
+      s.ai_score,
+      s.manual_score,
+      s.created_at,
+      s.updated_at,
+      a.id as assignment_id,
+      a.title as assignment_title,
+      a.description as assignment_description,
+      a.due_date as assignment_due_date,
+      u.id as student_id,
+      u.name as student_name,
+      u.email as student_email,
+      CAST(COUNT(DISTINCT f.id) AS INTEGER) as feedback_count
+     FROM submission s
+     JOIN assignment a ON s.assignment_id = a.id
+     JOIN course c ON a.course_id = c.id
+     JOIN "user" u ON s.user_id = u.id
+     LEFT JOIN feedback f ON s.id = f.submission_id
+     WHERE c.id = $1
+     GROUP BY s.id, s.github_url, s.commit_sha, s.status, s.ai_score, s.manual_score,
+              s.created_at, s.updated_at, a.id, a.title, a.description, a.due_date,
+              u.id, u.name, u.email
+     ORDER BY s.created_at DESC`,
+    [courseId]
+  );
+  return result.rows;
+}
+
+/**
  * Haalt de instellingen van een opdracht op
  * @param {number} assignmentId - ID van de opdracht
  * @returns {Promise<Object|null>} Object met instellingen of null als niet gevonden
@@ -773,6 +822,7 @@ module.exports = {
   getCourseAssignments,
   getAllAssignments,
   getAllSubmissions,
+  getSubmissionsByCourse,
   deleteAssignment,
   getStudentById,
   updateStudent,
