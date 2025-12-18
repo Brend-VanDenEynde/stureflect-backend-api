@@ -176,10 +176,20 @@ async function analyzeFile(filePath, content, language, courseSettings) {
       }
     );
 
+    // Log de volledige response structuur voor debugging
+    console.log(`[API] AI response structure:`, JSON.stringify({
+      hasData: !!response.data,
+      hasChoices: !!response.data?.choices,
+      choicesLength: response.data?.choices?.length,
+      firstChoice: response.data?.choices?.[0],
+      usage: response.data?.usage
+    }, null, 2));
+
     const aiResponse = response.data.choices[0]?.message?.content;
 
     if (!aiResponse) {
       console.warn(`[API] AI: No response for ${filePath}`);
+      console.warn(`[API] AI: Full response data:`, JSON.stringify(response.data));
       return [];
     }
 
