@@ -1245,6 +1245,106 @@ const getDocentAssignments = async (req, res) => {
   }
 };
 
+// Haal opdrachten van een specifiek vak op
+const getDocentCourseAssignments = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { courseId } = req.params;
+    const {
+      sortBy = 'dueDate',
+      sortOrder = 'asc'
+    } = req.query;
+
+    // Validate courseId
+    const courseIdNum = parseInt(courseId, 10);
+    if (isNaN(courseIdNum)) {
+      return res.status(400).json({ error: 'Invalid course ID' });
+    }
+
+    // Check if course exists
+    const courseCheck = await pool.query(
+      'SELECT id FROM course WHERE id = $1',
+      [courseIdNum]
+    );
+
+    if (courseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Authorization check: verify user is a teacher of this course
+    const accessCheck = await pool.query(
+      'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+      [courseIdNum, userId]
+    );
+
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to access this course'
+      });
+    }
+
+    // Build ORDER BY clause based on sortBy parameter
+    let orderByClause;
+    const validSortFields = {
+      'dueDate': 'a.due_date',
+      'title': 'a.title',
+      'createdAt': 'a.created_at',
+      'submissionCount': 'submission_count'
+    };
+
+    const sortField = validSortFields[sortBy] || 'a.due_date';
+    const order = sortOrder.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    
+    // For due_date and date fields, handle NULLs
+    if (sortField === 'a.due_date' || sortField === 'a.created_at') {
+      orderByClause = `${sortField} ${order} NULLS LAST`;
+    } else {
+      orderByClause = `${sortField} ${order}`;
+    }
+
+    // Fetch assignments with submission count
+    const result = await pool.query(
+      `SELECT 
+        a.id,
+        a.title,
+        a.description,
+        a.due_date,
+        a.rubric,
+        a.ai_guidelines,
+        a.created_at,
+        a.updated_at,
+        COUNT(DISTINCT s.id) as submission_count
+      FROM assignment a
+      LEFT JOIN submission s ON a.id = s.assignment_id
+      WHERE a.course_id = $1
+      GROUP BY a.id, a.title, a.description, a.due_date, a.rubric, a.ai_guidelines, a.created_at, a.updated_at
+      ORDER BY ${orderByClause}`,
+      [courseIdNum]
+    );
+
+    // Convert to camelCase
+    const assignments = result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      dueDate: row.due_date,
+      rubric: row.rubric,
+      aiGuidelines: row.ai_guidelines,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      submissionCount: parseInt(row.submission_count, 10)
+    }));
+
+    res.json({ assignments });
+  } catch (error) {
+    console.error('[API] Error fetching course assignments:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1256,6 +1356,7 @@ module.exports = {
   updateCourse,
   deleteCourse,
   streamCourseStatistics,
-  getDocentAssignments
+  getDocentAssignments,
+  getDocentCourseAssignments
 };
 

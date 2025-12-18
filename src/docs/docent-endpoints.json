@@ -233,6 +233,214 @@
             }
         }
     },
+    "/api/docent/courses/{courseId}/assignments": {
+        "get": {
+            "summary": "Haal opdrachten van een specifiek vak op",
+            "description": "Haalt alle opdrachten op van een specifiek vak waar de docent les aan geeft, inclusief het aantal inzendingen per opdracht. Ondersteunt sortering op verschillende velden.",
+            "operationId": "getDocentCourseAssignments",
+            "tags": [
+                "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "courseId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer"
+                    },
+                    "description": "ID van het vak"
+                },
+                {
+                    "name": "sortBy",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string",
+                        "enum": ["dueDate", "title", "createdAt", "submissionCount"],
+                        "default": "dueDate"
+                    },
+                    "description": "Sorteer opdrachten op dit veld (dueDate, title, createdAt, submissionCount)"
+                },
+                {
+                    "name": "sortOrder",
+                    "in": "query",
+                    "required": false,
+                    "schema": {
+                        "type": "string",
+                        "enum": ["asc", "desc"],
+                        "default": "asc"
+                    },
+                    "description": "Sorteervolgorde (asc = oplopend, desc = aflopend)"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Lijst met opdrachten van het vak",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "assignments": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "description": "Unieke ID van de opdracht"
+                                                },
+                                                "title": {
+                                                    "type": "string",
+                                                    "description": "Titel van de opdracht"
+                                                },
+                                                "description": {
+                                                    "type": "string",
+                                                    "description": "Beschrijving van de opdracht"
+                                                },
+                                                "dueDate": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "description": "Inleverdatum (kan null zijn)",
+                                                    "nullable": true
+                                                },
+                                                "rubric": {
+                                                    "type": "string",
+                                                    "description": "Beoordelingsrubriek",
+                                                    "nullable": true
+                                                },
+                                                "aiGuidelines": {
+                                                    "type": "string",
+                                                    "description": "AI-beoordelingsrichtlijnen",
+                                                    "nullable": true
+                                                },
+                                                "createdAt": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "description": "Aanmaakdatum"
+                                                },
+                                                "updatedAt": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "description": "Laatste wijzigingsdatum"
+                                                },
+                                                "submissionCount": {
+                                                    "type": "integer",
+                                                    "description": "Aantal inzendingen voor deze opdracht"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "example": {
+                                "assignments": [
+                                    {
+                                        "id": 1,
+                                        "title": "Recursie Oefening",
+                                        "description": "Implementeer recursieve functies",
+                                        "dueDate": "2025-01-20T23:59:59Z",
+                                        "rubric": "Correctheid: 40%, Stijl: 30%, Testen: 30%",
+                                        "aiGuidelines": "Controleer op efficiënte recursie",
+                                        "createdAt": "2025-01-01T10:00:00Z",
+                                        "updatedAt": "2025-01-02T14:30:00Z",
+                                        "submissionCount": 15
+                                    },
+                                    {
+                                        "id": 2,
+                                        "title": "Datastructuren Praktijk",
+                                        "description": "Bouw een stack en queue",
+                                        "dueDate": "2025-01-27T23:59:59Z",
+                                        "rubric": null,
+                                        "aiGuidelines": null,
+                                        "createdAt": "2025-01-05T09:00:00Z",
+                                        "updatedAt": "2025-01-05T09:00:00Z",
+                                        "submissionCount": 8
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ongeldige course ID",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Invalid course ID"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd"
+                },
+                "403": {
+                    "description": "Geen toegang tot dit vak",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Forbidden: You do not have permission to access this course"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "404": {
+                    "description": "Vak niet gevonden",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Course not found"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "500": {
+                    "description": "Interne serverfout",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Internal server error"
+                                    },
+                                    "message": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
     "/api/docent/courses/{courseId}": {
         "put": {
             "summary": "Vak bewerken",
