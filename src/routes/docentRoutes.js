@@ -16,7 +16,8 @@ const {
 	getDocentCourseAssignments,
 	createAssignment,
 	getAssignmentDetail,
-	updateAssignment
+	updateAssignment,
+	deleteAssignment
 } = require('../controllers/docentController');
 
 /**
@@ -472,6 +473,98 @@ router.get('/assignments/:assignmentId', getAssignmentDetail);
  *         description: Interne serverfout
  */
 router.put('/assignments/:assignmentId', authenticateToken, updateAssignment);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}:
+ *   delete:
+ *     tags:
+ *       - Docenten
+ *     summary: Verwijder opdracht
+ *     description: Verwijdert een opdracht permanent. Deze actie kan niet ongedaan worden gemaakt. Alle gerelateerde data (inleveringen, feedback) wordt automatisch verwijderd door database CASCADE.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de te verwijderen opdracht
+ *     responses:
+ *       200:
+ *         description: Opdracht succesvol verwijderd
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Assignment successfully deleted"
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 5
+ *                     title:
+ *                       type: string
+ *                       example: "REST API Implementation"
+ *                     description:
+ *                       type: string
+ *                       example: "Build a RESTful API with Node.js and Express"
+ *                     courseId:
+ *                       type: integer
+ *                       example: 1
+ *                     dueDate:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2025-12-31T23:59:59Z"
+ *                     rubric:
+ *                       type: string
+ *                       nullable: true
+ *                       example: "Functionality (40%), Code quality (30%), Documentation (30%)"
+ *                     aiGuidelines:
+ *                       type: string
+ *                       nullable: true
+ *                       example: "Check for RESTful best practices and proper error handling"
+ *       400:
+ *         description: Ongeldige assignment ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Invalid assignment ID: must be an integer"
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toestemming (gebruiker is geen docent van dit vak)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Forbidden: You do not have permission to delete this assignment"
+ *       404:
+ *         description: Opdracht niet gevonden
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Assignment not found"
+ *       500:
+ *         description: Interne serverfout
+ */
+router.delete('/assignments/:assignmentId', authenticateToken, deleteAssignment);
 
 /**
  * @swagger

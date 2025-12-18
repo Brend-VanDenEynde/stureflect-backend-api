@@ -1860,6 +1860,167 @@
                     }
                 }
             }
+        },
+        "delete": {
+            "summary": "Verwijder opdracht",
+            "description": "Verwijdert een opdracht permanent. Deze actie kan niet ongedaan worden gemaakt. Alle gerelateerde data (inleveringen, feedback) wordt automatisch verwijderd door database CASCADE.",
+            "operationId": "deleteAssignment",
+            "tags": [
+                "Docenten"
+            ],
+            "security": [
+                {
+                    "bearerAuth": []
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "assignmentId",
+                    "in": "path",
+                    "required": true,
+                    "description": "ID van de te verwijderen opdracht",
+                    "schema": {
+                        "type": "integer"
+                    }
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Opdracht succesvol verwijderd",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "message": {
+                                        "type": "string",
+                                        "example": "Assignment successfully deleted"
+                                    },
+                                    "assignment": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer",
+                                                "example": 5
+                                            },
+                                            "title": {
+                                                "type": "string",
+                                                "example": "REST API Implementation"
+                                            },
+                                            "description": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "Build a RESTful API with Node.js and Express"
+                                            },
+                                            "courseId": {
+                                                "type": "integer",
+                                                "example": 1
+                                            },
+                                            "dueDate": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "nullable": true,
+                                                "example": "2025-12-31T23:59:59Z"
+                                            },
+                                            "rubric": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "Functionality (40%), Code quality (30%), Documentation (30%)"
+                                            },
+                                            "aiGuidelines": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "example": "Check for RESTful best practices and proper error handling"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "example": {
+                                "message": "Assignment successfully deleted",
+                                "assignment": {
+                                    "id": 5,
+                                    "title": "REST API Implementation",
+                                    "description": "Build a RESTful API with Node.js and Express",
+                                    "courseId": 1,
+                                    "dueDate": "2025-12-31T23:59:59.000Z",
+                                    "rubric": "Functionality (40%), Code quality (30%), Documentation (30%)",
+                                    "aiGuidelines": "Check for RESTful best practices and proper error handling"
+                                }
+                            }
+                        }
+                    }
+                },
+                "400": {
+                    "description": "Ongeldige assignment ID",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {"type": "string"}
+                                }
+                            },
+                            "example": {
+                                "error": "Invalid assignment ID: must be an integer"
+                            }
+                        }
+                    }
+                },
+                "401": {
+                    "description": "Niet geauthenticeerd"
+                },
+                "403": {
+                    "description": "Geen toestemming - gebruiker is geen docent van dit vak",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {"type": "string"}
+                                }
+                            },
+                            "example": {
+                                "error": "Forbidden: You do not have permission to delete this assignment"
+                            }
+                        }
+                    }
+                },
+                "404": {
+                    "description": "Opdracht niet gevonden",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {"type": "string"}
+                                }
+                            },
+                            "example": {
+                                "error": "Assignment not found"
+                            }
+                        }
+                    }
+                },
+                "500": {
+                    "description": "Interne serverfout",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {"type": "string"},
+                                    "message": {"type": "string"}
+                                }
+                            },
+                            "example": {
+                                "error": "Internal server error",
+                                "message": "Database connection failed"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "/api/docent/courses/{courseId}/statistics/stream": {

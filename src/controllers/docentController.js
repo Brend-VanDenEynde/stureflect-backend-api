@@ -1730,6 +1730,104 @@ const updateAssignment = async (req, res) => {
   }
 };
 
+/**
+ * Delete an assignment
+ * @route DELETE /api/docent/assignments/:assignmentId
+ */
+const deleteAssignment = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Validation: assignmentId required
+    if (!assignmentId) {
+      return res.status(400).json({ error: 'assignmentId is required' });
+    }
+
+    // Validate assignment ID
+    const assignmentIdNum = parseInt(assignmentId, 10);
+    if (isNaN(assignmentIdNum)) {
+      return res.status(400).json({ error: 'Invalid assignment ID: must be an integer' });
+    }
+
+    // Check if assignment exists and get its data
+    const assignmentCheck = await pool.query(
+      'SELECT id, title, description, course_id, due_date, rubric, ai_guidelines FROM assignment WHERE id = $1',
+      [assignmentIdNum]
+    );
+
+    if (assignmentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const assignmentData = assignmentCheck.rows[0];
+    const courseId = assignmentData.course_id;
+
+    // Authorization check: verify user is a teacher of the assignment's course (admins bypass this)
+    if (userRole !== 'admin') {
+      const accessCheck = await pool.query(
+        'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+        [courseId, userId]
+      );
+
+      if (accessCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Forbidden: You do not have permission to delete this assignment' });
+      }
+    }
+
+    // Delete assignment (CASCADE will handle related submissions and feedback)
+    const deleteResult = await pool.query(
+      `DELETE FROM assignment
+       WHERE id = $1
+       RETURNING id, title, description, course_id, due_date, rubric, ai_guidelines`,
+      [assignmentIdNum]
+    );
+
+    const deletedAssignment = deleteResult.rows[0];
+
+    // Structured event log
+    logger.event('assignment_deleted', {
+      courseId: parseInt(courseId),
+      assignmentId: parseInt(assignmentIdNum),
+      submissionId: null,
+      userId: null,
+      actorId: req.user.id,
+      oldStatus: 'active',
+      newStatus: 'deleted',
+      metadata: {
+        assignmentTitle: assignmentData.title,
+        actorEmail: req.user.email,
+        actorRole: req.user.role
+      }
+    });
+
+    // Invalidate cache for this course
+    invalidateCourseCache(courseId);
+
+    console.log(`✅ Assignment deleted: ${assignmentIdNum} from course ${courseId} by user ${userId}`);
+    res.json({
+      message: 'Assignment successfully deleted',
+      assignment: {
+        id: deletedAssignment.id,
+        title: deletedAssignment.title,
+        description: deletedAssignment.description,
+        courseId: deletedAssignment.course_id,
+        dueDate: deletedAssignment.due_date,
+        rubric: deletedAssignment.rubric,
+        aiGuidelines: deletedAssignment.ai_guidelines
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error deleting assignment:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1745,6 +1843,7 @@ module.exports = {
   getDocentCourseAssignments,
   createAssignment,
   getAssignmentDetail,
-  updateAssignment
+  updateAssignment,
+  deleteAssignment
 };
 
