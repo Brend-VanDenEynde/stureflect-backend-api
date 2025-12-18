@@ -1,6 +1,43 @@
 const db = require('../config/db');
 
 /**
+ * Bepaal status tekst op basis van feedback severity
+ * @param {object} row - Database row met feedback counts
+ * @returns {string} - Status tekst
+ */
+function getStatusText(row) {
+  // Geen submission
+  if (!row.submission_id) {
+    return 'Nog niet ingediend';
+  }
+
+  // Submission bestaat maar nog niet geanalyseerd
+  if (!row.ai_score && row.ai_score !== 0) {
+    return 'In behandeling';
+  }
+
+  // Gebaseerd op feedback severity
+  const criticalCount = parseInt(row.critical_count) || 0;
+  const highCount = parseInt(row.high_count) || 0;
+  const mediumCount = parseInt(row.medium_count) || 0;
+  const lowCount = parseInt(row.low_count) || 0;
+
+  if (criticalCount > 0) {
+    return 'Actie vereist';
+  }
+
+  if (highCount > 0) {
+    return 'Verbeteringen nodig';
+  }
+
+  if (mediumCount > 0 || lowCount > 0) {
+    return 'Goed op weg';
+  }
+
+  return 'Uitstekend';
+}
+
+/**
  * Haal alle cursussen op waar de student is ingeschreven
  * @param {number} studentId - ID van de student
  * @returns {Promise<Array>}
@@ -56,12 +93,31 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
         a.due_date,
         a.created_at,
         s.id as submission_id,
+        s.status,
+        s.ai_score,
+        s.updated_at as last_analysis_date,
+        COALESCE(fc.critical_count, 0) as critical_count,
+        COALESCE(fc.high_count, 0) as high_count,
+        COALESCE(fc.medium_count, 0) as medium_count,
+        COALESCE(fc.low_count, 0) as low_count,
+        COALESCE(fc.total_count, 0) as feedback_count,
         CASE
           WHEN s.id IS NOT NULL THEN 'submitted'
           ELSE 'pending'
         END as submission_status
       FROM assignment a
       LEFT JOIN submission s ON a.id = s.assignment_id AND s.user_id = $1
+      LEFT JOIN (
+        SELECT
+          submission_id,
+          COUNT(*) FILTER (WHERE severity = 'critical') as critical_count,
+          COUNT(*) FILTER (WHERE severity = 'high') as high_count,
+          COUNT(*) FILTER (WHERE severity = 'medium') as medium_count,
+          COUNT(*) FILTER (WHERE severity = 'low') as low_count,
+          COUNT(*) as total_count
+        FROM feedback
+        GROUP BY submission_id
+      ) fc ON s.id = fc.submission_id
       WHERE a.course_id = $2
     `;
 
@@ -76,7 +132,23 @@ async function getCourseAssignments(studentId, courseId, options = {}) {
     query += ` ORDER BY a.${safeSortBy} ${safeOrder}`;
 
     const result = await db.query(query, [studentId, courseId]);
-    return result.rows;
+
+    // Map rows to include enhanced fields
+    return result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      due_date: row.due_date,
+      created_at: row.created_at,
+      submission_id: row.submission_id,
+      submission_status: row.submission_status,
+      status: row.status,
+      ai_score: row.ai_score,
+      progress_percentage: row.ai_score !== null ? row.ai_score : 0,
+      status_text: getStatusText(row),
+      feedback_count: parseInt(row.feedback_count) || 0,
+      last_analysis_date: row.last_analysis_date
+    }));
   } catch (error) {
     console.error('[API] Error fetching course assignments:', error.message);
     throw error;
@@ -473,17 +545,36 @@ async function updateSubmission(submissionId, studentId, githubUrl, commitSha) {
  */
 async function getAssignmentDetail(assignmentId, studentId) {
   try {
-    // Haal assignment op met enrollment check in dezelfde query
+    // Haal assignment op met enrollment check en feedback counts in dezelfde query
     // Dit voorkomt information leakage (niet onthullen of assignment bestaat)
     const assignmentResult = await db.query(
       `SELECT
         a.id, a.title, a.description, a.due_date, a.rubric, a.ai_guidelines, a.created_at,
         c.id as course_id, c.title as course_title,
         s.id as submission_id,
+        s.status as submission_status,
+        s.ai_score,
+        s.updated_at as last_analysis_date,
+        COALESCE(fc.critical_count, 0) as critical_count,
+        COALESCE(fc.high_count, 0) as high_count,
+        COALESCE(fc.medium_count, 0) as medium_count,
+        COALESCE(fc.low_count, 0) as low_count,
+        COALESCE(fc.total_count, 0) as feedback_count,
         e.id as enrollment_id
       FROM assignment a
       JOIN course c ON a.course_id = c.id
       LEFT JOIN submission s ON a.id = s.assignment_id AND s.user_id = $2
+      LEFT JOIN (
+        SELECT
+          submission_id,
+          COUNT(*) FILTER (WHERE severity = 'critical') as critical_count,
+          COUNT(*) FILTER (WHERE severity = 'high') as high_count,
+          COUNT(*) FILTER (WHERE severity = 'medium') as medium_count,
+          COUNT(*) FILTER (WHERE severity = 'low') as low_count,
+          COUNT(*) as total_count
+        FROM feedback
+        GROUP BY submission_id
+      ) fc ON s.id = fc.submission_id
       LEFT JOIN enrollment e ON c.id = e.course_id AND e.user_id = $2
       WHERE a.id = $1`,
       [assignmentId, studentId]
@@ -518,7 +609,17 @@ async function getAssignmentDetail(assignmentId, studentId) {
         },
         submission_status: {
           has_submitted: row.submission_id !== null,
-          submission_id: row.submission_id
+          submission_id: row.submission_id,
+          status_text: getStatusText(row),
+          progress_percentage: row.ai_score !== null ? row.ai_score : 0,
+          last_analysis_date: row.last_analysis_date,
+          feedback_summary: {
+            critical: parseInt(row.critical_count) || 0,
+            high: parseInt(row.high_count) || 0,
+            medium: parseInt(row.medium_count) || 0,
+            low: parseInt(row.low_count) || 0,
+            total: parseInt(row.feedback_count) || 0
+          }
         }
       }
     };
