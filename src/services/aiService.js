@@ -168,7 +168,6 @@ async function analyzeFile(filePath, content, language, courseSettings) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3, // Lage temperature voor consistente output
         max_completion_tokens: 2000
       },
       {
