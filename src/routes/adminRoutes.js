@@ -3993,4 +3993,196 @@ router.put('/admin/assignments/:assignmentId/settings', authenticateToken, async
   }
 });
 
+/**
+ * @swagger
+ * /api/admin/assignments/{assignmentId}:
+ *   put:
+ *     tags:
+ *       - Admin - Assignments
+ *     summary: Update opdracht (alle velden)
+ *     description: Werk alle velden van een opdracht bij inclusief title, description, due_date, rubric en ai_guidelines (alleen voor admins)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Titel van de opdracht (max 255 karakters)
+ *                 example: "REST API Implementatie - Updated"
+ *               description:
+ *                 type: string
+ *                 description: Beschrijving van de opdracht
+ *                 example: "Bouw een volledige RESTful API met authenticatie"
+ *               due_date:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Deadline voor de opdracht (ISO 8601 formaat)
+ *                 example: "2025-12-31T23:59:59Z"
+ *               rubric:
+ *                 type: string
+ *                 description: Beoordelingsrubric voor de opdracht
+ *                 example: "Code kwaliteit: 40%, Functionaliteit: 40%, Documentatie: 20%"
+ *               ai_guidelines:
+ *                 type: string
+ *                 description: AI feedback richtlijnen
+ *                 example: "Focus op API design, error handling en security"
+ *     responses:
+ *       200:
+ *         description: Opdracht succesvol bijgewerkt
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     course_id:
+ *                       type: integer
+ *                     due_date:
+ *                       type: string
+ *                     rubric:
+ *                       type: string
+ *                     ai_guidelines:
+ *                       type: string
+ *                     created_at:
+ *                       type: string
+ *                     updated_at:
+ *                       type: string
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Geen velden om te updaten of ongeldige data
+ *       403:
+ *         description: Geen admin rechten
+ *       404:
+ *         description: Opdracht niet gevonden
+ */
+router.put('/admin/assignments/:assignmentId', authenticateToken, async (req, res) => {
+  const logger = require('../utils/logger');
+  const adminId = req.user?.id || parseInt(req.query.adminId);
+  const assignmentId = parseInt(req.params.assignmentId);
+  const { title, description, due_date, rubric, ai_guidelines } = req.body;
+
+  console.log(`[API] Admin ${adminId || 'unknown'} updating assignment ${assignmentId} at ${new Date().toISOString()}`);
+
+  try {
+    // Validatie: controleer of admin ID aanwezig is
+    if (!adminId) {
+      console.log(`[API] Request denied: no admin ID provided`);
+      return res.status(400).json({
+        success: false,
+        message: 'Admin ID is verplicht',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Validatie: controleer of opdracht ID geldig is
+    if (!assignmentId || isNaN(assignmentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldig opdracht ID',
+        error: 'BAD_REQUEST'
+      });
+    }
+
+    // Autorisatie: controleer of gebruiker admin is
+    const isAdmin = await adminController.isUserAdmin(adminId);
+    if (!isAdmin) {
+      console.log(`[API] Access denied for user ${adminId}: not an admin`);
+      return res.status(403).json({
+        success: false,
+        message: 'Alleen admins hebben toegang tot deze functie',
+        error: 'FORBIDDEN'
+      });
+    }
+
+    // Update de opdracht
+    const updatedAssignment = await adminController.updateAssignment(assignmentId, {
+      title,
+      description,
+      due_date,
+      rubric,
+      ai_guidelines
+    });
+
+    logger.success('Admin-Assignment', `Admin ${adminId} updated assignment ${assignmentId}`);
+
+    res.status(200).json({
+      success: true,
+      data: updatedAssignment,
+      message: 'Opdracht succesvol bijgewerkt',
+      error: null
+    });
+  } catch (error) {
+    if (error.message === 'ASSIGNMENT_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: 'Opdracht niet gevonden',
+        error: 'NOT_FOUND'
+      });
+    }
+
+    if (error.message === 'TITLE_EMPTY') {
+      return res.status(400).json({
+        success: false,
+        message: 'Titel mag niet leeg zijn',
+        error: 'TITLE_EMPTY'
+      });
+    }
+
+    if (error.message === 'TITLE_TOO_LONG') {
+      return res.status(400).json({
+        success: false,
+        message: 'Titel mag niet langer zijn dan 255 karakters',
+        error: 'TITLE_TOO_LONG'
+      });
+    }
+
+    if (error.message === 'INVALID_DUE_DATE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Ongeldige datum formaat voor deadline',
+        error: 'INVALID_DUE_DATE'
+      });
+    }
+
+    if (error.message === 'NO_FIELDS_TO_UPDATE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Minimaal één veld moet worden opgegeven om bij te werken',
+        error: 'NO_FIELDS_TO_UPDATE'
+      });
+    }
+
+    logger.error('Admin-Assignment', `Failed to update assignment ${assignmentId}`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Fout bij bijwerken opdracht',
+      error: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
 module.exports = router;

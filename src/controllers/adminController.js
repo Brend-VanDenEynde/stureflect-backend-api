@@ -860,6 +860,90 @@ async function createAssignment(courseId, assignmentData) {
   return result.rows[0];
 }
 
+/**
+ * Werkt alle velden van een opdracht bij
+ * @param {number} assignmentId - ID van de opdracht
+ * @param {Object} updateData - Object met te updaten velden (title, description, due_date, rubric, ai_guidelines)
+ * @returns {Promise<Object>} Bijgewerkte opdracht
+ */
+async function updateAssignment(assignmentId, updateData) {
+  const { title, description, due_date, rubric, ai_guidelines } = updateData;
+
+  // Controleer eerst of de opdracht bestaat
+  const assignmentCheck = await db.query(
+    `SELECT id FROM assignment WHERE id = $1`,
+    [assignmentId]
+  );
+
+  if (assignmentCheck.rows.length === 0) {
+    throw new Error('ASSIGNMENT_NOT_FOUND');
+  }
+
+  // Build dynamic query based on provided fields
+  const updates = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (title !== undefined) {
+    if (!title || title.trim().length === 0) {
+      throw new Error('TITLE_EMPTY');
+    }
+    if (title.trim().length > 255) {
+      throw new Error('TITLE_TOO_LONG');
+    }
+    updates.push(`title = $${paramCount}`);
+    values.push(title.trim());
+    paramCount++;
+  }
+
+  if (description !== undefined) {
+    updates.push(`description = $${paramCount}`);
+    values.push(description || null);
+    paramCount++;
+  }
+
+  if (due_date !== undefined) {
+    if (due_date !== null) {
+      const parsedDate = new Date(due_date);
+      if (isNaN(parsedDate.getTime())) {
+        throw new Error('INVALID_DUE_DATE');
+      }
+    }
+    updates.push(`due_date = $${paramCount}`);
+    values.push(due_date);
+    paramCount++;
+  }
+
+  if (rubric !== undefined) {
+    updates.push(`rubric = $${paramCount}`);
+    values.push(rubric || null);
+    paramCount++;
+  }
+
+  if (ai_guidelines !== undefined) {
+    updates.push(`ai_guidelines = $${paramCount}`);
+    values.push(ai_guidelines || null);
+    paramCount++;
+  }
+
+  if (updates.length === 0) {
+    throw new Error('NO_FIELDS_TO_UPDATE');
+  }
+
+  updates.push(`updated_at = NOW()`);
+  values.push(assignmentId);
+
+  const query = `
+    UPDATE assignment
+    SET ${updates.join(', ')}
+    WHERE id = $${paramCount}
+    RETURNING id, title, description, course_id, due_date, rubric, ai_guidelines, created_at, updated_at
+  `;
+
+  const result = await db.query(query, values);
+  return result.rows[0];
+}
+
 module.exports = {
   getAllStudents,
   getAllTeachers,
@@ -890,5 +974,6 @@ module.exports = {
   getStudentEnrollments,
   getStudentSubmissions,
   getAssignmentSettings,
-  updateAssignmentSettings
+  updateAssignmentSettings,
+  updateAssignment
 };
