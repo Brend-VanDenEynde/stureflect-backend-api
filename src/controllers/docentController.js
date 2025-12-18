@@ -1435,6 +1435,165 @@ const createAssignment = async (req, res) => {
   }
 };
 
+/**
+ * Get detailed information about a specific assignment
+ * Includes assignment details, submission statistics, and all student submissions
+ * @route GET /api/docent/assignments/:assignmentId
+ */
+const getAssignmentDetail = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Validate assignment ID
+    const assignmentIdNum = parseInt(assignmentId, 10);
+    if (isNaN(assignmentIdNum)) {
+      return res.status(400).json({ error: 'Invalid assignment ID' });
+    }
+
+    // Get assignment details with course info and verify authorization in one query
+    const assignmentQuery = `
+      SELECT 
+        a.id,
+        a.title,
+        a.description,
+        a.course_id,
+        a.due_date,
+        a.rubric,
+        a.ai_guidelines,
+        a.created_at,
+        a.updated_at,
+        c.title as course_title,
+        CASE 
+          WHEN $3 = 'admin' THEN TRUE
+          WHEN ct.user_id IS NOT NULL THEN TRUE
+          ELSE FALSE
+        END as has_access
+      FROM assignment a
+      JOIN course c ON a.course_id = c.id
+      LEFT JOIN course_teacher ct ON ct.course_id = c.id AND ct.user_id = $2
+      WHERE a.id = $1
+    `;
+
+    const assignmentResult = await pool.query(assignmentQuery, [assignmentIdNum, userId, userRole]);
+
+    if (assignmentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const assignmentData = assignmentResult.rows[0];
+
+    // Check authorization
+    if (!assignmentData.has_access) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    // Get submission statistics
+    const statsQuery = `
+      SELECT
+        COUNT(DISTINCT s.id) as total_submissions,
+        COUNT(DISTINCT s.user_id) as students_submitted,
+        COUNT(DISTINCT CASE WHEN s.status = 'completed' THEN s.id END) as completed_count,
+        COUNT(DISTINCT CASE WHEN s.status = 'graded' THEN s.id END) as graded_count,
+        ROUND(AVG(COALESCE(s.manual_score, s.ai_score))::numeric, 2) as avg_score
+      FROM submission s
+      WHERE s.assignment_id = $1
+    `;
+
+    const statsResult = await pool.query(statsQuery, [assignmentIdNum]);
+    const statistics = statsResult.rows[0];
+
+    // Get all student submissions for this assignment
+    const submissionsQuery = `
+      SELECT
+        u.id as student_id,
+        u.name,
+        u.email,
+        s.id as submission_id,
+        s.status,
+        s.created_at as submission_date,
+        s.ai_score,
+        s.manual_score,
+        s.github_url,
+        COUNT(f.id) as feedback_count,
+        ROUND(AVG(
+          CASE 
+            WHEN f.severity = 'critical' THEN 4
+            WHEN f.severity = 'high' THEN 3
+            WHEN f.severity = 'medium' THEN 2
+            WHEN f.severity = 'low' THEN 1
+            ELSE 0
+          END
+        )::numeric, 2) as feedback_severity_avg
+      FROM enrollment e
+      JOIN "user" u ON e.user_id = u.id
+      LEFT JOIN LATERAL (
+        SELECT s.*
+        FROM submission s
+        WHERE s.assignment_id = $1 AND s.user_id = u.id
+        ORDER BY s.created_at DESC
+        LIMIT 1
+      ) s ON true
+      LEFT JOIN feedback f ON f.submission_id = s.id
+      WHERE e.course_id = $2
+      GROUP BY u.id, u.name, u.email, s.id, s.status, s.created_at, s.ai_score, s.manual_score, s.github_url
+      ORDER BY u.name ASC
+    `;
+
+    const submissionsResult = await pool.query(submissionsQuery, [assignmentIdNum, assignmentData.course_id]);
+
+    // Format response with camelCase
+    const response = {
+      assignment: {
+        id: assignmentData.id,
+        title: assignmentData.title,
+        description: assignmentData.description,
+        courseId: assignmentData.course_id,
+        dueDate: assignmentData.due_date,
+        rubric: assignmentData.rubric,
+        aiGuidelines: assignmentData.ai_guidelines,
+        createdAt: assignmentData.created_at,
+        updatedAt: assignmentData.updated_at
+      },
+      course: {
+        id: assignmentData.course_id,
+        title: assignmentData.course_title
+      },
+      statistics: {
+        totalSubmissions: parseInt(statistics.total_submissions) || 0,
+        studentsSubmitted: parseInt(statistics.students_submitted) || 0,
+        completedCount: parseInt(statistics.completed_count) || 0,
+        gradedCount: parseInt(statistics.graded_count) || 0,
+        avgScore: statistics.avg_score ? parseFloat(statistics.avg_score) : null
+      },
+      submissions: submissionsResult.rows.map(row => ({
+        studentId: row.student_id,
+        name: row.name,
+        email: row.email,
+        submissionId: row.submission_id,
+        status: row.status,
+        submissionDate: row.submission_date,
+        aiScore: row.ai_score,
+        manualScore: row.manual_score,
+        githubUrl: row.github_url,
+        feedbackCount: parseInt(row.feedback_count) || 0,
+        feedbackSeverityAvg: row.feedback_severity_avg ? parseFloat(row.feedback_severity_avg) : null
+      }))
+    };
+
+    console.log(`✅ Assignment detail fetched: ${assignmentIdNum} by user ${userId}`);
+    res.json(response);
+
+  } catch (error) {
+    console.error('❌ Error fetching assignment detail:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1448,6 +1607,7 @@ module.exports = {
   streamCourseStatistics,
   getDocentAssignments,
   getDocentCourseAssignments,
-  createAssignment
+  createAssignment,
+  getAssignmentDetail
 };
 
