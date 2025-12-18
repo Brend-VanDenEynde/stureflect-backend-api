@@ -8,6 +8,7 @@ const {
 	addStudentToCourse,
 	removeStudentFromCourse,
 	getDocentCourses,
+	createCourse,
 	streamCourseStatistics
 } = require('../controllers/docentController');
 
@@ -256,6 +257,8 @@ router.get('/courses/:courseId/student-status', getStudentStatusByCourse);
  *         description: Interne serverfout
  */
 router.get('/courses/:courseId/students/:studentId/status', getStudentStatusForStudent);
+
+router.post('/courses', createCourse);
 
 router.post('/courses/:courseId/students', addStudentToCourse);
 
