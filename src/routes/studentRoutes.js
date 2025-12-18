@@ -8,10 +8,8 @@ const { getFeedbackBySubmission } = require('../controllers/webhookController');
 const { getUserById } = require('../models/user');
 const sseManager = require('../services/sseManager');
 
-// Authenticatie alleen in productie
-if (process.env.NODE_ENV === 'production') {
-  router.use(authenticateToken);
-}
+// Authenticatie altijd actief (security fix: voorkom IDOR via query param)
+router.use(authenticateToken);
 
 /**
  * @swagger
@@ -22,18 +20,9 @@ if (process.env.NODE_ENV === 'production') {
  *     summary: Haal cursussen van ingelogde student op
  *     description: |
  *       Retourneert alle cursussen waar de ingelogde student voor is ingeschreven, inclusief het aantal opdrachten per cursus.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *     responses:
  *       200:
  *         description: Cursussen succesvol opgehaald
@@ -71,17 +60,13 @@ if (process.env.NODE_ENV === 'production') {
  */
 router.get('/me/courses', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -113,18 +98,9 @@ router.get('/me/courses', async (req, res) => {
  *     description: |
  *       Student kan zichzelf inschrijven voor een cursus door de join code in te voeren.
  *       De join code wordt verstrekt door de docent of admin.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *     requestBody:
  *       required: true
  *       content:
@@ -177,17 +153,13 @@ router.get('/me/courses', async (req, res) => {
  */
 router.post('/me/courses/join', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -247,18 +219,10 @@ router.post('/me/courses/join', async (req, res) => {
  *     summary: Haal alle submissions van student op
  *     description: |
  *       Haalt alle submissions op van de ingelogde student met optionele filters.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: query
  *         name: courseId
  *         schema:
@@ -280,17 +244,13 @@ router.post('/me/courses/join', async (req, res) => {
  */
 router.get('/me/submissions', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -328,18 +288,10 @@ router.get('/me/submissions', async (req, res) => {
  *     summary: Haal submission detail op
  *     description: |
  *       Haalt detail van een specifieke submission op inclusief feedback. Alleen toegankelijk voor de eigenaar.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: path
  *         name: submissionId
  *         required: true
@@ -370,17 +322,13 @@ router.get('/me/submissions', async (req, res) => {
  */
 router.get('/me/submissions/:submissionId', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -439,9 +387,7 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
  *     description: |
  *       Haalt alle feedback items op voor een specifieke submission.
  *       Kan gefilterd worden op reviewer type en severity level.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *
  *       **Severity levels:**
  *       - critical: Kritieke fouten (-20 punten)
@@ -451,12 +397,6 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: path
  *         name: submissionId
  *         required: true
@@ -523,17 +463,13 @@ router.get('/me/submissions/:submissionId', async (req, res) => {
  */
 router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -629,18 +565,10 @@ router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
  *     summary: Haal opdrachten van een cursus op
  *     description: |
  *       Haalt alle opdrachten op voor een specifieke cursus waar de student is ingeschreven.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: path
  *         name: courseId
  *         required: true
@@ -738,17 +666,13 @@ router.get('/me/submissions/:submissionId/feedback', async (req, res) => {
  */
 router.get('/me/courses/:courseId/assignments', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -817,17 +741,10 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
  *       - De analyse wordt automatisch getriggerd bij elke `git push` naar de repository
  *       - Bij elke push worden ALLE code bestanden geanalyseerd (niet alleen de diff)
  *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: path
  *         name: assignmentId
  *         required: true
@@ -948,17 +865,13 @@ router.get('/me/courses/:courseId/assignments', async (req, res) => {
  */
 router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -1165,18 +1078,10 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
  *       Haalt gedetailleerde informatie op over een specifieke opdracht,
  *       inclusief cursus informatie (met rubric en AI guidelines) en submission status.
  *       Alleen toegankelijk voor studenten die ingeschreven zijn voor de cursus.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: path
  *         name: assignmentId
  *         required: true
@@ -1279,17 +1184,13 @@ router.post('/me/assignments/:assignmentId/submissions', async (req, res) => {
  */
 router.get('/me/assignments/:assignmentId', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -1355,27 +1256,21 @@ router.get('/me/assignments/:assignmentId', async (req, res) => {
  *     description: |
  *       Server-Sent Events endpoint voor real-time notificaties wanneer nieuwe feedback beschikbaar is.
  *       De client ontvangt een `feedback_updated` event wanneer er nieuwe AI feedback is.
+ *       User ID wordt uit JWT token gehaald.
  *
  *       **Gebruik in frontend:**
  *       ```javascript
- *       const eventSource = new EventSource('/api/students/me/assignments/123/events?studentId=1');
+ *       const eventSource = new EventSource('/api/students/me/assignments/123/events', {
+ *         headers: { 'Authorization': 'Bearer <token>' }
+ *       });
  *       eventSource.addEventListener('feedback_updated', (e) => {
  *         // Re-fetch assignment data
  *         fetchAssignmentDetail(assignmentId);
  *       });
  *       ```
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: path
  *         name: assignmentId
  *         required: true
@@ -1400,19 +1295,15 @@ router.get('/me/assignments/:assignmentId', async (req, res) => {
  *         description: Server error
  */
 router.get('/me/assignments/:assignmentId/events', async (req, res) => {
-  console.log(`[SSE] 🔔 SSE endpoint hit: assignmentId=${req.params.assignmentId}, studentId=${req.query.studentId}`);
+  console.log(`[SSE] SSE endpoint hit: assignmentId=${req.params.assignmentId}, userId=${req.user?.id}`);
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -1486,18 +1377,10 @@ router.get('/me/assignments/:assignmentId/events', async (req, res) => {
  *       Wijzig de GitHub repository URL van een bestaande submission.
  *       De oude webhook wordt verwijderd en een nieuwe wordt geregistreerd.
  *       De status wordt gereset naar 'pending'.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: path
  *         name: submissionId
  *         required: true
@@ -1545,17 +1428,13 @@ router.get('/me/assignments/:assignmentId/events', async (req, res) => {
  */
 router.put('/me/submissions/:submissionId', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 
@@ -1754,18 +1633,10 @@ router.put('/me/submissions/:submissionId', async (req, res) => {
  *       De webhook wordt verwijderd van GitHub en de submission krijgt status 'unlinked'.
  *       Bestaande feedback blijft behouden voor history.
  *       Student kan later een nieuwe repository koppelen via PUT.
- *
- *       **Development mode:** Gebruik `studentId` query parameter.
- *       **Productie:** User ID wordt uit JWT token gehaald.
+ *       User ID wordt uit JWT token gehaald.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: studentId
- *         schema:
- *           type: integer
- *         description: Student ID (verplicht in development mode)
- *         example: 1
  *       - in: path
  *         name: submissionId
  *         required: true
@@ -1810,17 +1681,13 @@ router.put('/me/submissions/:submissionId', async (req, res) => {
  */
 router.delete('/me/submissions/:submissionId', async (req, res) => {
   try {
-    const studentId = req.user?.id ||
-      (process.env.NODE_ENV !== 'production' && req.query.studentId
-        ? parseInt(req.query.studentId, 10)
-        : null);
+    const studentId = req.user?.id;
 
-    if (!studentId || !Number.isInteger(studentId) || studentId <= 0) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      return res.status(isProduction ? 401 : 400).json({
+    if (!studentId) {
+      return res.status(401).json({
         success: false,
-        message: isProduction ? 'Authenticatie vereist' : 'studentId query parameter is verplicht en moet een geldig positief getal zijn',
-        error: isProduction ? 'UNAUTHORIZED' : 'BAD_REQUEST'
+        message: 'Authenticatie vereist',
+        error: 'UNAUTHORIZED'
       });
     }
 

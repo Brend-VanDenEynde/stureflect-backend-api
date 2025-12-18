@@ -4,6 +4,23 @@ const jwt = require('jsonwebtoken');
 function authenticateToken(req, res, next) {
   const token = req.headers['authorization']?.split(' ')[1];
 
+  // Development mode: fallback naar header of query param (alleen in dev!)
+  if (!token && process.env.NODE_ENV !== 'production') {
+    // Probeer eerst header, dan query param (backwards compatible)
+    const devUserId = req.headers['x-dev-user-id'] || req.query.studentId || req.query.userId;
+    if (devUserId) {
+      const userId = parseInt(devUserId, 10);
+      if (!isNaN(userId) && userId > 0) {
+        req.user = { id: userId, role: 'student', isDev: true };
+        return next();
+      }
+    }
+    return res.status(401).json({
+      error: 'Geen token verstrekt.',
+      hint: 'Development mode: gebruik X-Dev-User-Id header of ?studentId query param'
+    });
+  }
+
   if (!token) {
     return res.status(401).json({ error: 'Geen token verstrekt.' });
   }
