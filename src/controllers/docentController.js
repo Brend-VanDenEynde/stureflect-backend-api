@@ -1594,6 +1594,142 @@ const getAssignmentDetail = async (req, res) => {
   }
 };
 
+/**
+ * Update an existing assignment
+ * @route PUT /api/docent/assignments/:assignmentId
+ */
+const updateAssignment = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { title, description, dueDate, rubric, aiGuidelines } = req.body;
+
+    // Validate assignment ID
+    const assignmentIdNum = parseInt(assignmentId, 10);
+    if (isNaN(assignmentIdNum)) {
+      return res.status(400).json({ error: 'Invalid assignment ID: must be an integer' });
+    }
+
+    // Authorization check: verify user is teacher or admin
+    if (userRole !== 'teacher' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Only teachers and admins can update assignments' });
+    }
+
+    // Check if assignment exists and get course_id
+    const assignmentCheck = await pool.query(
+      'SELECT id, course_id FROM assignment WHERE id = $1',
+      [assignmentIdNum]
+    );
+
+    if (assignmentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const courseId = assignmentCheck.rows[0].course_id;
+
+    // Authorization check: verify user is a teacher of the assignment's course (admins bypass this)
+    if (userRole !== 'admin') {
+      const accessCheck = await pool.query(
+        'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+        [courseId, userId]
+      );
+
+      if (accessCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Forbidden: You are not a teacher of this course' });
+      }
+    }
+
+    // Build dynamic UPDATE query based on provided fields
+    const updateFields = [];
+    const queryParams = [];
+    let paramCounter = 1;
+
+    // Validate and add title if provided
+    if (title !== undefined) {
+      if (typeof title !== 'string' || title.trim().length === 0) {
+        return res.status(400).json({ error: 'Title cannot be empty' });
+      }
+      if (title.trim().length > 255) {
+        return res.status(400).json({ error: 'Title cannot exceed 255 characters' });
+      }
+      updateFields.push(`title = $${paramCounter}`);
+      queryParams.push(title.trim());
+      paramCounter++;
+    }
+
+    // Add description if provided (can be null)
+    if (description !== undefined) {
+      updateFields.push(`description = $${paramCounter}`);
+      queryParams.push(description || null);
+      paramCounter++;
+    }
+
+    // Validate and add due_date if provided
+    if (dueDate !== undefined) {
+      if (dueDate !== null) {
+        const parsedDate = new Date(dueDate);
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ error: 'Invalid dueDate format: must be a valid ISO8601 date' });
+        }
+      }
+      updateFields.push(`due_date = $${paramCounter}`);
+      queryParams.push(dueDate);
+      paramCounter++;
+    }
+
+    // Add rubric if provided (can be null)
+    if (rubric !== undefined) {
+      updateFields.push(`rubric = $${paramCounter}`);
+      queryParams.push(rubric || null);
+      paramCounter++;
+    }
+
+    // Add ai_guidelines if provided (can be null)
+    if (aiGuidelines !== undefined) {
+      updateFields.push(`ai_guidelines = $${paramCounter}`);
+      queryParams.push(aiGuidelines || null);
+      paramCounter++;
+    }
+
+    // If no fields to update, return error
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields provided to update' });
+    }
+
+    // Always update updated_at
+    updateFields.push(`updated_at = NOW()`);
+
+    // Add assignment ID as the final parameter
+    queryParams.push(assignmentIdNum);
+
+    // Execute UPDATE query
+    const updateQuery = `
+      UPDATE assignment
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramCounter}
+      RETURNING id, title, description, course_id as "courseId", due_date as "dueDate", rubric, ai_guidelines as "aiGuidelines", created_at as "createdAt", updated_at as "updatedAt"
+    `;
+
+    const result = await pool.query(updateQuery, queryParams);
+    const updatedAssignment = result.rows[0];
+
+    // Invalidate cache for this course
+    invalidateCourseCache(courseId);
+
+    console.log(`✅ Assignment updated: ${assignmentIdNum} by user ${userId}`);
+    res.json({ assignment: updatedAssignment });
+
+  } catch (error) {
+    console.error('❌ Error updating assignment:', error.message);
+
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1608,6 +1744,7 @@ module.exports = {
   getDocentAssignments,
   getDocentCourseAssignments,
   createAssignment,
-  getAssignmentDetail
+  getAssignmentDetail,
+  updateAssignment
 };
 
