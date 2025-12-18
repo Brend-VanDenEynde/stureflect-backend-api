@@ -1139,6 +1139,302 @@ const streamCourseStatistics = async (req, res) => {
   }
 };
 
+// Haal alle opdrachten van de docent op (over alle vakken)
+const getDocentAssignments = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      courseId,
+      sortBy = 'dueDate',
+      sortOrder = 'asc',
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    // Validate sortBy
+    const validSortFields = ['dueDate', 'title', 'createdAt', 'courseTitle'];
+    const sortFieldMap = {
+      dueDate: 'a.due_date',
+      title: 'a.title',
+      createdAt: 'a.created_at',
+      courseTitle: 'c.title'
+    };
+    const safeSortBy = validSortFields.includes(sortBy) ? sortFieldMap[sortBy] : 'a.due_date';
+    const safeOrder = sortOrder.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+    // Build WHERE conditions
+    let whereConditions = ['ct.user_id = $1'];
+    let queryParams = [userId];
+    let paramCounter = 2;
+
+    if (courseId) {
+      whereConditions.push(`a.course_id = $${paramCounter}`);
+      queryParams.push(courseId);
+      paramCounter++;
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Count query for pagination
+    const countResult = await pool.query(`
+      SELECT COUNT(DISTINCT a.id) as total
+      FROM assignment a
+      INNER JOIN course c ON c.id = a.course_id
+      INNER JOIN course_teacher ct ON ct.course_id = c.id
+      WHERE ${whereClause}
+    `, queryParams);
+
+    const totalItems = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(totalItems / limit);
+    const offset = (page - 1) * limit;
+
+    // Add pagination params
+    queryParams.push(limit, offset);
+
+    // Main query
+    const result = await pool.query(`
+      SELECT 
+        a.id,
+        a.title,
+        a.description,
+        a.course_id,
+        a.due_date,
+        a.rubric,
+        a.ai_guidelines,
+        a.created_at,
+        a.updated_at,
+        c.title as course_title
+      FROM assignment a
+      INNER JOIN course c ON c.id = a.course_id
+      INNER JOIN course_teacher ct ON ct.course_id = c.id
+      WHERE ${whereClause}
+      ORDER BY ${safeSortBy} ${safeOrder} NULLS LAST
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+    `, queryParams);
+
+    // Map to camelCase
+    const assignments = result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      courseId: row.course_id,
+      courseTitle: row.course_title,
+      dueDate: row.due_date,
+      rubric: row.rubric,
+      aiGuidelines: row.ai_guidelines,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    res.json({
+      assignments,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('[API] Error fetching docent assignments:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
+// Haal opdrachten van een specifiek vak op
+const getDocentCourseAssignments = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { courseId } = req.params;
+    const {
+      sortBy = 'dueDate',
+      sortOrder = 'asc'
+    } = req.query;
+
+    // Validate courseId
+    const courseIdNum = parseInt(courseId, 10);
+    if (isNaN(courseIdNum)) {
+      return res.status(400).json({ error: 'Invalid course ID' });
+    }
+
+    // Check if course exists
+    const courseCheck = await pool.query(
+      'SELECT id FROM course WHERE id = $1',
+      [courseIdNum]
+    );
+
+    if (courseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Authorization check: verify user is a teacher of this course
+    const accessCheck = await pool.query(
+      'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+      [courseIdNum, userId]
+    );
+
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to access this course'
+      });
+    }
+
+    // Build ORDER BY clause based on sortBy parameter
+    let orderByClause;
+    const validSortFields = {
+      'dueDate': 'a.due_date',
+      'title': 'a.title',
+      'createdAt': 'a.created_at',
+      'submissionCount': 'submission_count'
+    };
+
+    const sortField = validSortFields[sortBy] || 'a.due_date';
+    const order = sortOrder.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    
+    // For due_date and date fields, handle NULLs
+    if (sortField === 'a.due_date' || sortField === 'a.created_at') {
+      orderByClause = `${sortField} ${order} NULLS LAST`;
+    } else {
+      orderByClause = `${sortField} ${order}`;
+    }
+
+    // Fetch assignments with submission count
+    const result = await pool.query(
+      `SELECT 
+        a.id,
+        a.title,
+        a.description,
+        a.due_date,
+        a.rubric,
+        a.ai_guidelines,
+        a.created_at,
+        a.updated_at,
+        COUNT(DISTINCT s.id) as submission_count
+      FROM assignment a
+      LEFT JOIN submission s ON a.id = s.assignment_id
+      WHERE a.course_id = $1
+      GROUP BY a.id, a.title, a.description, a.due_date, a.rubric, a.ai_guidelines, a.created_at, a.updated_at
+      ORDER BY ${orderByClause}`,
+      [courseIdNum]
+    );
+
+    // Convert to camelCase
+    const assignments = result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      dueDate: row.due_date,
+      rubric: row.rubric,
+      aiGuidelines: row.ai_guidelines,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      submissionCount: parseInt(row.submission_count, 10)
+    }));
+
+    res.json({ assignments });
+  } catch (error) {
+    console.error('[API] Error fetching course assignments:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
+const createAssignment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { title, description, course_id, due_date, rubric, ai_guidelines } = req.body;
+
+    // Authorization check: verify user is teacher or admin
+    if (userRole !== 'teacher' && userRole !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Only teachers and admins can create assignments' });
+    }
+
+    // Validation: title required
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Title is required and cannot be empty' });
+    }
+
+    // Validation: title max length
+    if (title.trim().length > 255) {
+      return res.status(400).json({ error: 'Title cannot exceed 255 characters' });
+    }
+
+    // Validation: course_id required
+    if (!course_id) {
+      return res.status(400).json({ error: 'course_id is required' });
+    }
+
+    // Validation: course_id must be a valid integer
+    const courseIdNum = parseInt(course_id, 10);
+    if (isNaN(courseIdNum)) {
+      return res.status(400).json({ error: 'Invalid course_id: must be an integer' });
+    }
+
+    // Validation: due_date format (if provided)
+    let dueDateValue = null;
+    if (due_date) {
+      const parsedDate = new Date(due_date);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid due_date format: must be a valid ISO8601 date' });
+      }
+      dueDateValue = due_date;
+    }
+
+    // Check if course exists
+    const courseCheck = await pool.query(
+      'SELECT id FROM course WHERE id = $1',
+      [courseIdNum]
+    );
+
+    if (courseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Authorization check: verify user is a teacher of this course (admins bypass this)
+    if (userRole !== 'admin') {
+      const accessCheck = await pool.query(
+        'SELECT 1 FROM course_teacher WHERE course_id = $1 AND user_id = $2',
+        [courseIdNum, userId]
+      );
+
+      if (accessCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Forbidden: You are not a teacher of this course' });
+      }
+    }
+
+    // Insert assignment
+    const assignmentResult = await pool.query(
+      `INSERT INTO assignment (title, description, course_id, due_date, rubric, ai_guidelines, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+       RETURNING id, title, description, course_id as "courseId", due_date as "dueDate", rubric, ai_guidelines as "aiGuidelines", created_at as "createdAt", updated_at as "updatedAt"`,
+      [title.trim(), description || null, courseIdNum, dueDateValue, rubric || null, ai_guidelines || null]
+    );
+
+    const newAssignment = assignmentResult.rows[0];
+
+    // Invalidate cache for this course
+    invalidateCourseCache(courseIdNum);
+
+    console.log(`✅ Assignment created: ${newAssignment.id} for course ${courseIdNum} by user ${userId}`);
+    res.status(201).json({ assignment: newAssignment });
+
+  } catch (error) {
+    console.error('❌ Error creating assignment:', error.message);
+
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1149,6 +1445,9 @@ module.exports = {
   createCourse,
   updateCourse,
   deleteCourse,
-  streamCourseStatistics
+  streamCourseStatistics,
+  getDocentAssignments,
+  getDocentCourseAssignments,
+  createAssignment
 };
 

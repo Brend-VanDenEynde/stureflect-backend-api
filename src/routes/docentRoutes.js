@@ -11,7 +11,10 @@ const {
 	createCourse,
 	updateCourse,
 	deleteCourse,
-	streamCourseStatistics
+	streamCourseStatistics,
+	getDocentAssignments,
+	getDocentCourseAssignments,
+	createAssignment
 } = require('../controllers/docentController');
 
 /**
@@ -102,6 +105,147 @@ router.use(authenticateToken);
  *         description: Interne serverfout
  */
 router.get('/courses', getDocentCourses);
+
+/**
+ * @swagger
+ * /api/docent/assignments:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal alle opdrachten van de docent op
+ *     description: Haalt alle opdrachten op van alle vakken waar de docent les aan geeft, met optionele filtering en sortering
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: courseId
+ *         schema:
+ *           type: integer
+ *         description: Filter op specifiek vak (optioneel)
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [dueDate, title, createdAt, courseTitle]
+ *           default: dueDate
+ *         description: Sorteer veld
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: asc
+ *         description: Sorteer richting
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Paginanummer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: Aantal items per pagina
+ *     responses:
+ *       200:
+ *         description: Lijst met opdrachten en paginering metadata
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignments:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       courseId:
+ *                         type: integer
+ *                       courseTitle:
+ *                         type: string
+ *                       dueDate:
+ *                         type: string
+ *                         format: date-time
+ *                       rubric:
+ *                         type: string
+ *                       aiGuidelines:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     currentPage:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     totalItems:
+ *                       type: integer
+ *                     itemsPerPage:
+ *                       type: integer
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments', getDocentAssignments);
+
+/**
+ * @swagger
+ * /api/docent/courses/{courseId}/assignments:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal opdrachten van een specifiek vak op
+ *     description: Haalt alle opdrachten op van een specifiek vak waar de docent les aan geeft, inclusief het aantal inzendingen per opdracht
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van het vak
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [dueDate, title, createdAt, submissionCount]
+ *           default: dueDate
+ *         description: Sorteer opdrachten op dit veld
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: asc
+ *         description: Sorteervolgorde (oplopend of aflopend)
+ *     responses:
+ *       200:
+ *         description: Lijst met opdrachten
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toegang tot dit vak
+ *       404:
+ *         description: Vak niet gevonden
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/courses/:courseId/assignments', getDocentCourseAssignments);
 
 /**
  * @swagger
@@ -332,6 +476,104 @@ router.get('/courses/:courseId/students/:studentId/status', getStudentStatusForS
  *         description: Interne serverfout
  */
 router.post('/courses', createCourse);
+
+/**
+ * @swagger
+ * /api/docent/assignments:
+ *   post:
+ *     tags:
+ *       - Docenten
+ *     summary: Nieuwe opdracht aanmaken
+ *     description: Maakt een nieuwe opdracht aan voor een specifiek vak. Alleen docenten die les geven aan het vak kunnen opdrachten aanmaken.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - course_id
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 maxLength: 255
+ *                 description: Titel van de opdracht
+ *                 example: "Implementeer REST API"
+ *               description:
+ *                 type: string
+ *                 description: Gedetailleerde beschrijving van de opdracht (optioneel)
+ *                 example: "Bouw een RESTful API met Node.js en Express"
+ *               course_id:
+ *                 type: integer
+ *                 description: ID van het vak waarin de opdracht wordt aangemaakt
+ *                 example: 1
+ *               due_date:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Inleverdatum en tijd (optioneel, ISO8601 formaat)
+ *                 example: "2025-12-31T23:59:59Z"
+ *               rubric:
+ *                 type: string
+ *                 description: Beoordelingscriteria voor studenten (optioneel)
+ *                 example: "Functionaliteit (40%), Code kwaliteit (30%), Documentatie (30%)"
+ *               ai_guidelines:
+ *                 type: string
+ *                 description: Richtlijnen voor AI-feedback (optioneel)
+ *                 example: "Controleer op RESTful best practices en error handling"
+ *     responses:
+ *       201:
+ *         description: Opdracht succesvol aangemaakt
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     title:
+ *                       type: string
+ *                       example: "Implementeer REST API"
+ *                     description:
+ *                       type: string
+ *                       example: "Bouw een RESTful API met Node.js en Express"
+ *                     courseId:
+ *                       type: integer
+ *                       example: 1
+ *                     dueDate:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2025-12-31T23:59:59.000Z"
+ *                     rubric:
+ *                       type: string
+ *                       example: "Functionaliteit (40%), Code kwaliteit (30%), Documentatie (30%)"
+ *                     aiGuidelines:
+ *                       type: string
+ *                       example: "Controleer op RESTful best practices en error handling"
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Ongeldige invoer (titel ontbreekt, leeg, te lang, of course_id is ongeldig)
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toestemming (alleen docenten en admins die les geven aan het vak kunnen opdrachten aanmaken)
+ *       404:
+ *         description: Vak niet gevonden
+ *       500:
+ *         description: Interne serverfout
+ */
+router.post('/assignments', createAssignment);
 
 /**
  * @swagger
