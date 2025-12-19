@@ -18,7 +18,8 @@ const {
 	getAssignmentDetail,
 	updateAssignment,
 	deleteAssignment,
-	getAssignmentStatistics
+	getAssignmentStatistics,
+	getAssignmentSubmissions
 } = require('../controllers/docentController');
 
 /**
@@ -419,6 +420,138 @@ router.get('/assignments/:assignmentId', getAssignmentDetail);
  *         description: Interne serverfout
  */
 router.get('/assignments/:assignmentId/statistics', getAssignmentStatistics);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}/submissions:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal alle inzendingen voor een opdracht op
+ *     description: Haalt alle student inzendingen voor een specifieke opdracht op met klasbrede statistieken inclusief gemiddelde AI scores en hoogste/laagste scores
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: Opdracht inzendingen met statistieken
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     courseId:
+ *                       type: integer
+ *                     courseTitle:
+ *                       type: string
+ *                     dueDate:
+ *                       type: string
+ *                       format: date-time
+ *                 classStatistics:
+ *                   type: object
+ *                   properties:
+ *                     totalStudents:
+ *                       type: integer
+ *                       description: Totaal aantal studenten
+ *                     studentsSubmitted:
+ *                       type: integer
+ *                       description: Aantal studenten dat heeft ingediend
+ *                     totalSubmissions:
+ *                       type: integer
+ *                       description: Totaal aantal inzendingen
+ *                     submissionRate:
+ *                       type: number
+ *                       description: Percentage studenten dat heeft ingediend
+ *                     aiScores:
+ *                       type: object
+ *                       properties:
+ *                         average:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Gemiddelde AI score
+ *                         minimum:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Laagste AI score
+ *                         maximum:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Hoogste AI score
+ *                     finalScores:
+ *                       type: object
+ *                       properties:
+ *                         average:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Gemiddelde finale score
+ *                         minimum:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Laagste finale score
+ *                         maximum:
+ *                           type: number
+ *                           nullable: true
+ *                           description: Hoogste finale score
+ *                 students:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       studentId:
+ *                         type: integer
+ *                       studentName:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       githubId:
+ *                         type: string
+ *                       totalAttempts:
+ *                         type: integer
+ *                       averageScore:
+ *                         type: number
+ *                         nullable: true
+ *                       highestScore:
+ *                         type: number
+ *                         nullable: true
+ *                       lowestScore:
+ *                         type: number
+ *                         nullable: true
+ *                       averageAiScore:
+ *                         type: number
+ *                         nullable: true
+ *                       scoreImprovement:
+ *                         type: number
+ *                         nullable: true
+ *                       latestSubmission:
+ *                         type: object
+ *                         nullable: true
+ *                       attempts:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *       400:
+ *         description: Ongeldige opdracht ID
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       404:
+ *         description: Opdracht niet gevonden of geen toegang
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId/submissions', getAssignmentSubmissions);
 
 /**
  * @swagger
