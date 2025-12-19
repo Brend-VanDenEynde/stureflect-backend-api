@@ -1928,6 +1928,241 @@ const getAssignmentStatistics = async (req, res) => {
   }
 };
 
+/**
+ * Get all submissions for a specific assignment with class-wide statistics
+ * @route GET /api/docent/assignments/:assignmentId/submissions
+ */
+const getAssignmentSubmissions = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Validate assignment ID
+    const assignmentIdNum = parseInt(assignmentId, 10);
+    if (isNaN(assignmentIdNum)) {
+      return res.status(400).json({ error: 'Invalid assignment ID' });
+    }
+
+    // Generate cache key
+    const cacheKey = `assignment:${assignmentIdNum}:submissions`;
+    
+    // Try to get from cache
+    const cachedResult = getCachedData(cacheKey);
+    if (cachedResult) {
+      return res.json(cachedResult);
+    }
+
+    // Get assignment details with course info and verify authorization
+    const assignmentQuery = `
+      SELECT 
+        a.id,
+        a.title,
+        a.course_id,
+        a.due_date,
+        c.title as course_title,
+        CASE 
+          WHEN $3 = 'admin' THEN TRUE
+          WHEN ct.user_id IS NOT NULL THEN TRUE
+          ELSE FALSE
+        END as has_access
+      FROM assignment a
+      JOIN course c ON a.course_id = c.id
+      LEFT JOIN course_teacher ct ON ct.course_id = c.id AND ct.user_id = $2
+      WHERE a.id = $1
+    `;
+
+    const assignmentResult = await pool.query(assignmentQuery, [assignmentIdNum, userId, userRole]);
+
+    if (assignmentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const assignmentData = assignmentResult.rows[0];
+
+    // Check authorization
+    if (!assignmentData.has_access) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const courseId = assignmentData.course_id;
+
+    // Get all students with their submissions for this assignment
+    const submissionsQuery = `
+      WITH student_submissions AS (
+        SELECT
+          u.id as student_id,
+          u.name,
+          u.email,
+          u.github_id,
+          s.id as submission_id,
+          s.status,
+          s.created_at as submission_date,
+          s.ai_score,
+          s.manual_score,
+          s.github_url,
+          s.commit_sha,
+          COALESCE(s.manual_score, s.ai_score) as final_score,
+          COUNT(*) OVER (PARTITION BY u.id) as total_attempts,
+          ROW_NUMBER() OVER (PARTITION BY u.id ORDER BY s.created_at DESC) as attempt_rank
+        FROM enrollment e
+        JOIN "user" u ON e.user_id = u.id
+        LEFT JOIN submission s ON s.assignment_id = $1 AND s.user_id = u.id
+        WHERE e.course_id = $2
+      )
+      SELECT
+        student_id,
+        name,
+        email,
+        github_id,
+        submission_id,
+        status,
+        submission_date,
+        ai_score,
+        manual_score,
+        final_score,
+        github_url,
+        commit_sha,
+        total_attempts,
+        attempt_rank
+      FROM student_submissions
+      ORDER BY name ASC, submission_date DESC
+    `;
+
+    const submissionsResult = await pool.query(submissionsQuery, [assignmentIdNum, courseId]);
+
+    // Calculate class-wide statistics
+    const statsQuery = `
+      WITH submission_stats AS (
+        SELECT
+          COUNT(DISTINCT e.user_id) as total_students,
+          COUNT(DISTINCT s.user_id) as students_submitted,
+          COUNT(DISTINCT s.id) as total_submissions,
+          ROUND(AVG(s.ai_score)::numeric, 2) as avg_ai_score,
+          MIN(s.ai_score) as min_ai_score,
+          MAX(s.ai_score) as max_ai_score,
+          ROUND(AVG(COALESCE(s.manual_score, s.ai_score))::numeric, 2) as avg_final_score,
+          MIN(COALESCE(s.manual_score, s.ai_score)) as min_final_score,
+          MAX(COALESCE(s.manual_score, s.ai_score)) as max_final_score
+        FROM enrollment e
+        LEFT JOIN submission s ON s.assignment_id = $1 AND s.user_id = e.user_id
+        WHERE e.course_id = $2
+      )
+      SELECT * FROM submission_stats
+    `;
+
+    const statsResult = await pool.query(statsQuery, [assignmentIdNum, courseId]);
+    const stats = statsResult.rows[0];
+
+    // Group submissions by student
+    const studentsMap = new Map();
+    submissionsResult.rows.forEach(row => {
+      if (!studentsMap.has(row.student_id)) {
+        studentsMap.set(row.student_id, {
+          studentId: row.student_id,
+          studentName: row.name,
+          email: row.email,
+          githubId: row.github_id,
+          totalAttempts: row.submission_id ? parseInt(row.total_attempts) : 0,
+          latestSubmission: null,
+          attempts: []
+        });
+      }
+
+      const student = studentsMap.get(row.student_id);
+      
+      if (row.submission_id) {
+        const attempt = {
+          submissionId: row.submission_id,
+          status: row.status,
+          submissionDate: row.submission_date,
+          aiScore: row.ai_score,
+          manualScore: row.manual_score,
+          finalScore: row.final_score,
+          githubUrl: row.github_url,
+          commitSha: row.commit_sha
+        };
+
+        student.attempts.push(attempt);
+
+        // Set latest submission (first one due to ORDER BY)
+        if (row.attempt_rank === 1) {
+          student.latestSubmission = attempt;
+        }
+      }
+    });
+
+    // Calculate per-student statistics
+    const students = Array.from(studentsMap.values()).map(student => {
+      const scores = student.attempts
+        .map(a => a.finalScore)
+        .filter(s => s !== null);
+
+      const aiScores = student.attempts
+        .map(a => a.aiScore)
+        .filter(s => s !== null);
+
+      return {
+        ...student,
+        averageScore: scores.length > 0 
+          ? parseFloat((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2))
+          : null,
+        highestScore: scores.length > 0 ? Math.max(...scores) : null,
+        lowestScore: scores.length > 0 ? Math.min(...scores) : null,
+        averageAiScore: aiScores.length > 0
+          ? parseFloat((aiScores.reduce((a, b) => a + b, 0) / aiScores.length).toFixed(2))
+          : null,
+        scoreImprovement: scores.length >= 2
+          ? parseFloat((scores[0] - scores[scores.length - 1]).toFixed(2))
+          : null
+      };
+    });
+
+    // Format response
+    const responseData = {
+      assignment: {
+        id: assignmentData.id,
+        title: assignmentData.title,
+        courseId: assignmentData.course_id,
+        courseTitle: assignmentData.course_title,
+        dueDate: assignmentData.due_date
+      },
+      classStatistics: {
+        totalStudents: parseInt(stats.total_students) || 0,
+        studentsSubmitted: parseInt(stats.students_submitted) || 0,
+        totalSubmissions: parseInt(stats.total_submissions) || 0,
+        submissionRate: parseFloat(
+          (parseInt(stats.students_submitted) / parseInt(stats.total_students) * 100).toFixed(2)
+        ) || 0,
+        aiScores: {
+          average: stats.avg_ai_score ? parseFloat(stats.avg_ai_score) : null,
+          minimum: stats.min_ai_score || null,
+          maximum: stats.max_ai_score || null
+        },
+        finalScores: {
+          average: stats.avg_final_score ? parseFloat(stats.avg_final_score) : null,
+          minimum: stats.min_final_score || null,
+          maximum: stats.max_final_score || null
+        }
+      },
+      students
+    };
+
+    // Store in cache
+    setCachedData(cacheKey, responseData);
+
+    console.log(`✅ Assignment submissions fetched: ${assignmentIdNum} by user ${userId}`);
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('❌ Error fetching assignment submissions:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -1945,6 +2180,7 @@ module.exports = {
   getAssignmentDetail,
   updateAssignment,
   deleteAssignment,
-  getAssignmentStatistics
+  getAssignmentStatistics,
+  getAssignmentSubmissions
 };
 
