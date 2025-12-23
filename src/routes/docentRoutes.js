@@ -19,7 +19,8 @@ const {
 	updateAssignment,
 	deleteAssignment,
 	getAssignmentStatistics,
-	getAssignmentSubmissions
+	getAssignmentSubmissions,
+	getStudentSubmissionHistory
 } = require('../controllers/docentController');
 
 /**
@@ -1460,5 +1461,142 @@ router.post('/courses/:courseId/students', addStudentToCourse);
  *         description: Interne serverfout
  */
 router.delete('/courses/:courseId/students/:studentId', removeStudentFromCourse);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}/submissions/{studentId}:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Score verbetering over tijd voor specifieke student
+ *     description: Toont de progressie van een student over meerdere inzendingen, inclusief verbeteringsstatistieken en tijdlijn van alle pogingen.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de student
+ *     responses:
+ *       200:
+ *         description: Submission history succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     dueDate:
+ *                       type: string
+ *                       format: date-time
+ *                     courseId:
+ *                       type: integer
+ *                     courseTitle:
+ *                       type: string
+ *                 student:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     githubId:
+ *                       type: string
+ *                     enrolledAt:
+ *                       type: string
+ *                       format: date-time
+ *                 statistics:
+ *                   type: object
+ *                   properties:
+ *                     totalAttempts:
+ *                       type: integer
+ *                     hasSubmissions:
+ *                       type: boolean
+ *                     firstScore:
+ *                       type: number
+ *                       nullable: true
+ *                     latestScore:
+ *                       type: number
+ *                       nullable: true
+ *                     bestScore:
+ *                       type: number
+ *                       nullable: true
+ *                     worstScore:
+ *                       type: number
+ *                       nullable: true
+ *                     averageScore:
+ *                       type: number
+ *                       nullable: true
+ *                     improvement:
+ *                       type: number
+ *                       description: Percentage verbetering tussen eerste en laatste score
+ *                       nullable: true
+ *                     absoluteImprovement:
+ *                       type: number
+ *                       description: Absolute verbetering in punten
+ *                       nullable: true
+ *                     trend:
+ *                       type: string
+ *                       enum: [improving, declining, stable, single_attempt, no_scores, no_attempts]
+ *                 attempts:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       attemptNumber:
+ *                         type: integer
+ *                       submissionId:
+ *                         type: integer
+ *                       status:
+ *                         type: string
+ *                       aiScore:
+ *                         type: number
+ *                         nullable: true
+ *                       manualScore:
+ *                         type: number
+ *                         nullable: true
+ *                       finalScore:
+ *                         type: number
+ *                         nullable: true
+ *                       githubUrl:
+ *                         type: string
+ *                       commitSha:
+ *                         type: string
+ *                       submittedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *       400:
+ *         description: Ontbrekende of ongeldige parameters
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toestemming (gebruiker is geen docent van dit vak)
+ *       404:
+ *         description: Opdracht of student niet gevonden
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId/submissions/:studentId', authenticateToken, getStudentSubmissionHistory);
 
 module.exports = router;

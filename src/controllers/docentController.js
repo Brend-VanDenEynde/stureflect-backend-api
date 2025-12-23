@@ -2163,6 +2163,210 @@ const getAssignmentSubmissions = async (req, res) => {
   }
 };
 
+/**
+ * Get student submission history with score improvement over time
+ * Shows progression across multiple attempts
+ */
+const getStudentSubmissionHistory = async (req, res) => {
+  try {
+    const { assignmentId, studentId } = req.params;
+    const userId = req.user?.id;
+
+    if (!assignmentId || !studentId) {
+      return res.status(400).json({ error: 'assignmentId and studentId are required' });
+    }
+
+    const assignmentIdNum = parseInt(assignmentId, 10);
+    const studentIdNum = parseInt(studentId, 10);
+
+    if (isNaN(assignmentIdNum) || isNaN(studentIdNum)) {
+      return res.status(400).json({ error: 'Invalid assignmentId or studentId' });
+    }
+
+    // Check cache first
+    const cacheKey = `assignment:${assignmentIdNum}:student:${studentIdNum}:history`;
+    const cachedResult = getCachedData(cacheKey);
+    if (cachedResult) {
+      return res.json(cachedResult);
+    }
+
+    // Verify assignment exists and get course info
+    const assignmentQuery = `
+      SELECT a.id, a.title, a.description, a.due_date, a.course_id, c.title as course_title
+      FROM assignment a
+      JOIN course c ON a.course_id = c.id
+      WHERE a.id = $1
+    `;
+    const assignmentResult = await pool.query(assignmentQuery, [assignmentIdNum]);
+
+    if (assignmentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const assignment = assignmentResult.rows[0];
+    const courseId = assignment.course_id;
+
+    // Authorization: Verify user is a docent for this course
+    const authQuery = `
+      SELECT 1 FROM course_teacher
+      WHERE course_id = $1 AND user_id = $2
+    `;
+    const authResult = await pool.query(authQuery, [courseId, userId]);
+
+    if (authResult.rows.length === 0) {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'You are not authorized to view submissions for this course'
+      });
+    }
+
+    // Get student info and verify enrollment
+    const studentQuery = `
+      SELECT u.id, u.name, u.email, u.github_id, e.created_at as enrolled_at
+      FROM "user" u
+      JOIN enrollment e ON u.id = e.user_id
+      WHERE u.id = $1 AND e.course_id = $2
+    `;
+    const studentResult = await pool.query(studentQuery, [studentIdNum, courseId]);
+
+    if (studentResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Student not found or not enrolled in this course'
+      });
+    }
+
+    const student = studentResult.rows[0];
+
+    // Get all submissions for this student-assignment combination, ordered chronologically
+    const submissionsQuery = `
+      SELECT 
+        id,
+        github_url,
+        commit_sha,
+        status,
+        ai_score,
+        manual_score,
+        COALESCE(manual_score, ai_score) as final_score,
+        created_at,
+        updated_at
+      FROM submission
+      WHERE assignment_id = $1 AND user_id = $2
+      ORDER BY created_at ASC
+    `;
+    const submissionsResult = await pool.query(submissionsQuery, [assignmentIdNum, studentIdNum]);
+
+    const attempts = submissionsResult.rows.map((row, index) => ({
+      attemptNumber: index + 1,
+      submissionId: row.id,
+      status: row.status,
+      aiScore: row.ai_score,
+      manualScore: row.manual_score,
+      finalScore: row.final_score,
+      githubUrl: row.github_url,
+      commitSha: row.commit_sha,
+      submittedAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    // Calculate improvement statistics
+    const statistics = {
+      totalAttempts: attempts.length,
+      hasSubmissions: attempts.length > 0
+    };
+
+    if (attempts.length > 0) {
+      const scores = attempts
+        .map(a => a.finalScore)
+        .filter(s => s !== null && s !== undefined);
+
+      if (scores.length > 0) {
+        const firstScore = scores[0];
+        const latestScore = scores[scores.length - 1];
+        const bestScore = Math.max(...scores);
+        const worstScore = Math.min(...scores);
+        const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+
+        statistics.firstScore = firstScore;
+        statistics.latestScore = latestScore;
+        statistics.bestScore = bestScore;
+        statistics.worstScore = worstScore;
+        statistics.averageScore = Math.round(avgScore * 100) / 100;
+        
+        // Calculate improvement percentage
+        if (firstScore !== null && firstScore > 0) {
+          statistics.improvement = Math.round(((latestScore - firstScore) / firstScore) * 10000) / 100;
+          statistics.absoluteImprovement = latestScore - firstScore;
+        } else {
+          statistics.improvement = null;
+          statistics.absoluteImprovement = latestScore - firstScore;
+        }
+
+        // Determine trend
+        if (scores.length === 1) {
+          statistics.trend = 'single_attempt';
+        } else if (latestScore > firstScore) {
+          statistics.trend = 'improving';
+        } else if (latestScore < firstScore) {
+          statistics.trend = 'declining';
+        } else {
+          statistics.trend = 'stable';
+        }
+      } else {
+        statistics.firstScore = null;
+        statistics.latestScore = null;
+        statistics.bestScore = null;
+        statistics.worstScore = null;
+        statistics.averageScore = null;
+        statistics.improvement = null;
+        statistics.absoluteImprovement = null;
+        statistics.trend = 'no_scores';
+      }
+    } else {
+      statistics.firstScore = null;
+      statistics.latestScore = null;
+      statistics.bestScore = null;
+      statistics.worstScore = null;
+      statistics.averageScore = null;
+      statistics.improvement = null;
+      statistics.absoluteImprovement = null;
+      statistics.trend = 'no_attempts';
+    }
+
+    const responseData = {
+      assignment: {
+        id: assignment.id,
+        title: assignment.title,
+        description: assignment.description,
+        dueDate: assignment.due_date,
+        courseId: assignment.course_id,
+        courseTitle: assignment.course_title
+      },
+      student: {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        githubId: student.github_id,
+        enrolledAt: student.enrolled_at
+      },
+      statistics,
+      attempts
+    };
+
+    // Store in cache
+    setCachedData(cacheKey, responseData);
+
+    console.log(`✅ Student submission history fetched for student ${studentIdNum}, assignment ${assignmentIdNum}`);
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('❌ Error fetching student submission history:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -2181,6 +2385,7 @@ module.exports = {
   updateAssignment,
   deleteAssignment,
   getAssignmentStatistics,
-  getAssignmentSubmissions
+  getAssignmentSubmissions,
+  getStudentSubmissionHistory
 };
 
