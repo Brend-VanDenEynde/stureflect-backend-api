@@ -2564,6 +2564,124 @@ const getAssignmentAIFeedbackAnalytics = async (req, res) => {
   }
 };
 
+const getAtRiskStudents = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Validate assignment ID
+    const assignmentIdNum = parseInt(assignmentId, 10);
+    if (isNaN(assignmentIdNum)) {
+      return res.status(400).json({ error: 'Invalid assignment ID' });
+    }
+
+    // Generate cache key
+    const cacheKey = `assignment:${assignmentIdNum}:atrisk:students`;
+    
+    // Try to get from cache
+    const cachedResult = getCachedData(cacheKey);
+    if (cachedResult) {
+      return res.json(cachedResult);
+    }
+
+    // Get assignment details and verify authorization
+    const assignmentQuery = `
+      SELECT 
+        a.id,
+        a.title,
+        a.course_id,
+        c.title as course_title,
+        CASE 
+          WHEN $3 = 'admin' THEN TRUE
+          WHEN ct.user_id IS NOT NULL THEN TRUE
+          ELSE FALSE
+        END as has_access
+      FROM assignment a
+      JOIN course c ON a.course_id = c.id
+      LEFT JOIN course_teacher ct ON ct.course_id = c.id AND ct.user_id = $2
+      WHERE a.id = $1
+    `;
+
+    const assignmentResult = await pool.query(assignmentQuery, [assignmentIdNum, userId, userRole]);
+
+    if (assignmentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const assignmentData = assignmentResult.rows[0];
+
+    // Check authorization
+    if (!assignmentData.has_access) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    const courseId = assignmentData.course_id;
+
+    // Get students enrolled in the course who have no submissions for this assignment
+    const atRiskQuery = `
+      SELECT 
+        u.id as student_id,
+        u.name,
+        u.email,
+        u.github_id
+      FROM enrollment e
+      JOIN "user" u ON e.user_id = u.id
+      LEFT JOIN submission s ON s.assignment_id = $1 AND s.user_id = u.id
+      WHERE e.course_id = $2
+        AND s.id IS NULL
+      ORDER BY u.name ASC
+    `;
+
+    const atRiskResult = await pool.query(atRiskQuery, [assignmentIdNum, courseId]);
+
+    // Get total enrolled count
+    const enrolledCountQuery = `
+      SELECT COUNT(DISTINCT user_id) as total
+      FROM enrollment
+      WHERE course_id = $1
+    `;
+
+    const enrolledCountResult = await pool.query(enrolledCountQuery, [courseId]);
+    const totalEnrolled = parseInt(enrolledCountResult.rows[0].total) || 0;
+
+    // Format response
+    const atRiskStudents = atRiskResult.rows.map(student => ({
+      studentId: student.student_id,
+      name: student.name,
+      email: student.email,
+      githubId: student.github_id
+    }));
+
+    const responseData = {
+      assignment: {
+        id: assignmentData.id,
+        title: assignmentData.title,
+        courseId: assignmentData.course_id,
+        courseTitle: assignmentData.course_title
+      },
+      statistics: {
+        totalEnrolled,
+        studentsWithoutSubmission: atRiskStudents.length
+      },
+      atRiskStudents
+    };
+
+    // Store in cache (5 minutes)
+    setCachedData(cacheKey, responseData);
+
+    console.log(`✅ At-risk students fetched for assignment ${assignmentIdNum}: ${atRiskStudents.length} students`);
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('❌ Error fetching at-risk students:', error.message);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getEnrolledStudents,
   getStudentStatusByCourse,
@@ -2584,6 +2702,7 @@ module.exports = {
   getAssignmentStatistics,
   getAssignmentSubmissions,
   getStudentSubmissionHistory,
-  getAssignmentAIFeedbackAnalytics
+  getAssignmentAIFeedbackAnalytics,
+  getAtRiskStudents
 };
 

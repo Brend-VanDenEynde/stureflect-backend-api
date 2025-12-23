@@ -21,7 +21,8 @@ const {
 	getAssignmentStatistics,
 	getAssignmentSubmissions,
 	getStudentSubmissionHistory,
-	getAssignmentAIFeedbackAnalytics
+	getAssignmentAIFeedbackAnalytics,
+	getAtRiskStudents
 } = require('../controllers/docentController');
 
 /**
@@ -657,6 +658,71 @@ router.get('/assignments/:assignmentId/submissions', getAssignmentSubmissions);
  *         description: Interne serverfout
  */
 router.get('/assignments/:assignmentId/submissions/aifeedback', authenticateToken, getAssignmentAIFeedbackAnalytics);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}/submissions/atriskstudents:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal studenten zonder inzendingen op (at-risk)
+ *     description: Haalt alle studenten op die ingeschreven zijn voor de cursus maar nog geen enkele inzending hebben gedaan voor deze opdracht. Nuttig voor vroege interventie.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: Lijst met at-risk studenten succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     courseId:
+ *                       type: integer
+ *                     courseTitle:
+ *                       type: string
+ *                 statistics:
+ *                   type: object
+ *                   properties:
+ *                     totalEnrolled:
+ *                       type: integer
+ *                     studentsWithoutSubmission:
+ *                       type: integer
+ *                 atRiskStudents:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       studentId:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       githubId:
+ *                         type: string
+ *       400:
+ *         description: Ongeldige opdracht ID
+ *       404:
+ *         description: Opdracht niet gevonden of geen toegang
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId/submissions/atriskstudents', authenticateToken, getAtRiskStudents);
 
 /**
  * @swagger
