@@ -19,7 +19,10 @@ const {
 	updateAssignment,
 	deleteAssignment,
 	getAssignmentStatistics,
-	getAssignmentSubmissions
+	getAssignmentSubmissions,
+	getStudentSubmissionHistory,
+	getAssignmentAIFeedbackAnalytics,
+	getAtRiskStudents
 } = require('../controllers/docentController');
 
 /**
@@ -570,6 +573,174 @@ router.get('/assignments/:assignmentId/statistics', getAssignmentStatistics);
  *         description: Interne serverfout
  */
 router.get('/assignments/:assignmentId/submissions', getAssignmentSubmissions);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}/submissions/aifeedback:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal AI feedback analytics op voor een opdracht
+ *     description: Verkrijg geaggregeerde statistieken over AI-gegenereerde feedback voor alle inzendingen van een opdracht. Inclusief severity distributie, meest voorkomende feedback types, gemiddelde severity score, en studenten met de meeste critical feedback.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: AI feedback analytics succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     courseId:
+ *                       type: integer
+ *                     courseTitle:
+ *                       type: string
+ *                 analytics:
+ *                   type: object
+ *                   properties:
+ *                     totalFeedbackItems:
+ *                       type: integer
+ *                       description: Totaal aantal AI feedback items
+ *                     severityDistribution:
+ *                       type: object
+ *                       properties:
+ *                         low:
+ *                           type: integer
+ *                         medium:
+ *                           type: integer
+ *                         high:
+ *                           type: integer
+ *                         critical:
+ *                           type: integer
+ *                     avgSeverityScore:
+ *                       type: number
+ *                       nullable: true
+ *                       description: Gemiddelde severity score (1=low, 2=medium, 3=high, 4=critical)
+ *                     feedbackTypes:
+ *                       type: array
+ *                       description: Meest voorkomende feedback types/categorieën
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           type:
+ *                             type: string
+ *                             description: Type/categorie van de feedback
+ *                           count:
+ *                             type: integer
+ *                             description: Aantal feedback items van dit type
+ *                           avgSeverityScore:
+ *                             type: number
+ *                             description: Gemiddelde severity score voor dit type
+ *                     studentsWithCriticalFeedback:
+ *                       type: array
+ *                       description: Studenten met de meeste critical feedback
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           studentId:
+ *                             type: integer
+ *                           name:
+ *                             type: string
+ *                           email:
+ *                             type: string
+ *                           githubId:
+ *                             type: string
+ *                           criticalCount:
+ *                             type: integer
+ *                             description: Aantal critical feedback items
+ *                           submissionCount:
+ *                             type: integer
+ *                             description: Aantal inzendingen van deze student
+ *       400:
+ *         description: Ongeldige opdracht ID
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       404:
+ *         description: Opdracht niet gevonden of geen toegang
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId/submissions/aifeedback', authenticateToken, getAssignmentAIFeedbackAnalytics);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}/submissions/atriskstudents:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal studenten zonder inzendingen op (at-risk)
+ *     description: Haalt alle studenten op die ingeschreven zijn voor de cursus maar nog geen enkele inzending hebben gedaan voor deze opdracht. Nuttig voor vroege interventie.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: Lijst met at-risk studenten succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     courseId:
+ *                       type: integer
+ *                     courseTitle:
+ *                       type: string
+ *                 statistics:
+ *                   type: object
+ *                   properties:
+ *                     totalEnrolled:
+ *                       type: integer
+ *                     studentsWithoutSubmission:
+ *                       type: integer
+ *                 atRiskStudents:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       studentId:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       githubId:
+ *                         type: string
+ *       400:
+ *         description: Ongeldige opdracht ID
+ *       404:
+ *         description: Opdracht niet gevonden of geen toegang
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId/submissions/atriskstudents', authenticateToken, getAtRiskStudents);
 
 /**
  * @swagger
@@ -1621,5 +1792,142 @@ router.post('/courses/:courseId/students', addStudentToCourse);
  *         description: Interne serverfout
  */
 router.delete('/courses/:courseId/students/:studentId', removeStudentFromCourse);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}/submissions/{studentId}:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Score verbetering over tijd voor specifieke student
+ *     description: Toont de progressie van een student over meerdere inzendingen, inclusief verbeteringsstatistieken en tijdlijn van alle pogingen.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de student
+ *     responses:
+ *       200:
+ *         description: Submission history succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     dueDate:
+ *                       type: string
+ *                       format: date-time
+ *                     courseId:
+ *                       type: integer
+ *                     courseTitle:
+ *                       type: string
+ *                 student:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     githubId:
+ *                       type: string
+ *                     enrolledAt:
+ *                       type: string
+ *                       format: date-time
+ *                 statistics:
+ *                   type: object
+ *                   properties:
+ *                     totalAttempts:
+ *                       type: integer
+ *                     hasSubmissions:
+ *                       type: boolean
+ *                     firstScore:
+ *                       type: number
+ *                       nullable: true
+ *                     latestScore:
+ *                       type: number
+ *                       nullable: true
+ *                     bestScore:
+ *                       type: number
+ *                       nullable: true
+ *                     worstScore:
+ *                       type: number
+ *                       nullable: true
+ *                     averageScore:
+ *                       type: number
+ *                       nullable: true
+ *                     improvement:
+ *                       type: number
+ *                       description: Percentage verbetering tussen eerste en laatste score
+ *                       nullable: true
+ *                     absoluteImprovement:
+ *                       type: number
+ *                       description: Absolute verbetering in punten
+ *                       nullable: true
+ *                     trend:
+ *                       type: string
+ *                       enum: [improving, declining, stable, single_attempt, no_scores, no_attempts]
+ *                 attempts:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       attemptNumber:
+ *                         type: integer
+ *                       submissionId:
+ *                         type: integer
+ *                       status:
+ *                         type: string
+ *                       aiScore:
+ *                         type: number
+ *                         nullable: true
+ *                       manualScore:
+ *                         type: number
+ *                         nullable: true
+ *                       finalScore:
+ *                         type: number
+ *                         nullable: true
+ *                       githubUrl:
+ *                         type: string
+ *                       commitSha:
+ *                         type: string
+ *                       submittedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *       400:
+ *         description: Ontbrekende of ongeldige parameters
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       403:
+ *         description: Geen toestemming (gebruiker is geen docent van dit vak)
+ *       404:
+ *         description: Opdracht of student niet gevonden
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId/submissions/:studentId', authenticateToken, getStudentSubmissionHistory);
 
 module.exports = router;
