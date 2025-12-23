@@ -20,7 +20,8 @@ const {
 	deleteAssignment,
 	getAssignmentStatistics,
 	getAssignmentSubmissions,
-	getStudentSubmissionHistory
+	getStudentSubmissionHistory,
+	getAssignmentAIFeedbackAnalytics
 } = require('../controllers/docentController');
 
 /**
@@ -553,6 +554,109 @@ router.get('/assignments/:assignmentId/statistics', getAssignmentStatistics);
  *         description: Interne serverfout
  */
 router.get('/assignments/:assignmentId/submissions', getAssignmentSubmissions);
+
+/**
+ * @swagger
+ * /api/docent/assignments/{assignmentId}/submissions/aifeedback:
+ *   get:
+ *     tags:
+ *       - Docenten
+ *     summary: Haal AI feedback analytics op voor een opdracht
+ *     description: Verkrijg geaggregeerde statistieken over AI-gegenereerde feedback voor alle inzendingen van een opdracht. Inclusief severity distributie, meest voorkomende feedback types, gemiddelde severity score, en studenten met de meeste critical feedback.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: assignmentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID van de opdracht
+ *     responses:
+ *       200:
+ *         description: AI feedback analytics succesvol opgehaald
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 assignment:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     courseId:
+ *                       type: integer
+ *                     courseTitle:
+ *                       type: string
+ *                 analytics:
+ *                   type: object
+ *                   properties:
+ *                     totalFeedbackItems:
+ *                       type: integer
+ *                       description: Totaal aantal AI feedback items
+ *                     severityDistribution:
+ *                       type: object
+ *                       properties:
+ *                         low:
+ *                           type: integer
+ *                         medium:
+ *                           type: integer
+ *                         high:
+ *                           type: integer
+ *                         critical:
+ *                           type: integer
+ *                     avgSeverityScore:
+ *                       type: number
+ *                       nullable: true
+ *                       description: Gemiddelde severity score (1=low, 2=medium, 3=high, 4=critical)
+ *                     feedbackTypes:
+ *                       type: array
+ *                       description: Meest voorkomende feedback types/categorieën
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           type:
+ *                             type: string
+ *                             description: Type/categorie van de feedback
+ *                           count:
+ *                             type: integer
+ *                             description: Aantal feedback items van dit type
+ *                           avgSeverityScore:
+ *                             type: number
+ *                             description: Gemiddelde severity score voor dit type
+ *                     studentsWithCriticalFeedback:
+ *                       type: array
+ *                       description: Studenten met de meeste critical feedback
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           studentId:
+ *                             type: integer
+ *                           name:
+ *                             type: string
+ *                           email:
+ *                             type: string
+ *                           githubId:
+ *                             type: string
+ *                           criticalCount:
+ *                             type: integer
+ *                             description: Aantal critical feedback items
+ *                           submissionCount:
+ *                             type: integer
+ *                             description: Aantal inzendingen van deze student
+ *       400:
+ *         description: Ongeldige opdracht ID
+ *       401:
+ *         description: Niet geauthenticeerd
+ *       404:
+ *         description: Opdracht niet gevonden of geen toegang
+ *       500:
+ *         description: Interne serverfout
+ */
+router.get('/assignments/:assignmentId/submissions/aifeedback', authenticateToken, getAssignmentAIFeedbackAnalytics);
 
 /**
  * @swagger
